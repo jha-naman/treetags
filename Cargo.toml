@@ -1,0 +1,23 @@
+[package]
+name = "treetags"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.27", features = ["derive"] }
+tree-sitter-c = "0.23.4"
+tree-sitter-cpp = "0.23.4"
+tree-sitter-css = "0.23.2"
+tree-sitter-elixir = "0.3.3"
+tree-sitter-go = "0.23.4"
+tree-sitter-java = "0.23.5"
+tree-sitter-javascript = "0.23.1"
+tree-sitter-lua = "0.2.0"
+tree-sitter-ocaml = "0.24.0"
+tree-sitter-php = "0.23.11"
+tree-sitter-python = "0.23.6"
+tree-sitter-ruby = "0.23.1"
+tree-sitter-rust = "0.23.2"
+tree-sitter-tags = "0.24.7"
+tree-sitter-typescript = "0.23.2"
+walkdir = "2"
