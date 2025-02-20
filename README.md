@@ -1,6 +1,8 @@
 # TreeTags
 
-Generate vi compatible tags for multiple languages. Uses the tags queries defined
+Generate vi compatible tags for multiple languages.
+
+Uses the tags queries defined
 in the various official language parsers to detect tags.
 
 The goal is to have code navigation available in vim/nvim for multiple languages
