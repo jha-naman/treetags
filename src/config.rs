@@ -15,8 +15,8 @@ pub struct Config {
     pub append: bool,
     /// List of file names to be processed when `--append` option is passed
     pub file_names: Vec<String>,
-    /// Number of threads to use for parsing files
     #[arg(long, default_value = "4")]
+    /// Number of threads to use for parsing files
     pub workers: usize,
     /// Files/directories matching the pattern will not be used while generating tags
     #[arg(long)]

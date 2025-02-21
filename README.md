@@ -57,5 +57,5 @@ Options:
                            Will panic if the tag file doesn't already exist in current or one of the parent
                            directories.
       --workers <WORKERS>  Number of threads to use for parsing files [default: 4]
-  -h, --help               Print help
-```
+      --exclude <EXCLUDE>  Files/directories matching the pattern will not be used while generating tags
+  -h, --help               Print help```
