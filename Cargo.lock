@@ -422,6 +422,7 @@ name = "treetags"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "regex",
  "tree-sitter-c",
  "tree-sitter-cpp",
  "tree-sitter-css",

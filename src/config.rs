@@ -18,6 +18,9 @@ pub struct Config {
     /// Number of threads to use for parsing files
     #[arg(long, default_value = "4")]
     pub workers: usize,
+    /// Files/directories matching the pattern will not be used while generating tags
+    #[arg(long)]
+    pub exclude: Vec<String>,
 }
 
 impl Config {

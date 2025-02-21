@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.27", features = ["derive"] }
+regex = "1.11.1"
 tree-sitter-c = "0.23.4"
 tree-sitter-cpp = "0.23.4"
 tree-sitter-css = "0.23.2"

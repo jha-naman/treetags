@@ -1,3 +1,4 @@
+use regex::RegexSet;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -5,6 +6,8 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use treetags::{parse_tag_file, Config, Parser, Tag};
 use walkdir::WalkDir;
+
+mod shell_to_regex;
 
 fn main() {
     let config = Config::new();
@@ -33,6 +36,7 @@ fn main() {
             tag_file_path
                 .parent()
                 .expect("Failed to access tag file parent"),
+            &config.exclude,
         )
     };
 
@@ -100,10 +104,15 @@ fn find_tag_file(filename: &str) -> Option<String> {
     None
 }
 
-fn get_files_from_dir(dir_path: &Path) -> Vec<String> {
+fn get_files_from_dir(dir_path: &Path, exclude_patterns: &Vec<String>) -> Vec<String> {
     let mut file_names = Vec::new();
+    let exclude_patterns = exclude_patterns
+        .into_iter()
+        .map(|pattern| shell_to_regex::shell_to_regex(&pattern));
+    let exclude_patterns = RegexSet::new(exclude_patterns).unwrap();
+    let walker = WalkDir::new(dir_path).into_iter();
 
-    for entry in WalkDir::new(dir_path) {
+    for entry in walker.filter_entry(|e| !exclude_patterns.is_match(e.path().to_str().unwrap())) {
         if let Ok(entry) = entry {
             if !entry.file_type().is_file() {
                 continue;
