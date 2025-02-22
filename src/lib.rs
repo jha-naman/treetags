@@ -6,16 +6,4 @@ pub use tag::Tag;
 mod parser;
 pub use parser::Parser;
 
-pub mod c;
-pub mod cpp;
-pub mod elixir;
-pub mod go;
-pub mod java;
-pub mod js;
-pub mod lua;
-pub mod ocaml;
-pub mod php;
-pub mod python;
-pub mod ruby;
-pub mod rust;
-pub mod typescript;
+mod tags_config;

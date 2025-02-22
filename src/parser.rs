@@ -1,6 +1,6 @@
-use crate::{c, cpp, elixir, go, java, js, lua, ocaml, php, python, ruby, rust, tag, typescript};
+use crate::tag;
+use crate::tags_config::get_tags_config;
 use std::fs;
-use std::sync::{Arc, Mutex};
 use tree_sitter_tags::TagsConfiguration;
 use tree_sitter_tags::TagsContext;
 
@@ -24,32 +24,64 @@ pub struct Parser {
 impl Parser {
     pub fn new() -> Self {
         Self {
-            rust_config: rust::get_tags_config(),
-            go_config: go::get_tags_config(),
-            js_config: js::get_tags_config(),
-            ruby_config: ruby::get_tags_config(),
-            python_config: python::get_tags_config(),
-            c_config: c::get_tags_config(),
-            cpp_config: cpp::get_tags_config(),
-            java_config: java::get_tags_config(),
-            ocaml_config: ocaml::get_tags_config(),
-            php_config: php::get_tags_config(),
-            typescript_config: typescript::get_tags_config(),
-            elixir_config: elixir::get_tags_config(),
-            lua_config: lua::get_tags_config(),
+            rust_config: get_tags_config(
+                tree_sitter_rust::LANGUAGE.into(),
+                tree_sitter_rust::TAGS_QUERY,
+            ),
+            go_config: get_tags_config(tree_sitter_go::LANGUAGE.into(), tree_sitter_go::TAGS_QUERY),
+            js_config: get_tags_config(
+                tree_sitter_javascript::LANGUAGE.into(),
+                tree_sitter_javascript::TAGS_QUERY,
+            ),
+            ruby_config: get_tags_config(
+                tree_sitter_ruby::LANGUAGE.into(),
+                tree_sitter_ruby::TAGS_QUERY,
+            ),
+            python_config: get_tags_config(
+                tree_sitter_python::LANGUAGE.into(),
+                tree_sitter_python::TAGS_QUERY,
+            ),
+            c_config: get_tags_config(tree_sitter_c::LANGUAGE.into(), tree_sitter_c::TAGS_QUERY),
+            cpp_config: get_tags_config(
+                tree_sitter_cpp::LANGUAGE.into(),
+                tree_sitter_cpp::TAGS_QUERY,
+            ),
+            java_config: get_tags_config(
+                tree_sitter_java::LANGUAGE.into(),
+                tree_sitter_java::TAGS_QUERY,
+            ),
+            ocaml_config: get_tags_config(
+                tree_sitter_ocaml::LANGUAGE_OCAML.into(),
+                tree_sitter_ocaml::TAGS_QUERY,
+            ),
+            php_config: get_tags_config(
+                tree_sitter_php::LANGUAGE_PHP.into(),
+                tree_sitter_php::TAGS_QUERY,
+            ),
+            typescript_config: get_tags_config(
+                tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
+                tree_sitter_typescript::TAGS_QUERY,
+            ),
+            elixir_config: get_tags_config(
+                tree_sitter_elixir::LANGUAGE.into(),
+                tree_sitter_elixir::TAGS_QUERY,
+            ),
+            lua_config: get_tags_config(
+                tree_sitter_lua::LANGUAGE.into(),
+                tree_sitter_lua::TAGS_QUERY,
+            ),
             tags_context: TagsContext::new(),
         }
     }
 
     pub fn parse_file(
         &mut self,
-        tags_lock: &mut Arc<Mutex<Vec<tag::Tag>>>,
         file_path_relative_to_tag_file: &str,
         file_path: &str,
         extension: &str,
-    ) {
+    ) -> Vec<tag::Tag> {
         let code = fs::read(file_path).expect("expected to read file");
-        self.parse(&code, file_path_relative_to_tag_file, extension, tags_lock);
+        self.parse(&code, file_path_relative_to_tag_file, extension)
     }
 
     pub fn parse(
@@ -57,8 +89,7 @@ impl Parser {
         code: &Vec<u8>,
         file_path_relative_to_tag_file: &str,
         extension: &str,
-        tags_lock: &mut Arc<Mutex<Vec<tag::Tag>>>,
-    ) {
+    ) -> Vec<tag::Tag> {
         let config = match extension {
             "rs" => Some(&self.rust_config),
             "go" => Some(&self.go_config),
@@ -80,12 +111,12 @@ impl Parser {
             _ => None,
         };
 
+        let mut tags: Vec<tag::Tag> = Vec::new();
         if let None = config {
-            return;
+            return tags;
         }
 
         let tags_config = config.unwrap();
-        let mut tags: Vec<tag::Tag> = Vec::new();
 
         let result = self.tags_context.generate_tags(&tags_config, &code, None);
 
@@ -105,10 +136,9 @@ impl Parser {
                         }
                     }
                 }
-
-                let mut tags_guard = tags_lock.lock().unwrap();
-                tags_guard.append(&mut tags);
             }
         }
+
+        tags
     }
 }

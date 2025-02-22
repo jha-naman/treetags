@@ -143,12 +143,16 @@ fn worker(
 
         match file_path.extension() {
             Some(raw_extension) => match raw_extension.to_str() {
-                Some(extension) => parser.parse_file(
-                    tags_lock,
-                    &file_path_relative_to_tag_file,
-                    &file_path.to_string_lossy().into_owned(),
-                    extension,
-                ),
+                Some(extension) => {
+                    let mut tags = parser.parse_file(
+                        &file_path_relative_to_tag_file,
+                        &file_path.to_string_lossy().into_owned(),
+                        extension,
+                    );
+
+                    let mut tags_guard = tags_lock.lock().unwrap();
+                    tags_guard.append(&mut tags);
+                }
                 None => (),
             },
             None => (),
