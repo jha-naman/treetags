@@ -1,4 +1,5 @@
 use clap::Parser;
+use std::fs;
 use std::path::Path;
 
 #[derive(Parser)]
@@ -21,14 +22,39 @@ pub struct Config {
     /// Files/directories matching the pattern will not be used while generating tags
     #[arg(long)]
     pub exclude: Vec<String>,
+    /// Value passed in this arg is currently being ignored.
+    /// Kept for compatibility with `vim-gutentags` plugin.
+    #[arg(long = "options", default_value = "", verbatim_doc_comment)]
+    pub _options: String,
 }
 
 impl Config {
     pub fn new() -> Config {
-        let config = Self::parse();
+        let mut config = Self::parse();
         config.validate();
+        config.parse_file_args();
 
         config
+    }
+
+    fn parse_file_args(&mut self) {
+        for pattern in &self.exclude.clone() {
+            match pattern.strip_prefix("@") {
+                None => continue,
+                Some(file_name) => {
+                    let file = match fs::read_to_string(file_name) {
+                        Ok(contents) => contents,
+                        Err(_) => {
+                            eprintln!("Could not read file from exclude pattern: {}", pattern);
+                            std::process::exit(1);
+                        }
+                    };
+
+                    self.exclude
+                        .extend(file.lines().map(|line| line.to_string()));
+                }
+            }
+        }
     }
 
     fn validate(&self) {
@@ -41,6 +67,23 @@ impl Config {
                 tag_file.display()
             );
             std::process::exit(1);
+        }
+
+        self.validate_file_args();
+    }
+
+    fn validate_file_args(&self) {
+        for pattern in &self.exclude {
+            match pattern.strip_prefix("@") {
+                None => continue,
+                Some(file_name) => match fs::exists(file_name) {
+                    Ok(_) => {}
+                    Err(_) => {
+                        eprintln!("Could not read file from exclude pattern: {}", pattern);
+                        std::process::exit(1);
+                    }
+                },
+            }
         }
     }
 }
