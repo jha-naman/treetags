@@ -28,6 +28,12 @@ pub struct Config {
     pub _options: String,
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Config {
     pub fn new() -> Config {
         let mut config = Self::parse();
@@ -61,7 +67,7 @@ impl Config {
         let tag_file = Path::new(&self.tag_file);
         let mut path_components = tag_file.components();
         let _ = path_components.next();
-        if path_components.next() != None {
+        if path_components.next().is_some() {
             eprintln!(
                 "tagfile should only contain the tagfile name, not the path: {}",
                 tag_file.display()

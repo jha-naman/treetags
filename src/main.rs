@@ -104,22 +104,23 @@ fn find_tag_file(filename: &str) -> Option<String> {
     None
 }
 
-fn get_files_from_dir(dir_path: &Path, exclude_patterns: &Vec<String>) -> Vec<String> {
+fn get_files_from_dir(dir_path: &Path, exclude_patterns: &[String]) -> Vec<String> {
     let mut file_names = Vec::new();
     let exclude_patterns = exclude_patterns
-        .into_iter()
-        .map(|pattern| shell_to_regex::shell_to_regex(&pattern));
+        .iter()
+        .map(|pattern| shell_to_regex::shell_to_regex(pattern));
     let exclude_patterns = RegexSet::new(exclude_patterns).unwrap();
     let walker = WalkDir::new(dir_path).into_iter();
 
-    for entry in walker.filter_entry(|e| !exclude_patterns.is_match(e.path().to_str().unwrap())) {
-        if let Ok(entry) = entry {
-            if !entry.file_type().is_file() {
-                continue;
-            }
-
-            file_names.push(entry.path().to_str().unwrap().to_string());
+    for entry in walker
+        .filter_entry(|e| !exclude_patterns.is_match(e.path().to_str().unwrap()))
+        .flatten()
+    {
+        if !entry.file_type().is_file() {
+            continue;
         }
+
+        file_names.push(entry.path().to_str().unwrap().to_string());
     }
 
     file_names
@@ -141,21 +142,17 @@ fn worker(
             .to_string_lossy()
             .into_owned();
 
-        match file_path.extension() {
-            Some(raw_extension) => match raw_extension.to_str() {
-                Some(extension) => {
-                    let mut tags = parser.parse_file(
-                        &file_path_relative_to_tag_file,
-                        &file_path.to_string_lossy().into_owned(),
-                        extension,
-                    );
+        if let Some(raw_extension) = file_path.extension() {
+            if let Some(extension) = raw_extension.to_str() {
+                let mut tags = parser.parse_file(
+                    &file_path_relative_to_tag_file,
+                    &file_path.to_string_lossy(),
+                    extension,
+                );
 
-                    let mut tags_guard = tags_lock.lock().unwrap();
-                    tags_guard.append(&mut tags);
-                }
-                None => (),
-            },
-            None => (),
+                let mut tags_guard = tags_lock.lock().unwrap();
+                tags_guard.append(&mut tags);
+            }
         }
     }
 }

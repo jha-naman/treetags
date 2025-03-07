@@ -21,6 +21,12 @@ pub struct Parser {
     pub tags_context: TagsContext,
 }
 
+impl Default for Parser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Parser {
     pub fn new() -> Self {
         Self {
@@ -86,7 +92,7 @@ impl Parser {
 
     pub fn parse(
         &mut self,
-        code: &Vec<u8>,
+        code: &[u8],
         file_path_relative_to_tag_file: &str,
         extension: &str,
     ) -> Vec<tag::Tag> {
@@ -112,13 +118,13 @@ impl Parser {
         };
 
         let mut tags: Vec<tag::Tag> = Vec::new();
-        if let None = config {
+        if config.is_none() {
             return tags;
         }
 
         let tags_config = config.unwrap();
 
-        let result = self.tags_context.generate_tags(&tags_config, &code, None);
+        let result = self.tags_context.generate_tags(tags_config, code, None);
 
         match result {
             Err(err) => eprintln!("Error generating tags for file: {}", err),
@@ -132,7 +138,7 @@ impl Parser {
                                 continue;
                             }
 
-                            tags.push(tag::Tag::new(tag, &code, file_path_relative_to_tag_file));
+                            tags.push(tag::Tag::new(tag, code, file_path_relative_to_tag_file));
                         }
                     }
                 }

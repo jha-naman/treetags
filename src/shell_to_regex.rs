@@ -5,7 +5,7 @@ pub fn shell_to_regex(s: &str) -> String {
     while let Some(c) = chars.next() {
         match c {
             '*' => regex.push_str(".*"),  // '*' becomes '.*'
-            '?' => regex.push_str("."),   // '?' becomes '.'
+            '?' => regex.push('.'),       // '?' becomes '.'
             '.' => regex.push_str("\\."), // '.' becomes
             '[' => {
                 regex.push('['); // '[' stays as it is

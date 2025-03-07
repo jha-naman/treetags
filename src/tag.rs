@@ -10,7 +10,7 @@ pub struct Tag {
 }
 
 impl Tag {
-    pub fn new(tag: tree_sitter_tags::Tag, code: &Vec<u8>, file_path: &str) -> Self {
+    pub fn new(tag: tree_sitter_tags::Tag, code: &[u8], file_path: &str) -> Self {
         Tag {
             name: String::from_utf8(code[tag.name_range.start..tag.name_range.end].to_vec())
                 .expect("expected function name to be a valid utf8 string"),
@@ -37,18 +37,16 @@ pub fn parse_tag_file(tag_file_path: &Path) -> Vec<Tag> {
     let reader = BufReader::new(file);
     let mut tags = Vec::new();
 
-    for line in reader.lines() {
-        if let Ok(line) = line {
-            let mut parts = line.split('\t');
-            if let Some(name) = parts.next() {
-                if let Some(file_name) = parts.next() {
-                    if let Some(address) = parts.next() {
-                        tags.push(Tag {
-                            name: name.to_string(),
-                            file_name: file_name.to_string(),
-                            address: format!("{}\t", address.to_string()),
-                        });
-                    }
+    for line in reader.lines().map_while(Result::ok) {
+        let mut parts = line.split('\t');
+        if let Some(name) = parts.next() {
+            if let Some(file_name) = parts.next() {
+                if let Some(address) = parts.next() {
+                    tags.push(Tag {
+                        name: name.to_string(),
+                        file_name: file_name.to_string(),
+                        address: format!("{}\t", address),
+                    });
                 }
             }
         }
