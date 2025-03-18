@@ -1,33 +1,59 @@
+//! # Parser Module
+//!
+//! This module implements the core parsing functionality for generating Vi compatible tags
+//! across multiple programming languages using tree-sitter.
+//!
+//! The `Parser` struct maintains configuration for each supported language and provides
+//! methods to parse files and generate tags from source code.
+
 use crate::tag;
 use crate::tags_config::get_tags_config;
 use std::fs;
 use tree_sitter_tags::TagsConfiguration;
 use tree_sitter_tags::TagsContext;
 
+/// Parser manages the parsing configurations for all supported languages
+/// and provides methods to generate tags from source files.
 pub struct Parser {
+    /// Configuration for Rust language
     pub rust_config: TagsConfiguration,
+    /// Configuration for Go language
     pub go_config: TagsConfiguration,
+    /// Configuration for JavaScript language
     pub js_config: TagsConfiguration,
+    /// Configuration for Ruby language
     pub ruby_config: TagsConfiguration,
+    /// Configuration for Python language
     pub python_config: TagsConfiguration,
+    /// Configuration for C language
     pub c_config: TagsConfiguration,
+    /// Configuration for C++ language
     pub cpp_config: TagsConfiguration,
+    /// Configuration for Java language
     pub java_config: TagsConfiguration,
+    /// Configuration for OCaml language
     pub ocaml_config: TagsConfiguration,
+    /// Configuration for PHP language
     pub php_config: TagsConfiguration,
+    /// Configuration for TypeScript language
     pub typescript_config: TagsConfiguration,
+    /// Configuration for Elixir language
     pub elixir_config: TagsConfiguration,
+    /// Configuration for Lua language
     pub lua_config: TagsConfiguration,
+    /// Context for generating tags
     pub tags_context: TagsContext,
 }
 
 impl Default for Parser {
+    /// Creates a new Parser with default configurations
     fn default() -> Self {
         Self::new()
     }
 }
 
 impl Parser {
+    /// Creates a new Parser instance with configurations for all supported languages
     pub fn new() -> Self {
         Self {
             rust_config: get_tags_config(
@@ -80,6 +106,17 @@ impl Parser {
         }
     }
 
+    /// Parses a file from the filesystem and generates tags
+    ///
+    /// # Arguments
+    ///
+    /// * `file_path_relative_to_tag_file` - Path to the file relative to the tags file
+    /// * `file_path` - Absolute path to the file
+    /// * `extension` - File extension used to determine the language
+    ///
+    /// # Returns
+    ///
+    /// A vector of `Tag` objects generated from the file
     pub fn parse_file(
         &mut self,
         file_path_relative_to_tag_file: &str,
@@ -90,6 +127,17 @@ impl Parser {
         self.parse(&code, file_path_relative_to_tag_file, extension)
     }
 
+    /// Parses source code and generates tags
+    ///
+    /// # Arguments
+    ///
+    /// * `code` - Source code bytes
+    /// * `file_path_relative_to_tag_file` - Path to the file relative to the tags file
+    /// * `extension` - File extension used to determine the language
+    ///
+    /// # Returns
+    ///
+    /// A vector of `Tag` objects generated from the provided code
     pub fn parse(
         &mut self,
         code: &[u8],

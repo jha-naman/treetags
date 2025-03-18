@@ -23,3 +23,11 @@ tree-sitter-rust = "0.23.2"
 tree-sitter-tags = "0.24.7"
 tree-sitter-typescript = "0.23.2"
 walkdir = "2"
+
+[[bin]]
+name = "treetags"
+path = "src/main.rs"
+
+[lib]
+name = "treetags"
+path = "src/lib.rs"

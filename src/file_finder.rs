@@ -1,3 +1,9 @@
+//! Module for finding files and tag files in the filesystem.
+//!
+//! This module provides functionality to search for tag files,
+//! recursively scan directories for source files, and apply
+//! file exclusion patterns.
+
 use regex::RegexSet;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -6,12 +12,29 @@ use walkdir::WalkDir;
 
 use crate::shell_to_regex;
 
+/// A structure for finding and filtering files in a directory.
+///
+/// FileFinder recursively explores directories and filters files
+/// based on exclude patterns provided in the configuration.
 pub struct FileFinder {
+    /// The root directory path to search
     dir_path: PathBuf,
+
+    /// A set of regular expressions for file exclusion
     exclude_patterns: RegexSet,
 }
 
 impl FileFinder {
+    /// Creates a new FileFinder instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `tag_file_path` - Path to the tag file, used to determine the root directory
+    /// * `exclude_patterns` - Shell-style patterns for files to exclude
+    ///
+    /// # Returns
+    ///
+    /// A new FileFinder instance configured with the given parameters
     pub fn new(tag_file_path: &Path, exclude_patterns: Vec<String>) -> Self {
         let dir_path = tag_file_path
             .parent()
@@ -32,6 +55,11 @@ impl FileFinder {
         }
     }
 
+    /// Recursively finds all files in the directory that don't match exclude patterns.
+    ///
+    /// # Returns
+    ///
+    /// A vector of file paths as strings
     pub fn get_files_from_dir(&self) -> Vec<String> {
         let mut file_names = Vec::new();
         let walker = WalkDir::new(&self.dir_path).into_iter();
@@ -58,8 +86,14 @@ impl FileFinder {
 
 /// Determines the path to the tag file based on configuration.
 ///
-/// If `append` is true, it will search for an existing tag file.
-/// Otherwise, it will create a new path in the current directory.
+/// # Arguments
+///
+/// * `tag_file_name` - Name of the tag file
+/// * `append` - If true, search for an existing tag file; otherwise create a new path
+///
+/// # Returns
+///
+/// A Result containing either the tag file path or an error message
 pub fn determine_tag_file_path(tag_file_name: &str, append: bool) -> Result<String, String> {
     if append {
         find_tag_file(tag_file_name)
@@ -73,6 +107,15 @@ pub fn determine_tag_file_path(tag_file_name: &str, append: bool) -> Result<Stri
     }
 }
 
+/// Searches for a tag file in the current directory and its parents.
+///
+/// # Arguments
+///
+/// * `filename` - Name of the tag file to search for
+///
+/// # Returns
+///
+/// Option containing the path to the tag file if found, None otherwise
 pub fn find_tag_file(filename: &str) -> Option<String> {
     let mut current_dir = std::env::current_dir().ok()?;
 
@@ -92,6 +135,15 @@ pub fn find_tag_file(filename: &str) -> Option<String> {
     None
 }
 
+/// Parses an existing tag file and returns its tags.
+///
+/// # Arguments
+///
+/// * `path` - Path to the tag file
+///
+/// # Returns
+///
+/// A vector of parsed tags
 pub fn parse_tag_file(path: &str) -> Vec<Tag> {
     parse_tags(&PathBuf::from(path))
 }

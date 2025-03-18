@@ -58,4 +58,6 @@ Options:
                            directories.
       --workers <WORKERS>  Number of threads to use for parsing files [default: 4]
       --exclude <EXCLUDE>  Files/directories matching the pattern will not be used while generating tags
+      --options <OPTIONS>  Value passed in this arg is currently being ignored.
+                           Kept for compatibility with `vim-gutentags` plugin. [default: ]
   -h, --help               Print help```

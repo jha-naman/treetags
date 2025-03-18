@@ -1,7 +1,16 @@
+//! Configuration handling for the tag generator application.
+//!
+//! This module is responsible for parsing command line arguments
+//! and providing configuration options to the rest of the application.
+
 use clap::Parser;
 use std::fs;
 use std::path::Path;
 
+/// Configuration options for the tag generator.
+///
+/// Contains all settings that affect the behavior of the application,
+/// including file selection, threading, and output options.
 #[derive(Parser)]
 #[command(about = "Generate vi compatible tags for multiple languages", long_about = None)]
 pub struct Config {
@@ -35,6 +44,14 @@ impl Default for Config {
 }
 
 impl Config {
+    /// Creates a new configuration from command line arguments.
+    ///
+    /// Parses the command line arguments and sets up the configuration
+    /// with appropriate defaults for any options not explicitly provided.
+    ///
+    /// # Returns
+    ///
+    /// A new `Config` instance with parsed arguments and defaults.
     pub fn new() -> Config {
         let mut config = Self::parse();
         config.validate();

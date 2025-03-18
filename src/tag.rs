@@ -1,15 +1,44 @@
+//! # Tag Module
+//!
+//! This module defines the `Tag` struct which represents a Vi compatible tag
+//! and provides functionality for creating and manipulating tags.
+//!
+//! Tags are used by text editors like Vim to navigate to specific definitions
+//! across a codebase. This module handles the parsing and formatting of tags
+//! in a format compatible with Vi/Vim.
+
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
+/// Represents a Vi compatible tag
+///
+/// A tag consists of:
+/// - name: The identifier (e.g., function name, class name, etc.)
+/// - file_name: The file where the identifier is defined
+/// - address: A search pattern to locate the identifier in the file
 #[derive(Debug, Clone, PartialEq)]
 pub struct Tag {
+    /// The name of the tag (e.g., function name, class name)
     pub name: String,
+    /// The file where the tag is defined
     pub file_name: String,
+    /// The search pattern to locate the tag in the file
     pub address: String,
 }
 
 impl Tag {
+    /// Creates a new `Tag` from a tree-sitter tag and source code
+    ///
+    /// # Arguments
+    ///
+    /// * `tag` - The tree-sitter tag
+    /// * `code` - The source code bytes
+    /// * `file_path` - The file path to associate with the tag
+    ///
+    /// # Returns
+    ///
+    /// A new `Tag` instance
     pub fn new(tag: tree_sitter_tags::Tag, code: &[u8], file_path: &str) -> Self {
         Tag {
             name: String::from_utf8(code[tag.name_range.start..tag.name_range.end].to_vec())
@@ -27,11 +56,25 @@ impl Tag {
         }
     }
 
+    /// Converts the tag into a byte representation suitable for writing to a tags file
+    ///
+    /// # Returns
+    ///
+    /// A vector of bytes representing the tag in the format: `name\tfile_name\taddress\n`
     pub fn into_bytes(&self) -> Vec<u8> {
         format!("{}\t{}\t{}\n", self.name, self.file_name, self.address).into_bytes()
     }
 }
 
+/// Parses a tags file and returns a vector of `Tag` objects
+///
+/// # Arguments
+///
+/// * `tag_file_path` - Path to the tags file
+///
+/// # Returns
+///
+/// A vector of `Tag` objects parsed from the file
 pub fn parse_tag_file(tag_file_path: &Path) -> Vec<Tag> {
     let file = File::open(tag_file_path).expect("Failed to read the tags file");
     let reader = BufReader::new(file);

@@ -1,14 +1,38 @@
+// src/tag_processor.rs
+
+//! Module for processing source files and generating tags.
+//!
+//! This module handles the multithreaded processing of source files,
+//! extracting tag information and coordinating the results.
+
 use std::path::Path;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use treetags::{Parser, Tag};
 
+/// A structure for processing files and generating tags.
+///
+/// TagProcessor dispatches file processing tasks to multiple worker
+/// threads and collects the resulting tags.
 pub struct TagProcessor {
+    /// Path to the tag file, used for calculating relative paths
     tag_file_path: String,
+
+    /// Number of worker threads to use for processing
     workers: usize,
 }
 
 impl TagProcessor {
+    /// Creates a new TagProcessor instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `tag_file_path` - Path to the tag file
+    /// * `workers` - Number of worker threads to use
+    ///
+    /// # Returns
+    ///
+    /// A new TagProcessor instance
     pub fn new(tag_file_path: String, workers: usize) -> Self {
         Self {
             tag_file_path,
@@ -16,6 +40,18 @@ impl TagProcessor {
         }
     }
 
+    /// Processes a list of files and generates tags.
+    ///
+    /// This method distributes the work among multiple threads and
+    /// collects the results.
+    ///
+    /// # Arguments
+    ///
+    /// * `file_names` - List of file paths to process
+    ///
+    /// # Returns
+    ///
+    /// A vector of generated tags
     pub fn process_files(&self, file_names: Vec<String>) -> Vec<Tag> {
         let tags_lock = Arc::new(Mutex::new(Vec::new()));
         let mut threads = Vec::with_capacity(self.workers);
@@ -70,6 +106,16 @@ impl TagProcessor {
         result
     }
 
+    /// Worker function executed by each thread.
+    ///
+    /// Receives files to process, generates tags, and adds them to the
+    /// shared tag collection.
+    ///
+    /// # Arguments
+    ///
+    /// * `file_names_rx` - Channel receiver for file names
+    /// * `tags_lock` - Shared mutex for the tag collection
+    /// * `tag_file_path` - Path to the tag file for relative path calculations
     fn worker(
         file_names_rx: mpsc::Receiver<String>,
         tags_lock: Arc<Mutex<Vec<Tag>>>,
