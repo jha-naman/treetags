@@ -127,7 +127,7 @@ impl TagProcessor {
 
         // Process each file
         while let Ok(file_name) = file_names_rx.recv() {
-            let file_path = std::path::PathBuf::from(&file_name);
+            let file_path = std::env::current_dir().unwrap().join(&file_name);
 
             // Get relative path to tag file
             let file_path_relative = match file_path.strip_prefix(tag_file_dir) {
