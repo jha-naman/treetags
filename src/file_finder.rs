@@ -136,15 +136,19 @@ impl FileFinder {
 ///
 /// A Result containing either the tag file path or an error message
 pub fn determine_tag_file_path(tag_file_name: &str, append: bool) -> Result<String, String> {
-    if append {
-        find_tag_file(tag_file_name)
-            .ok_or_else(|| format!("Could not find the tag file: {}", tag_file_name))
-    } else {
-        Ok(std::env::current_dir()
-            .map_err(|e| format!("Failed to get current directory: {}", e))?
-            .join(tag_file_name)
-            .to_string_lossy()
-            .into_owned())
+    match find_tag_file(tag_file_name) {
+        Some(tag_file) => Ok(tag_file),
+        None => {
+            if append {
+                Err(format!("Could not find hte tag file: {}", tag_file_name))
+            } else {
+                Ok(std::env::current_dir()
+                    .map_err(|e| format!("Failed to get current directory: {}", e))?
+                    .join(tag_file_name)
+                    .to_string_lossy()
+                    .into_owned())
+            }
+        }
     }
 }
 
