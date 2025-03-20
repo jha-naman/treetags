@@ -25,12 +25,12 @@ Generate vi compatible tags for multiple languages
 Usage: treetags [OPTIONS] [FILE_NAMES]...
 
 Arguments:
-  [FILE_NAMES]...  List of file names to be processed when `--append` option is passed
+  [FILE_NAMES]...  List of file and directory names to be processed when `--append` option is passed
 
 Options:
   -f <TAG_FILE>            Name to be used for the tagfile, should not contain path separator [default: tags]
       --append             Append tags to existing tag file instead of reginerating the file from scratch.
-                           Need to pass in list of file names for which new tags are to be generated.
+                           Need to pass in list of file and/or directory names for which new tags are to be generated.
                            Will panic if the tag file doesn't already exist in current or one of the parent
                            directories.
       --workers <WORKERS>  Number of threads to use for parsing files [default: 4]
@@ -76,7 +76,8 @@ fn main() {
     // Get files to process
     let file_finder = FileFinder::new(Path::new(&tag_file_path), config.exclude.clone());
     let files = if !config.file_names.is_empty() {
-        config.file_names.clone()
+        // Process both files and directories from the command line arguments
+        file_finder.get_files_from_paths(&config.file_names)
     } else {
         file_finder.get_files_from_dir()
     };

@@ -61,8 +61,52 @@ impl FileFinder {
     ///
     /// A vector of file paths as strings
     pub fn get_files_from_dir(&self) -> Vec<String> {
+        self.scan_directory(&self.dir_path)
+    }
+
+    /// Processes a list of files and directories, expanding any directories
+    /// to include all files contained within them.
+    ///
+    /// # Arguments
+    ///
+    /// * `paths` - A list of file and directory paths to process
+    ///
+    /// # Returns
+    ///
+    /// A vector of file paths as strings
+    pub fn get_files_from_paths(&self, paths: &[String]) -> Vec<String> {
         let mut file_names = Vec::new();
-        let walker = WalkDir::new(&self.dir_path).into_iter();
+
+        for path_str in paths {
+            let path = Path::new(path_str);
+
+            if path.is_file() {
+                // If it's a file, add it directly
+                file_names.push(path_str.clone());
+            } else if path.is_dir() {
+                // If it's a directory, recursively find all files
+                file_names.extend(self.scan_directory(path));
+            } else {
+                // Path doesn't exist or is inaccessible, warn but continue
+                eprintln!("Warning: Path not found or inaccessible: {}", path_str);
+            }
+        }
+
+        file_names
+    }
+
+    /// Helper method to scan a directory for files, applying exclusion filters.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir_path` - The directory path to scan
+    ///
+    /// # Returns
+    ///
+    /// A vector of file paths as strings
+    fn scan_directory(&self, dir_path: &Path) -> Vec<String> {
+        let mut file_names = Vec::new();
+        let walker = WalkDir::new(dir_path).into_iter();
 
         for entry in walker
             .filter_entry(|e| {
@@ -70,11 +114,8 @@ impl FileFinder {
                 !self.exclude_patterns.is_match(path_str)
             })
             .filter_map(Result::ok)
+            .filter(|e| e.file_type().is_file())
         {
-            if !entry.file_type().is_file() {
-                continue;
-            }
-
             if let Some(path_str) = entry.path().to_str() {
                 file_names.push(path_str.to_string());
             }
