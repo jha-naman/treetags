@@ -33,6 +33,7 @@ with tags generated from the list of files passed via command line.
 - [x] Rust
 
 ## Installation
+Install Rust and C developmet toolchains to build `treetags`
 
 ```
 cargo build --release
