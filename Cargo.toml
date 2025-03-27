@@ -2,6 +2,11 @@
 name = "treetags"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "Generate vi compatible tags for multiple languages"
+repository = "https://github.com/jha-naman/treetags"
+readme = "README.md"
+categories = ["development-tools", "command-line-utilities"]
 
 [dependencies]
 clap = { version = "4.5.27", features = ["derive"] }
