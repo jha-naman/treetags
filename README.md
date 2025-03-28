@@ -31,6 +31,7 @@ with tags generated from the list of files passed via command line.
 - [x] Python
 - [x] Ruby
 - [x] Rust
+- [x] C#
 
 ## Installation
 Install Rust and C developmet toolchains to build `treetags`
