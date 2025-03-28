@@ -41,6 +41,27 @@ cargo build --release
 cp target/release/treetags /somewhere/in/the/PATH/
 ```
 
+## Recommended Usage
+
+While it is fine to manually invoke `treetags` to generate tags file for a project,
+the recommended way is to use the [gutentags](https://github.com/ludovicchabant/vim-gutentags)
+plugin to manage the tags file. There is a nice write-up on setting up gutentags
+[here](https://www.reddit.com/r/vim/comments/d77t6j/guide_how_to_setup_ctags_with_gutentags_properly/),
+which can be useful for setting things up.
+
+You will have to configure gutentags to use `treetags` as the tags generator at
+a minimum in your vim/nvim configuration file.
+
+```vimscript
+let g:gutentags_ctags_executable = 'treetags'
+```
+
+Or, if you are using lua for configuration
+
+```lua
+vim.g.gutentags_ctags_executable = 'treetags'
+```
+
 ## Usage
 
 ```
