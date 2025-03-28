@@ -2,6 +2,12 @@
 
 (class_declaration name: (identifier) @name) @definition.class
 
+(property_declaration name: (identifier) @name) @definition.class.property
+
+(constructor_declaration name: (identifier) @name) @definition.class.constructor
+
+(field_declaration (variable_declaration (variable_declarator name: (identifier) @name))) @definition.class.field
+
 (class_declaration (base_list (_) @name)) @reference.class
 
 (interface_declaration name: (identifier) @name) @definition.interface
@@ -23,8 +29,13 @@
 (invocation_expression function: (member_access_expression name: (identifier) @name)) @reference.send
 
 (namespace_declaration name: (identifier) @name) @definition.module
+(namespace_declaration (qualified_name) @name) @definition.module
 
 (record_declaration name: (identifier) @name) @definition.type
 
 (enum_declaration name: (identifier) @name) @definition.enum
 
+(enum_member_declaration name: (identifier) @name) @definition.enum.member
+
+(delegate_declaration name: (identifier) @name) @definition.delegate
+(event_field_declaration (variable_declaration (variable_declarator name: (identifier) @name))) @definition.event
