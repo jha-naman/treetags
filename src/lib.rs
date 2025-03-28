@@ -25,4 +25,5 @@ pub use tag::Tag;
 mod parser;
 pub use parser::Parser;
 
+mod queries;
 mod tags_config;

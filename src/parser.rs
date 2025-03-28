@@ -6,6 +6,7 @@
 //! The `Parser` struct maintains configuration for each supported language and provides
 //! methods to parse files and generate tags from source code.
 
+use crate::queries;
 use crate::tag;
 use crate::tags_config::get_tags_config;
 use std::fs;
@@ -41,6 +42,8 @@ pub struct Parser {
     pub elixir_config: TagsConfiguration,
     /// Configuration for Lua language
     pub lua_config: TagsConfiguration,
+    /// Configuration for C# language
+    pub csharp_config: TagsConfiguration,
     /// Context for generating tags
     pub tags_context: TagsContext,
 }
@@ -102,6 +105,10 @@ impl Parser {
                 tree_sitter_lua::LANGUAGE.into(),
                 tree_sitter_lua::TAGS_QUERY,
             ),
+            csharp_config: get_tags_config(
+                tree_sitter_c_sharp::LANGUAGE.into(),
+                queries::C_SHARP_TAGS_QUERY,
+            ),
             tags_context: TagsContext::new(),
         }
     }
@@ -162,6 +169,7 @@ impl Parser {
             "tsx" => Some(&self.typescript_config),
             "ex" => Some(&self.elixir_config),
             "lua" => Some(&self.lua_config),
+            "cs" => Some(&self.csharp_config),
             _ => None,
         };
 
