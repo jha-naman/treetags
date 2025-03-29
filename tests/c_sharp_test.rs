@@ -111,7 +111,9 @@ fn cs_test() {
         Tag {
             name: String::from("TestEvent"),
             file_name: String::from("main.cs"),
-            address: String::from("/^                public static event DelegateTest TestEvent;$/;\"\t"),
+            address: String::from(
+                "/^                public static event DelegateTest TestEvent;$/;\"\t",
+            ),
         },
         Tag {
             name: String::from("Tests.Qualified"),

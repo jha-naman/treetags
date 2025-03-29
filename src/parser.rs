@@ -44,6 +44,8 @@ pub struct Parser {
     pub lua_config: TagsConfiguration,
     /// Configuration for C# language
     pub csharp_config: TagsConfiguration,
+    /// Configuration for Bash language,
+    pub bash_config: TagsConfiguration,
     /// Context for generating tags
     pub tags_context: TagsContext,
 }
@@ -109,6 +111,10 @@ impl Parser {
                 tree_sitter_c_sharp::LANGUAGE.into(),
                 queries::C_SHARP_TAGS_QUERY,
             ),
+            bash_config: get_tags_config(
+                tree_sitter_bash::LANGUAGE.into(),
+                queries::BASH_TAGS_QUERY,
+            ),
             tags_context: TagsContext::new(),
         }
     }
@@ -170,6 +176,8 @@ impl Parser {
             "ex" => Some(&self.elixir_config),
             "lua" => Some(&self.lua_config),
             "cs" => Some(&self.csharp_config),
+            "sh" => Some(&self.bash_config),
+            "bash" => Some(&self.bash_config),
             _ => None,
         };
 
