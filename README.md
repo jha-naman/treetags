@@ -2,14 +2,14 @@
 
 Generate vi compatible tags for multiple languages.
 
-Uses the tags queries defined
-in the various official language parsers to detect tags.
+Uses the tags queries defined in the various official language parsers to detect tags.
 
 The goal is to have code navigation available in vim/nvim for multiple languages
 with minimum effort and have reasonable performance.
 [Extension Fields](https://docs.ctags.io/en/latest/man/ctags.1.html#extension-fields)
 support is missing by design to make it easier to support multiple languages and
-keep the program trivially easy to maintain.
+keep the program trivially easy to maintain. Refer to [this](https://github.com/jha-naman/treetags/issues/1)
+issue to see how tags compare to LSP.
 
 By default, it will generate a new tag file in the current directory and look
 for tags recursively in the current directory and its children.
