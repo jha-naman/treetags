@@ -18,7 +18,7 @@ fn ruby_test() {
         end
         "#;
 
-    let tags = parser.parse(
+    let tags = parser.generate_by_tag_query(
         &code.as_bytes().to_vec(),
         PathBuf::from("main.rb").to_str().unwrap(),
         "rb",
@@ -29,21 +29,29 @@ fn ruby_test() {
             name: String::from("Foo"),
             file_name: String::from("main.rb"),
             address: String::from("/^        class Foo$/;\"\t"),
+            extension_fields: None,
+            kind: None,
         },
         Tag {
             name: String::from("Bar"),
             file_name: String::from("main.rb"),
             address: String::from("/^        module Bar < Object$/;\"\t"),
+            extension_fields: None,
+            kind: None,
         },
         Tag {
             name: String::from("foo"),
             file_name: String::from("main.rb"),
             address: String::from("/^            def self.foo$/;\"\t"),
+            extension_fields: None,
+            kind: None,
         },
         Tag {
             name: String::from("baz"),
             file_name: String::from("main.rb"),
             address: String::from("/^            def baz$/;\"\t"),
+            extension_fields: None,
+            kind: None,
         },
     ];
 
