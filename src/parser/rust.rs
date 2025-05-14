@@ -137,7 +137,7 @@ impl Parser {
 }
 
 // Depth-First Tree Traversal with Scope Management
-fn walk<'a>(cursor: &mut TreeCursor<'a>, context: &mut Context<'a>) {
+fn walk(cursor: &mut TreeCursor, context: &mut Context) {
     loop {
         let node = cursor.node();
 
@@ -178,10 +178,9 @@ fn walk<'a>(cursor: &mut TreeCursor<'a>, context: &mut Context<'a>) {
 }
 
 // Dispatches node processing based on kind, returns scope info if node defines one
-fn process_node<'a>(
-    // Lifetime 'a needed for return type referencing context
-    cursor: &mut TreeCursor<'a>,
-    context: &mut Context<'a>,
+fn process_node(
+    cursor: &mut TreeCursor,
+    context: &mut Context,
 ) -> Option<(ScopeType, String)> {
     // Returns (ScopeType, Name) if scope changes
     let node = cursor.node();
@@ -270,9 +269,9 @@ fn create_tag(
 
 // --- Specific Node Processors (returning Scope Info) ---
 
-fn process_module<'a>(
-    cursor: &mut TreeCursor<'a>,
-    context: &mut Context<'a>,
+fn process_module(
+    cursor: &mut TreeCursor,
+    context: &mut Context,
 ) -> Option<(ScopeType, String)> {
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["identifier"]) {
@@ -283,9 +282,9 @@ fn process_module<'a>(
     }
 }
 
-fn process_struct<'a>(
-    cursor: &mut TreeCursor<'a>,
-    context: &mut Context<'a>,
+fn process_struct(
+    cursor: &mut TreeCursor,
+    context: &mut Context,
 ) -> Option<(ScopeType, String)> {
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["type_identifier"]) {
@@ -299,8 +298,8 @@ fn process_struct<'a>(
 }
 
 fn process_union<'a>(
-    cursor: &mut TreeCursor<'a>,
-    context: &mut Context<'a>,
+    cursor: &mut TreeCursor,
+    context: &mut Context,
 ) -> Option<(ScopeType, String)> {
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["type_identifier"]) {
@@ -311,9 +310,9 @@ fn process_union<'a>(
     }
 }
 
-fn process_enum<'a>(
-    cursor: &mut TreeCursor<'a>,
-    context: &mut Context<'a>,
+fn process_enum(
+    cursor: &mut TreeCursor,
+    context: &mut Context,
 ) -> Option<(ScopeType, String)> {
     let node = cursor.node();
     let enum_name = get_node_name(cursor, context, &["type_identifier"]);
@@ -332,9 +331,9 @@ fn process_enum<'a>(
     }
 }
 
-fn process_identifiers_list<'a>(
-    cursor: &mut TreeCursor<'a>,
-    context: &mut Context<'a>,
+fn process_identifiers_list(
+    cursor: &mut TreeCursor,
+    context: &mut Context,
     name: &str,
     tag_kind: &str,
 ) {
@@ -386,9 +385,9 @@ fn process_identifiers_list<'a>(
     }
 }
 
-fn process_trait<'a>(
-    cursor: &mut TreeCursor<'a>,
-    context: &mut Context<'a>,
+fn process_trait(
+    cursor: &mut TreeCursor,
+    context: &mut Context,
 ) -> Option<(ScopeType, String)> {
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["type_identifier"]) {
@@ -400,9 +399,9 @@ fn process_trait<'a>(
 }
 
 // Process 'impl_item' -> impl Foo { ... } or impl Bar for Foo { ... }
-fn process_impl<'a>(
-    cursor: &mut TreeCursor<'a>,
-    context: &mut Context<'a>,
+fn process_impl(
+    cursor: &mut TreeCursor,
+    context: &mut Context,
 ) -> Option<(ScopeType, String)> {
     let node = cursor.node();
     let (trait_name, type_name) = find_impl_names(cursor, context)?;
@@ -425,9 +424,9 @@ fn process_impl<'a>(
     Some((ScopeType::Implementation, tag_name))
 }
 
-fn find_impl_names<'a>(
-    cursor: &mut TreeCursor<'a>,
-    context: &Context<'a>,
+fn find_impl_names(
+    cursor: &mut TreeCursor,
+    context: &Context,
 ) -> Option<(Option<String>, Option<String>)> {
     let mut trait_name = None;
     let mut type_name = None;
@@ -467,9 +466,9 @@ fn find_impl_names<'a>(
     Some((trait_name, type_name))
 }
 // Processes 'function_item' and 'function_signature_item'
-fn process_function<'a>(
-    cursor: &mut TreeCursor<'a>,
-    context: &mut Context<'a>,
+fn process_function(
+    cursor: &mut TreeCursor,
+    context: &mut Context,
     kind_char: &str, // e.g., "f"
 ) {
     let node = cursor.node();
@@ -480,7 +479,7 @@ fn process_function<'a>(
 }
 
 // Processes 'associated_type' -> type Item;
-fn process_associated_type<'a>(cursor: &mut TreeCursor<'a>, context: &mut Context<'a>) {
+fn process_associated_type(cursor: &mut TreeCursor, context: &mut Context) {
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["type_identifier"]) {
         // Using 'T' like type alias, context provides trait scope
@@ -489,7 +488,7 @@ fn process_associated_type<'a>(cursor: &mut TreeCursor<'a>, context: &mut Contex
 }
 
 // Processes 'const_item'
-fn process_constant<'a>(cursor: &mut TreeCursor<'a>, context: &mut Context<'a>) {
+fn process_constant(cursor: &mut TreeCursor, context: &mut Context) {
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["identifier"]) {
         create_tag(name, "C", node, context, None); // 'c' for constant
@@ -497,7 +496,7 @@ fn process_constant<'a>(cursor: &mut TreeCursor<'a>, context: &mut Context<'a>) 
 }
 
 // Processes 'static_item'
-fn process_variable<'a>(cursor: &mut TreeCursor<'a>, context: &mut Context<'a>) {
+fn process_variable(cursor: &mut TreeCursor, context: &mut Context) {
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["identifier"]) {
         create_tag(name, "v", node, context, None); // 'v' for variable (ctags uses this for static)
@@ -505,7 +504,7 @@ fn process_variable<'a>(cursor: &mut TreeCursor<'a>, context: &mut Context<'a>) 
 }
 
 // Processes 'type_item' -> type MyType = ...;
-fn process_typedef<'a>(cursor: &mut TreeCursor<'a>, context: &mut Context<'a>) {
+fn process_typedef(cursor: &mut TreeCursor, context: &mut Context) {
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["type_identifier"]) {
         create_tag(name, "T", node, context, None); // 'T' for type alias
@@ -513,7 +512,7 @@ fn process_typedef<'a>(cursor: &mut TreeCursor<'a>, context: &mut Context<'a>) {
 }
 
 // Processes 'macro_definition' -> macro_rules! my_macro { ... }
-fn process_macro<'a>(cursor: &mut TreeCursor<'a>, context: &mut Context<'a>) {
+fn process_macro(cursor: &mut TreeCursor, context: &mut Context) {
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["identifier", "metavariable"]) {
         let clean_name = name.strip_suffix('!').unwrap_or(&name).to_string();
@@ -525,9 +524,9 @@ fn process_macro<'a>(cursor: &mut TreeCursor<'a>, context: &mut Context<'a>) {
 
 // Finds the first child node matching any of the specified kinds and returns its text content.
 // IMPORTANT: Temporarily modifies the cursor but restores it.
-fn get_node_name<'a>(
-    cursor: &mut TreeCursor<'a>, // Needs to be mutable to move
-    context: &Context<'a>,
+fn get_node_name(
+    cursor: &mut TreeCursor, // Needs to be mutable to move
+    context: &Context,
     kinds: &[&str],
 ) -> Option<String> {
     if !cursor.goto_first_child() {
