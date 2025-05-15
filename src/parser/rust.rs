@@ -178,10 +178,7 @@ fn walk(cursor: &mut TreeCursor, context: &mut Context) {
 }
 
 // Dispatches node processing based on kind, returns scope info if node defines one
-fn process_node(
-    cursor: &mut TreeCursor,
-    context: &mut Context,
-) -> Option<(ScopeType, String)> {
+fn process_node(cursor: &mut TreeCursor, context: &mut Context) -> Option<(ScopeType, String)> {
     // Returns (ScopeType, Name) if scope changes
     let node = cursor.node();
     // println!("Node: {} @ {:?} Scope: {:?}", node.kind(), String::from_utf8_lossy(&context.lines[node.start_position().row]), context.scope_stack); // Debug print
@@ -269,10 +266,7 @@ fn create_tag(
 
 // --- Specific Node Processors (returning Scope Info) ---
 
-fn process_module(
-    cursor: &mut TreeCursor,
-    context: &mut Context,
-) -> Option<(ScopeType, String)> {
+fn process_module(cursor: &mut TreeCursor, context: &mut Context) -> Option<(ScopeType, String)> {
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["identifier"]) {
         create_tag(name.clone(), "n", node, context, None); // 'n' for module
@@ -282,10 +276,7 @@ fn process_module(
     }
 }
 
-fn process_struct(
-    cursor: &mut TreeCursor,
-    context: &mut Context,
-) -> Option<(ScopeType, String)> {
+fn process_struct(cursor: &mut TreeCursor, context: &mut Context) -> Option<(ScopeType, String)> {
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["type_identifier"]) {
         create_tag(name.clone(), "s", node, context, None); // 's' for struct
@@ -310,10 +301,7 @@ fn process_union<'a>(
     }
 }
 
-fn process_enum(
-    cursor: &mut TreeCursor,
-    context: &mut Context,
-) -> Option<(ScopeType, String)> {
+fn process_enum(cursor: &mut TreeCursor, context: &mut Context) -> Option<(ScopeType, String)> {
     let node = cursor.node();
     let enum_name = get_node_name(cursor, context, &["type_identifier"]);
 
@@ -385,10 +373,7 @@ fn process_identifiers_list(
     }
 }
 
-fn process_trait(
-    cursor: &mut TreeCursor,
-    context: &mut Context,
-) -> Option<(ScopeType, String)> {
+fn process_trait(cursor: &mut TreeCursor, context: &mut Context) -> Option<(ScopeType, String)> {
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["type_identifier"]) {
         create_tag(name.clone(), "t", node, context, None); // 't' for trait
@@ -399,10 +384,7 @@ fn process_trait(
 }
 
 // Process 'impl_item' -> impl Foo { ... } or impl Bar for Foo { ... }
-fn process_impl(
-    cursor: &mut TreeCursor,
-    context: &mut Context,
-) -> Option<(ScopeType, String)> {
+fn process_impl(cursor: &mut TreeCursor, context: &mut Context) -> Option<(ScopeType, String)> {
     let node = cursor.node();
     let (trait_name, type_name) = find_impl_names(cursor, context)?;
 
