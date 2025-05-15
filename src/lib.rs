@@ -26,4 +26,5 @@ mod parser;
 pub use parser::Parser;
 
 mod queries;
+mod split_by_newlines;
 mod tags_config;

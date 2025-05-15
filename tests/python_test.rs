@@ -19,7 +19,7 @@ fn python_test() {
             x + y
         "#;
 
-    let tags = parser.parse(
+    let tags = parser.generate_by_tag_query(
         &code.as_bytes().to_vec(),
         PathBuf::from("main.py").to_str().unwrap(),
         "py",
@@ -30,26 +30,36 @@ fn python_test() {
             name: String::from("Foo"),
             file_name: String::from("main.py"),
             address: String::from("/^        class Foo:$/;\"\t"),
+            extension_fields: None,
+            kind: None,
         },
         Tag {
             name: String::from("__init__"),
             file_name: String::from("main.py"),
             address: String::from("/^            def __init__(self, bar):$/;\"\t"),
+            extension_fields: None,
+            kind: None,
         },
         Tag {
             name: String::from("bar"),
             file_name: String::from("main.py"),
             address: String::from("/^            def bar(self):$/;\"\t"),
+            extension_fields: None,
+            kind: None,
         },
         Tag {
             name: String::from("variable"),
             file_name: String::from("main.py"),
             address: String::from("/^        variable = [1, 2]$/;\"\t"),
+            extension_fields: None,
+            kind: None,
         },
         Tag {
             name: String::from("func"),
             file_name: String::from("main.py"),
             address: String::from("/^        def func(x, y):$/;\"\t"),
+            extension_fields: None,
+            kind: None,
         },
     ];
 
