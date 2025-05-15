@@ -414,32 +414,34 @@ fn find_impl_names(
     let mut type_name = None;
     let mut found_for = false;
 
-    if cursor.goto_first_child() {
-        loop {
-            let child_node = cursor.node();
-            match child_node.kind() {
-                "type_identifier" | "scoped_type_identifier" | "generic_type" => {
-                    let name = context.node_text(&child_node).to_string();
-                    if found_for {
-                        if type_name.is_none() {
-                            type_name = Some(name);
-                        }
-                    } else if trait_name.is_none() {
-                        trait_name = Some(name);
-                    } else if type_name.is_none() {
+    if !cursor.goto_first_child() {
+        return Some((trait_name, type_name));
+    }
+
+    loop {
+        let child_node = cursor.node();
+        match child_node.kind() {
+            "type_identifier" | "scoped_type_identifier" | "generic_type" => {
+                let name = context.node_text(&child_node).to_string();
+                if found_for {
+                    if type_name.is_none() {
                         type_name = Some(name);
                     }
+                } else if trait_name.is_none() {
+                    trait_name = Some(name);
+                } else if type_name.is_none() {
+                    type_name = Some(name);
                 }
-                "for" => found_for = true,
-                "declaration_list" | "{" => break,
-                _ => {}
             }
-            if !cursor.goto_next_sibling() {
-                break;
-            }
+            "for" => found_for = true,
+            "declaration_list" | "{" => break,
+            _ => {}
         }
-        cursor.goto_parent();
+        if !cursor.goto_next_sibling() {
+            break;
+        }
     }
+    cursor.goto_parent();
 
     if !found_for {
         type_name = trait_name.take();
