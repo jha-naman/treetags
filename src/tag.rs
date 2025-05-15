@@ -95,7 +95,7 @@ impl Tag {
             for (key, value) in fields.iter().filter(|(k, _)| *k != "module") {
                 // For other fields, prepend module value if it exists
                 let formatted_value = if let Some(module) = module_value {
-                    format!("{}.{}", module, value)
+                    format!("{}::{}", module, value)
                 } else {
                     value.clone()
                 };
@@ -347,7 +347,7 @@ mod tests {
 
         // Module should be prepended to the implementation value and module key should not appear
         let expected =
-            "draw\tshapes.rs\t/^fn draw(&self) {$/\tmethod\timplementation:example.Circle\n";
+            "draw\tshapes.rs\t/^fn draw(&self) {$/\tmethod\timplementation:example::Circle\n";
         assert_eq!(String::from_utf8(tag.into_bytes()).unwrap(), expected);
     }
 
@@ -367,7 +367,7 @@ mod tests {
 
         // Module should be prepended to the trait value and module key should not appear
         let expected =
-            "area\ttraits.rs\t/^fn area(&self) -> f64 {$/\tmethod\ttrait:example.Shape\n";
+            "area\ttraits.rs\t/^fn area(&self) -> f64 {$/\tmethod\ttrait:example::Shape\n";
         assert_eq!(String::from_utf8(tag.into_bytes()).unwrap(), expected);
     }
 
@@ -393,8 +393,8 @@ mod tests {
         // Since HashMap iteration order is not guaranteed, check for individual components
         assert!(output
             .starts_with("calculate\tgeometry.rs\t/^fn calculate(&self) -> f64 {$/\tmethod\t"));
-        assert!(output.contains("trait:geometry.Shape"));
-        assert!(output.contains("implementation:geometry.Circle"));
+        assert!(output.contains("trait:geometry::Shape"));
+        assert!(output.contains("implementation:geometry::Circle"));
         assert!(!output.contains("module:geometry"));
         assert!(output.ends_with("\n"));
     }

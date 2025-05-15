@@ -57,7 +57,7 @@ impl<'a> Context<'a> {
                     fields.insert(String::from("union"), name.clone());
                 }
                 ScopeType::Trait => {
-                    fields.insert(String::from("trait"), name.clone());
+                    fields.insert(String::from("interface"), name.clone());
                 }
                 ScopeType::Implementation => {
                     // For impls, store the type being implemented.
@@ -305,8 +305,8 @@ fn process_enum(cursor: &mut TreeCursor, context: &mut Context) -> Option<(Scope
     match &enum_name {
         None => None,
         Some(name) => {
-            create_tag(name.clone(), "e", node, context, None); // 'e' for enum
-            process_identifiers_list(cursor, context, name, "g");
+            create_tag(name.clone(), "g", node, context, None); // 'g' for enum
+            process_identifiers_list(cursor, context, name, "e");
 
             cursor.goto_parent(); // Back to enum_item node
                                   // --- End Process Enum Variants ---
@@ -326,7 +326,7 @@ fn process_identifiers_list(
         return;
     }
 
-    let variant_type = if tag_kind == "g" { "enum" } else { "struct" };
+    let variant_type = if tag_kind == "e" { "enum" } else { "struct" };
 
     // --- Process Enum Variants ---
     loop {
@@ -373,7 +373,7 @@ fn process_identifiers_list(
 fn process_trait(cursor: &mut TreeCursor, context: &mut Context) -> Option<(ScopeType, String)> {
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["type_identifier"]) {
-        create_tag(name.clone(), "t", node, context, None); // 't' for trait
+        create_tag(name.clone(), "i", node, context, None); // 'i' for trait
         Some((ScopeType::Trait, name))
     } else {
         None
@@ -488,7 +488,7 @@ fn process_variable(cursor: &mut TreeCursor, context: &mut Context) {
 fn process_typedef(cursor: &mut TreeCursor, context: &mut Context) {
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["type_identifier"]) {
-        create_tag(name, "T", node, context, None); // 'T' for type alias
+        create_tag(name, "t", node, context, None); // 'T' for type alias
     }
 }
 
@@ -497,7 +497,7 @@ fn process_macro(cursor: &mut TreeCursor, context: &mut Context) {
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["identifier", "metavariable"]) {
         let clean_name = name.strip_suffix('!').unwrap_or(&name).to_string();
-        create_tag(clean_name, "d", node, context, None); // 'd' for macro definition
+        create_tag(clean_name, "M", node, context, None); // 'M' for macro definition
     }
 }
 
