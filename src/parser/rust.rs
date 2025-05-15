@@ -288,7 +288,7 @@ fn process_struct(cursor: &mut TreeCursor, context: &mut Context) -> Option<(Sco
     }
 }
 
-fn process_union<'a>(
+fn process_union(
     cursor: &mut TreeCursor,
     context: &mut Context,
 ) -> Option<(ScopeType, String)> {
