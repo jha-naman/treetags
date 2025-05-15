@@ -288,10 +288,7 @@ fn process_struct(cursor: &mut TreeCursor, context: &mut Context) -> Option<(Sco
     }
 }
 
-fn process_union(
-    cursor: &mut TreeCursor,
-    context: &mut Context,
-) -> Option<(ScopeType, String)> {
+fn process_union(cursor: &mut TreeCursor, context: &mut Context) -> Option<(ScopeType, String)> {
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["type_identifier"]) {
         create_tag(name.clone(), "u", node, context, None); // 'u' for union
