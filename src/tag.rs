@@ -118,6 +118,7 @@ impl Tag {
 ///
 /// A vector of `Tag` objects parsed from the file
 pub fn parse_tag_file(tag_file_path: &Path) -> Vec<Tag> {
+    dbg!(tag_file_path);
     let file = File::open(tag_file_path).expect("Failed to read the tags file");
     let reader = BufReader::new(file);
     let mut tags = Vec::new();

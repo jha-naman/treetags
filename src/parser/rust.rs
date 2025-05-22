@@ -193,13 +193,25 @@ fn process_node(cursor: &mut TreeCursor, context: &mut Context) -> Option<(Scope
 
         // Items often found inside traits or impls
         "function_item" => {
-            // Standalone functions or methods in impls
-            process_function(cursor, context, "P"); // 'f' for function/method
+            // Determine if it's a method or a standalone function based on scope
+            let kind_char = if let Some((top_scope, _)) = context.scope_stack.last() {
+                match top_scope {
+                    ScopeType::Implementation
+                    | ScopeType::Struct
+                    | ScopeType::Enum
+                    | ScopeType::Union
+                    | ScopeType::Trait => "P", // Method or default trait method
+                    ScopeType::Module => "f", // Function within a module
+                }
+            } else {
+                "f" // Top-level function
+            };
+            process_function(cursor, context, kind_char);
             None // Doesn't start a new named scope for context stack
         }
         "function_signature_item" => {
             // Function signatures within traits
-            process_function(cursor, context, "P"); // Also tag as 'P'
+            process_function(cursor, context, "m"); // Also tag as 'm'
             None
         }
         "associated_type" => {
@@ -250,6 +262,10 @@ fn create_tag(
     if let Some(extras) = extra_fields {
         extension_fields.extend(extras);
     }
+
+    // Add line number as an extension field
+    // Line numbers are typically 1-indexed in editors/tags files
+    extension_fields.insert(String::from("line"), (row + 1).to_string());
 
     context.tags.push(tag::Tag {
         name,
@@ -455,7 +471,25 @@ fn process_function(
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["identifier"]) {
         // No extra fields needed here, context provides scope (struct/trait/impl/module)
-        create_tag(name, kind_char, node, context, None);
+        // create_tag(name, kind_char, node, context, None);
+        let mut extra_fields = HashMap::new();
+
+        // Get the signature string
+        if let Some(signature_str) = get_function_signature_string(node, context) {
+            extra_fields.insert(String::from("signature"), signature_str);
+        }
+
+        create_tag(
+            name,
+            kind_char,
+            node,
+            context,
+            if extra_fields.is_empty() {
+                None
+            } else {
+                Some(extra_fields)
+            },
+        );
     }
 }
 
@@ -540,4 +574,53 @@ fn address_string_from_line(row: usize, context: &Context) -> String {
         .replace('^', "\\^")
         .replace('$', "\\$");
     format!("/^{}$/;\"", escaped)
+}
+
+// Helper to find a direct child node of a specific kind and get its text.
+fn find_child_text_by_kind(parent_node: Node, kind: &str, context: &Context) -> Option<String> {
+    let mut cursor = parent_node.walk();
+    if cursor.goto_first_child() {
+        loop {
+            if cursor.node().kind() == kind {
+                let text = context.node_text(&cursor.node()).to_string();
+                return if text.is_empty() { None } else { Some(text) };
+            }
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+    None
+}
+
+// Constructs the signature string for a function/method node.
+// Example: "(param1: Type1, param2: Type2) -> ReturnType"
+fn get_function_signature_string(func_node: Node, context: &Context) -> Option<String> {
+    // The `parameters` node in tree-sitter-rust typically includes the parentheses.
+    // Its text would be like "(param1: Type1, param2: Type2)" or "()".
+    let params_text = match find_child_text_by_kind(func_node, "parameters", context) {
+        Some(pt) => pt,
+        None => return None, // Parameters are essential for a meaningful signature.
+    };
+
+    // The `return_type` node in tree-sitter-rust is just the type itself (e.g., "String").
+    // The "->" is part of the function item structure, not the return_type node's text.
+    let return_type_text_opt = find_child_text_by_kind(func_node, "return_type", context);
+
+    // if let Some(rt_text) = return_type_text_opt {
+    let raw_signature_str = if let Some(rt_text) = return_type_text_opt {
+        // Only add "-> ReturnType" if rt_text is non-empty.
+        if !rt_text.is_empty() {
+            // Some(format!("{} -> {}", params_text, rt_text))
+            format!("{} -> {}", params_text, rt_text)
+        } else {
+            params_text // Return type node exists but its text is empty.
+        }
+    } else {
+        params_text // No return type node.
+    };
+
+    // Replace newline characters with a single space.
+    let cleaned_signature = raw_signature_str.replace('\n', " ");
+    Some(cleaned_signature)
 }

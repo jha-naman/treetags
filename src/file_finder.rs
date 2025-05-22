@@ -36,10 +36,15 @@ impl FileFinder {
     ///
     /// A new FileFinder instance configured with the given parameters
     pub fn new(tag_file_path: &Path, exclude_patterns: Vec<String>) -> Self {
-        let dir_path = tag_file_path
-            .parent()
-            .expect("Failed to access tag file's parent directory")
-            .to_path_buf();
+        let dir_path = if tag_file_path.to_str() == Some("-") {
+            // If writing to stdout, use current directory as the root
+            std::env::current_dir().expect("Failed to access current directory")
+        } else {
+            tag_file_path
+                .parent()
+                .expect("Failed to access tag file's parent directory")
+                .to_path_buf()
+        };
 
         let exclude_regexes = exclude_patterns
             .iter()
@@ -61,7 +66,13 @@ impl FileFinder {
     ///
     /// A vector of file paths as strings
     pub fn get_files_from_dir(&self) -> Vec<String> {
-        self.scan_directory(&self.dir_path)
+        let dir_path = if self.dir_path.to_str() == Some("-") {
+            // If writing to stdout, use current directory as the root
+            &std::env::current_dir().unwrap()
+        } else {
+            &self.dir_path
+        };
+        self.scan_directory(dir_path)
     }
 
     /// Processes a list of files and directories, expanding any directories
@@ -136,6 +147,10 @@ impl FileFinder {
 ///
 /// A Result containing either the tag file path or an error message
 pub fn determine_tag_file_path(tag_file_name: &str, append: bool) -> Result<String, String> {
+    if tag_file_name == "-" {
+        return Ok("-".to_string());
+    }
+
     match find_tag_file(tag_file_name) {
         Some(tag_file) => Ok(tag_file),
         None => {
