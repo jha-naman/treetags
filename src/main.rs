@@ -74,7 +74,14 @@ fn main() {
     };
 
     // Get files to process
-    let file_finder = FileFinder::new(Path::new(&tag_file_path), config.exclude.clone());
+    // If writing to stdout, use the current directory as the base for file finding
+    let search_base = Path::new(&tag_file_path);
+    // let search_base = if tag_file_path == "-" {
+    //     Path::new(".")
+    // } else {
+    //     Path::new(&tag_file_path)
+    // };
+    let file_finder = FileFinder::new(search_base, config.exclude.clone());
     let files = if !config.file_names.is_empty() {
         // Process both files and directories from the command line arguments
         file_finder.get_files_from_paths(&config.file_names)
@@ -90,6 +97,11 @@ fn main() {
     if config.append {
         let existing_tags = file_finder::parse_tag_file(&tag_file_path);
         tags.extend(existing_tags);
+    }
+
+    if config.sort {
+        // Sort tags by name
+        tags.sort_by(|a, b| a.name.cmp(&b.name));
     }
 
     // Write tags to file
