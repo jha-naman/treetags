@@ -475,7 +475,7 @@ fn process_function(
         let mut extra_fields = HashMap::new();
 
         // Get the signature string
-        if let Some(signature_str) = get_function_signature_string(node, context) {
+        if let Some(signature_str) = get_function_signature_string(node, cursor, context) {
             extra_fields.insert(String::from("signature"), signature_str);
         }
 
@@ -576,29 +576,14 @@ fn address_string_from_line(row: usize, context: &Context) -> String {
     format!("/^{}$/;\"", escaped)
 }
 
-// Helper to find a direct child node of a specific kind and get its text.
-fn find_child_text_by_kind(parent_node: Node, kind: &str, context: &Context) -> Option<String> {
-    let mut cursor = parent_node.walk();
-    if cursor.goto_first_child() {
-        loop {
-            if cursor.node().kind() == kind {
-                let text = context.node_text(&cursor.node()).to_string();
-                return if text.is_empty() { None } else { Some(text) };
-            }
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
-    }
-    None
-}
+// oo
 
 // Constructs the signature string for a function/method node.
 // Example: "(param1: Type1, param2: Type2) -> ReturnType"
-fn get_function_signature_string(func_node: Node, context: &Context) -> Option<String> {
+fn get_function_signature_string(func_node: Node, cursor: &mut TreeCursor, context: &Context) -> Option<String> {
     // The `parameters` node in tree-sitter-rust typically includes the parentheses.
     // Its text would be like "(param1: Type1, param2: Type2)" or "()".
-    let params_text = match find_child_text_by_kind(func_node, "parameters", context) {
+    let params_text = match get_node_name(cursor, context, &["parameters"]) {
         Some(pt) => pt,
         None => return None, // Parameters are essential for a meaningful signature.
     };
@@ -617,7 +602,6 @@ fn get_function_signature_string(func_node: Node, context: &Context) -> Option<S
             }
         });
 
-    // if let Some(rt_text) = return_type_text_opt {
     let raw_signature_str = if let Some(rt_text) = return_type_text_opt {
         // Only add "-> ReturnType" if rt_text is non-empty.
         if !rt_text.is_empty() {
