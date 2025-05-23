@@ -603,9 +603,19 @@ fn get_function_signature_string(func_node: Node, context: &Context) -> Option<S
         None => return None, // Parameters are essential for a meaningful signature.
     };
 
-    // The `return_type` node in tree-sitter-rust is just the type itself (e.g., "String").
-    // The "->" is part of the function item structure, not the return_type node's text.
-    let return_type_text_opt = find_child_text_by_kind(func_node, "return_type", context);
+    // For Return Type: "return_type" is a FIELD NAME on the function_item node.
+    // The actual child node will have a KIND corresponding to the specific type (e.g., type_identifier).
+    // We fetch the child by its field name, then get its text.
+    let return_type_text_opt = func_node
+        .child_by_field_name("return_type")
+        .and_then(|rt_node| {
+            let text = context.node_text(&rt_node).to_string();
+            if text.is_empty() { // If the node's text is empty, treat as None
+                None
+            } else {
+                Some(text)
+            }
+        });
 
     // if let Some(rt_text) = return_type_text_opt {
     let raw_signature_str = if let Some(rt_text) = return_type_text_opt {
