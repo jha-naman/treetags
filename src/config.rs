@@ -22,7 +22,7 @@ pub struct Config {
     /// Need to pass in list of file names for which new tags are to be generated.
     /// Will panic if the tag file doesn't already exist in current or one of the parent
     /// directories.
-    #[arg(long = "append", verbatim_doc_comment)]
+    #[arg(long = "append", verbatim_doc_comment, default_value = "false")]
     pub append_raw: String,
     /// Field value derived from the `append_raw` string field
     #[arg(skip)]
@@ -166,14 +166,6 @@ impl Config {
     /// # Panics
     ///
     /// Panics if the input value doesn't match any of the accepted values.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// assert_eq!(string_to_bool("true"), true);
-    /// assert_eq!(string_to_bool("YES"), true);
-    /// assert_eq!(string_to_bool("false"), false);
-    /// assert_eq!(string_to_bool("no"), false);
     /// ```
     fn string_to_bool(&self, value: &str) -> bool {
         match value.to_lowercase().as_str() {
@@ -181,5 +173,48 @@ impl Config {
             "no" | "off" | "false" | "0" => false,
             _ => panic!("Invalid value passed: '{}'", value),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_true_values() {
+        let config = Config::new();
+        assert_eq!(config.string_to_bool("yes"), true);
+        assert_eq!(config.string_to_bool("YES"), true);
+        assert_eq!(config.string_to_bool("on"), true);
+        assert_eq!(config.string_to_bool("ON"), true);
+        assert_eq!(config.string_to_bool("true"), true);
+        assert_eq!(config.string_to_bool("TRUE"), true);
+        assert_eq!(config.string_to_bool("1"), true);
+    }
+
+    #[test]
+    fn test_false_values() {
+        let config = Config::new();
+        assert_eq!(config.string_to_bool("no"), false);
+        assert_eq!(config.string_to_bool("NO"), false);
+        assert_eq!(config.string_to_bool("off"), false);
+        assert_eq!(config.string_to_bool("OFF"), false);
+        assert_eq!(config.string_to_bool("false"), false);
+        assert_eq!(config.string_to_bool("FALSE"), false);
+        assert_eq!(config.string_to_bool("0"), false);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid value passed")]
+    fn test_invalid_value() {
+        let config = Config::new();
+        config.string_to_bool("invalid");
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid value passed")]
+    fn test_empty_string() {
+        let config = Config::new();
+        config.string_to_bool("");
     }
 }
