@@ -1,5 +1,5 @@
 use super::Parser;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tree_sitter::{Node, TreeCursor};
 
 use crate::{split_by_newlines, tag};
@@ -15,12 +15,272 @@ enum ScopeType {
     Implementation, // Can store both trait and type info if needed
 }
 
+// Configuration for which tag kinds to generate
+#[derive(Debug, Clone)]
+pub struct TagKindConfig {
+    enabled_kinds: HashSet<String>,
+    // Cache for optimization - whether we need to traverse certain node types
+    needs_traversal_cache: HashMap<String, bool>,
+}
+
+impl TagKindConfig {
+    /// Create a new configuration with all kinds enabled by default
+    pub fn new() -> Self {
+        let mut enabled_kinds = HashSet::new();
+        // Add all possible tag kinds
+        enabled_kinds.insert("n".to_string()); // module
+        enabled_kinds.insert("s".to_string()); // struct
+        enabled_kinds.insert("g".to_string()); // enum
+        enabled_kinds.insert("u".to_string()); // union
+        enabled_kinds.insert("i".to_string()); // trait/interface
+        enabled_kinds.insert("c".to_string()); // implementation
+        enabled_kinds.insert("f".to_string()); // function
+        enabled_kinds.insert("P".to_string()); // method/procedure
+        enabled_kinds.insert("m".to_string()); // method signature
+        enabled_kinds.insert("e".to_string()); // enum variant
+        enabled_kinds.insert("T".to_string()); // associated type
+        enabled_kinds.insert("C".to_string()); // constant
+        enabled_kinds.insert("v".to_string()); // variable/static
+        enabled_kinds.insert("t".to_string()); // type alias
+        enabled_kinds.insert("M".to_string()); // macro
+
+        let mut config = Self {
+            enabled_kinds,
+            needs_traversal_cache: HashMap::new(),
+        };
+        config.rebuild_traversal_cache();
+        config
+    }
+
+    /// Create a configuration from a kinds string (e.g., "nsf" or "n,s,f")
+    pub fn from_kinds_string(kinds_str: &str) -> Self {
+        let mut enabled_kinds = HashSet::new();
+
+        // Handle both comma-separated and concatenated formats
+        let kinds: Vec<&str> = if kinds_str.contains(',') {
+            kinds_str.split(',').map(|s| s.trim()).collect()
+        } else {
+            // Split each character as a separate kind
+            kinds_str
+                .chars()
+                .map(|c| match c {
+                    'n' => "n",
+                    's' => "s",
+                    'g' => "g",
+                    'u' => "u",
+                    'i' => "i",
+                    'c' => "c",
+                    'f' => "f",
+                    'P' => "P",
+                    'm' => "m",
+                    'e' => "e",
+                    'T' => "T",
+                    'C' => "C",
+                    'v' => "v",
+                    't' => "t",
+                    'M' => "M",
+                    _ => "", // Ignore unknown kinds
+                })
+                .filter(|s| !s.is_empty())
+                .collect()
+        };
+
+        for kind in kinds {
+            match kind {
+                "n" | "module" => {
+                    enabled_kinds.insert("n".to_string());
+                }
+                "s" | "struct" => {
+                    enabled_kinds.insert("s".to_string());
+                }
+                "g" | "enum" => {
+                    enabled_kinds.insert("g".to_string());
+                }
+                "u" | "union" => {
+                    enabled_kinds.insert("u".to_string());
+                }
+                "i" | "trait" | "interface" => {
+                    enabled_kinds.insert("i".to_string());
+                }
+                "c" | "impl" | "implementation" => {
+                    enabled_kinds.insert("c".to_string());
+                }
+                "f" | "function" => {
+                    enabled_kinds.insert("f".to_string());
+                }
+                "P" | "method" | "procedure" => {
+                    enabled_kinds.insert("P".to_string());
+                }
+                "m" | "field" => {
+                    enabled_kinds.insert("m".to_string());
+                }
+                "e" | "enumerator" | "variant" => {
+                    enabled_kinds.insert("e".to_string());
+                }
+                "T" | "typedef" | "associated_type" => {
+                    enabled_kinds.insert("T".to_string());
+                }
+                "C" | "constant" => {
+                    enabled_kinds.insert("C".to_string());
+                }
+                "v" | "variable" | "static" => {
+                    enabled_kinds.insert("v".to_string());
+                }
+                "t" | "type" | "alias" => {
+                    enabled_kinds.insert("t".to_string());
+                }
+                "M" | "macro" => {
+                    enabled_kinds.insert("M".to_string());
+                }
+                _ => {
+                    eprintln!("Warning: Unknown Rust tag kind: {}", kind);
+                }
+            }
+        }
+
+        let mut config = Self {
+            enabled_kinds,
+            needs_traversal_cache: HashMap::new(),
+        };
+        config.rebuild_traversal_cache();
+        config
+    }
+
+    /// Create a configuration with only specific kinds enabled
+    pub fn with_kinds(kinds: &[&str]) -> Self {
+        let enabled_kinds = kinds.iter().map(|k| k.to_string()).collect();
+        let mut config = Self {
+            enabled_kinds,
+            needs_traversal_cache: HashMap::new(),
+        };
+        config.rebuild_traversal_cache();
+        config
+    }
+
+    /// Enable a specific tag kind
+    pub fn enable_kind(&mut self, kind: &str) -> &mut Self {
+        self.enabled_kinds.insert(kind.to_string());
+        self.rebuild_traversal_cache();
+        self
+    }
+
+    /// Disable a specific tag kind
+    pub fn disable_kind(&mut self, kind: &str) -> &mut Self {
+        self.enabled_kinds.remove(kind);
+        self.rebuild_traversal_cache();
+        self
+    }
+
+    /// Check if a tag kind is enabled
+    pub fn is_kind_enabled(&self, kind: &str) -> bool {
+        self.enabled_kinds.contains(kind)
+    }
+
+    /// Get all enabled kinds
+    pub fn enabled_kinds(&self) -> &HashSet<String> {
+        &self.enabled_kinds
+    }
+
+    /// Check if we need to traverse into a specific node type for optimization
+    pub fn needs_traversal(&self, node_kind: &str) -> bool {
+        self.needs_traversal_cache
+            .get(node_kind)
+            .copied()
+            .unwrap_or(true)
+    }
+
+    /// Rebuild the traversal optimization cache
+    fn rebuild_traversal_cache(&mut self) {
+        self.needs_traversal_cache.clear();
+
+        // Define what child tags each node type can contain
+        // Only traverse if we need the parent tag OR any potential child tags
+
+        // Modules can contain everything
+        self.needs_traversal_cache.insert(
+            "mod_item".to_string(),
+            self.is_kind_enabled("n") || self.needs_any_child_tags(),
+        );
+
+        // Structs can contain fields (tagged as 'm')
+        self.needs_traversal_cache.insert(
+            "struct_item".to_string(),
+            self.is_kind_enabled("s") || self.is_kind_enabled("m"),
+        );
+
+        // Enums can contain variants (tagged as 'e')
+        self.needs_traversal_cache.insert(
+            "enum_item".to_string(),
+            self.is_kind_enabled("g") || self.is_kind_enabled("e"),
+        );
+
+        // Unions are simple - no child tags typically
+        self.needs_traversal_cache
+            .insert("union_item".to_string(), self.is_kind_enabled("u"));
+
+        // Traits can contain methods ('m'), associated types ('T'), constants ('C')
+        self.needs_traversal_cache.insert(
+            "trait_item".to_string(),
+            self.is_kind_enabled("i")
+                || self.is_kind_enabled("m")
+                || self.is_kind_enabled("T")
+                || self.is_kind_enabled("C"),
+        );
+
+        // Impl blocks can contain methods ('P'), associated types ('T'), constants ('C')
+        self.needs_traversal_cache.insert(
+            "impl_item".to_string(),
+            self.is_kind_enabled("c")
+                || self.is_kind_enabled("P")
+                || self.is_kind_enabled("T")
+                || self.is_kind_enabled("C"),
+        );
+
+        // Functions are leaf nodes - no child tags
+        self.needs_traversal_cache.insert(
+            "function_item".to_string(),
+            self.is_kind_enabled("f") || self.is_kind_enabled("P"),
+        );
+
+        self.needs_traversal_cache.insert(
+            "function_signature_item".to_string(),
+            self.is_kind_enabled("m"),
+        );
+
+        // Other leaf nodes
+        self.needs_traversal_cache
+            .insert("associated_type".to_string(), self.is_kind_enabled("T"));
+        self.needs_traversal_cache
+            .insert("const_item".to_string(), self.is_kind_enabled("C"));
+        self.needs_traversal_cache
+            .insert("static_item".to_string(), self.is_kind_enabled("v"));
+        self.needs_traversal_cache
+            .insert("type_item".to_string(), self.is_kind_enabled("t"));
+        self.needs_traversal_cache
+            .insert("macro_definition".to_string(), self.is_kind_enabled("M"));
+    }
+
+    /// Helper to check if we need any child tags (for modules)
+    fn needs_any_child_tags(&self) -> bool {
+        // If any tag type is enabled, modules might need traversal
+        !self.enabled_kinds.is_empty()
+    }
+}
+
+impl Default for TagKindConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // Stores context during traversal
 struct Context<'a> {
     source_code: &'a str,
     lines: Vec<Vec<u8>>,
     file_name: &'a str,
     tags: &'a mut Vec<tag::Tag>,
+    tag_config: &'a TagKindConfig,
+    user_config: &'a crate::config::Config,
     // Use a stack to keep track of nested scopes (module, struct, trait, etc.)
     scope_stack: Vec<(ScopeType, String)>,
 }
@@ -89,6 +349,34 @@ impl Parser {
         code: &[u8], // Changed to slice for flexibility
         file_path_relative_to_tag_file: &str,
     ) -> Option<Vec<tag::Tag>> {
+        self.generate_rust_tags_with_config(
+            code,
+            file_path_relative_to_tag_file,
+            &TagKindConfig::default(),
+        )
+    }
+
+    pub fn generate_rust_tags_with_config(
+        &mut self,
+        code: &[u8], // Changed to slice for flexibility
+        file_path_relative_to_tag_file: &str,
+        tag_config: &TagKindConfig,
+    ) -> Option<Vec<tag::Tag>> {
+        self.generate_rust_tags_with_full_config(
+            code,
+            file_path_relative_to_tag_file,
+            tag_config,
+            &crate::config::Config::default(),
+        )
+    }
+
+    pub fn generate_rust_tags_with_full_config(
+        &mut self,
+        code: &[u8], // Changed to slice for flexibility
+        file_path_relative_to_tag_file: &str,
+        tag_config: &TagKindConfig,
+        user_config: &crate::config::Config,
+    ) -> Option<Vec<tag::Tag>> {
         // Ensure the code is valid UTF-8
         let source_code = match std::str::from_utf8(code) {
             Ok(s) => s,
@@ -126,6 +414,8 @@ impl Parser {
                 lines,
                 source_code,
                 tags: &mut tags,
+                tag_config,
+                user_config,
                 scope_stack: vec![], // Initialize empty scope stack
             };
 
@@ -136,10 +426,20 @@ impl Parser {
     }
 }
 
-// Depth-First Tree Traversal with Scope Management
+// Depth-First Tree Traversal with Scope Management and Early Termination
 fn walk(cursor: &mut TreeCursor, context: &mut Context) {
     loop {
         let node = cursor.node();
+        let node_kind = node.kind();
+
+        // Early termination: skip traversing this subtree if we don't need any tags from it
+        if !context.tag_config.needs_traversal(node_kind) {
+            // Skip to next sibling without processing this node or its children
+            if !cursor.goto_next_sibling() {
+                break; // No more siblings, return to parent level
+            }
+            continue;
+        }
 
         // --- 1. Process the current node ---
         // Returns Option<(ScopeType, Name)> if a new scope is entered
@@ -160,19 +460,21 @@ fn walk(cursor: &mut TreeCursor, context: &mut Context) {
             walk(cursor, context);
         }
 
-        // --- 4. Move to the next sibling ---
+        // --- 4. Pop Scope if necessary (before moving to sibling) ---
+        if scope_pushed {
+            if context.scope_stack.pop().is_none() {
+                // This should ideally not happen if push/pop logic is correct
+                eprintln!(
+                    "Warning: Popped from empty scope stack! Node: {:?}",
+                    node_kind
+                );
+            }
+        }
+
+        // --- 5. Move to the next sibling ---
         if !cursor.goto_next_sibling() {
             cursor.goto_parent(); // Return cursor to current node after visiting children
             break; // No more siblings, return to parent level
-        }
-
-        // --- 5. Pop Scope if necessary ---
-        if scope_pushed && context.scope_stack.pop().is_none() {
-            // This should ideally not happen if push/pop logic is correct
-            eprintln!(
-                "Warning: Popped from empty scope stack! Node: {:?}",
-                node.kind()
-            );
         }
     }
 }
@@ -235,7 +537,7 @@ fn process_node(cursor: &mut TreeCursor, context: &mut Context) -> Option<(Scope
         }
         "macro_definition" => {
             process_macro(cursor, context);
-            None // Macros don't typically form scopes in the way structs/traits [48;52;236;1976;3776tdo
+            None // Macros don't typically form scopes in the way structs/traits
         }
         _ => None, // Ignore other node kinds for scope tracking / direct tagging
     }
@@ -254,18 +556,96 @@ fn create_tag(
     if name.is_empty() || name == "_" {
         return; // Don't tag empty or placeholder names
     }
-    let row = node.start_position().row;
-    let address = address_string_from_line(row, context);
-    let mut extension_fields = context.create_extension_fields();
 
-    // Merge extra fields if provided
-    if let Some(extras) = extra_fields {
-        extension_fields.extend(extras);
+    // Check if this tag kind is enabled in the configuration
+    if !context.tag_config.is_kind_enabled(kind_char) {
+        return; // Skip creating this tag if the kind is disabled
     }
 
-    // Add line number as an extension field
-    // Line numbers are typically 1-indexed in editors/tags files
-    extension_fields.insert(String::from("line"), (row + 1).to_string());
+    let row = node.start_position().row;
+    let address = address_string_from_line(row, context);
+    let mut extension_fields = HashMap::new();
+
+    // Add line number if enabled (n field)
+    if context.user_config.fields_config.is_field_enabled("line") {
+        extension_fields.insert(String::from("line"), (row + 1).to_string());
+    }
+
+    // Add kind in extension fields if enabled (k field)
+    if context.user_config.fields_config.is_field_enabled("kind") {
+        extension_fields.insert(String::from("kind"), kind_char.to_string());
+    }
+
+    // Add file field if enabled (f field) - indicates file-restricted scoping
+    if context.user_config.fields_config.is_field_enabled("file") {
+        extension_fields.insert(String::from("file"), "".to_string());
+    }
+
+    // Add end position if enabled (e field)
+    if context.user_config.fields_config.is_field_enabled("end") {
+        extension_fields.insert(
+            String::from("end"),
+            (node.end_position().row + 1).to_string(),
+        );
+    }
+
+    // Add scope information if enabled (s field)
+    if context.user_config.fields_config.is_field_enabled("scope")
+        || context.user_config.extras_config.qualified
+    {
+        let scope_fields = context.create_extension_fields();
+        extension_fields.extend(scope_fields);
+    }
+
+    // Merge extra fields if provided and their corresponding field types are enabled
+    if let Some(extras) = extra_fields {
+        for (key, value) in extras {
+            match key.as_str() {
+                "signature" => {
+                    if context
+                        .user_config
+                        .fields_config
+                        .is_field_enabled("signature")
+                    {
+                        extension_fields.insert(key, value);
+                    }
+                }
+                "access" => {
+                    if context.user_config.fields_config.is_field_enabled("access") {
+                        extension_fields.insert(key, value);
+                    }
+                }
+                "typeref" => {
+                    if context
+                        .user_config
+                        .fields_config
+                        .is_field_enabled("typeref")
+                    {
+                        extension_fields.insert(key, value);
+                    }
+                }
+                "implementation" | "trait" | "struct" | "enum" | "union" => {
+                    if context
+                        .user_config
+                        .fields_config
+                        .is_field_enabled("implementation")
+                        || context.user_config.fields_config.is_field_enabled("scope")
+                        || context.user_config.extras_config.qualified
+                    {
+                        extension_fields.insert(key, value);
+                    }
+                }
+                _ => {
+                    // For other fields, include them if scope/qualified is enabled
+                    if context.user_config.fields_config.is_field_enabled("scope")
+                        || context.user_config.extras_config.qualified
+                    {
+                        extension_fields.insert(key, value);
+                    }
+                }
+            }
+        }
+    }
 
     context.tags.push(tag::Tag {
         name,
@@ -279,7 +659,6 @@ fn create_tag(
         },
     });
 }
-
 // --- Specific Node Processors (returning Scope Info) ---
 
 fn process_module(cursor: &mut TreeCursor, context: &mut Context) -> Option<(ScopeType, String)> {
@@ -470,13 +849,17 @@ fn process_function(
 ) {
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["identifier"]) {
-        // No extra fields needed here, context provides scope (struct/trait/impl/module)
-        // create_tag(name, kind_char, node, context, None);
         let mut extra_fields = HashMap::new();
 
-        // Get the signature string
-        if let Some(signature_str) = get_function_signature_string(node, cursor, context) {
-            extra_fields.insert(String::from("signature"), signature_str);
+        // Only get the signature string if signature field is enabled
+        if context
+            .user_config
+            .fields_config
+            .is_field_enabled("signature")
+        {
+            if let Some(signature_str) = get_function_signature_string(node, cursor, context) {
+                extra_fields.insert(String::from("signature"), signature_str);
+            }
         }
 
         create_tag(
@@ -580,7 +963,11 @@ fn address_string_from_line(row: usize, context: &Context) -> String {
 
 // Constructs the signature string for a function/method node.
 // Example: "(param1: Type1, param2: Type2) -> ReturnType"
-fn get_function_signature_string(func_node: Node, cursor: &mut TreeCursor, context: &Context) -> Option<String> {
+fn get_function_signature_string(
+    func_node: Node,
+    cursor: &mut TreeCursor,
+    context: &Context,
+) -> Option<String> {
     // The `parameters` node in tree-sitter-rust typically includes the parentheses.
     // Its text would be like "(param1: Type1, param2: Type2)" or "()".
     let params_text = match get_node_name(cursor, context, &["parameters"]) {
@@ -595,7 +982,8 @@ fn get_function_signature_string(func_node: Node, cursor: &mut TreeCursor, conte
         .child_by_field_name("return_type")
         .and_then(|rt_node| {
             let text = context.node_text(&rt_node).to_string();
-            if text.is_empty() { // If the node's text is empty, treat as None
+            if text.is_empty() {
+                // If the node's text is empty, treat as None
                 None
             } else {
                 Some(text)
@@ -614,7 +1002,11 @@ fn get_function_signature_string(func_node: Node, cursor: &mut TreeCursor, conte
         params_text // No return type node.
     };
 
-    // Replace newline characters with a single space.
-    let cleaned_signature = raw_signature_str.replace('\n', " ");
+    // Replace newlines and normalize whitespace to single spaces
+    let cleaned_signature = raw_signature_str
+        .split_whitespace()
+        .collect::<Vec<&str>>()
+        .join(" ");
+
     Some(cleaned_signature)
 }

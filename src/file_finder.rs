@@ -4,13 +4,12 @@
 //! recursively scan directories for source files, and apply
 //! file exclusion patterns.
 
+use crate::shell_to_regex;
+use crate::tag::{parse_tag_file as parse_tags, Tag};
 use regex::RegexSet;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use treetags::{parse_tag_file as parse_tags, Tag};
 use walkdir::WalkDir;
-
-use crate::shell_to_regex;
 
 /// A structure for finding and filtering files in a directory.
 ///

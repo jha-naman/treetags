@@ -46,9 +46,14 @@ use std::process;
 
 mod config;
 mod file_finder;
+mod parser;
+mod queries;
 mod shell_to_regex;
+mod split_by_newlines;
+mod tag;
 mod tag_processor;
 mod tag_writer;
+mod tags_config;
 
 use crate::config::Config;
 use crate::file_finder::FileFinder;
@@ -90,7 +95,7 @@ fn main() {
     };
 
     // Process files and generate tags
-    let tag_processor = TagProcessor::new(tag_file_path.clone(), config.workers);
+    let tag_processor = TagProcessor::new(tag_file_path.clone(), config.workers, config.clone());
     let mut tags = tag_processor.process_files(files);
 
     // Append existing tags if needed

@@ -4,9 +4,9 @@
 //!
 //! This module handles sorting and writing tags to the output file or standard output.
 
+use crate::tag::Tag;
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
-use treetags::Tag;
 
 /// A structure for writing tags to a file.
 ///

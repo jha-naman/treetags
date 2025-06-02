@@ -17,14 +17,18 @@ let tags = parser.parse_file(&file_path_relative_to_tag_file, &file_path, extens
 ```
  */
 
-mod config;
-pub use config::Config;
-mod tag;
-pub use tag::parse_tag_file;
-pub use tag::Tag;
-mod parser;
-pub use parser::Parser;
+pub mod config;
+pub mod file_finder;
+pub mod parser;
+pub mod queries;
+pub mod shell_to_regex;
+pub mod split_by_newlines;
+pub mod tag;
+pub mod tag_processor;
+pub mod tag_writer;
+pub mod tags_config;
 
-mod queries;
-mod split_by_newlines;
-mod tags_config;
+// Re-export commonly used items
+pub use config::Config;
+pub use parser::Parser;
+pub use tag::{parse_tag_file, Tag};
