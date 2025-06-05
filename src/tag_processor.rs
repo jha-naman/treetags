@@ -5,10 +5,12 @@
 //! This module handles the multithreaded processing of source files,
 //! extracting tag information and coordinating the results.
 
+use crate::config::Config;
+use crate::parser::Parser;
+use crate::tag::Tag;
 use std::path::Path;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
-use treetags::{Parser, Tag};
 
 /// A structure for processing files and generating tags.
 ///
@@ -20,6 +22,9 @@ pub struct TagProcessor {
 
     /// Number of worker threads to use for processing
     workers: usize,
+
+    /// Configuration for tag generation
+    config: Config,
 }
 
 impl TagProcessor {
@@ -29,14 +34,16 @@ impl TagProcessor {
     ///
     /// * `tag_file_path` - Path to the tag file
     /// * `workers` - Number of worker threads to use
+    /// * `config` - Configuration for tag generation
     ///
     /// # Returns
     ///
     /// A new TagProcessor instance
-    pub fn new(tag_file_path: String, workers: usize) -> Self {
+    pub fn new(tag_file_path: String, workers: usize, config: Config) -> Self {
         Self {
             tag_file_path,
             workers,
+            config,
         }
     }
 
@@ -62,9 +69,10 @@ impl TagProcessor {
             let (sender, receiver) = mpsc::channel::<String>();
             let tags_lock = Arc::clone(&tags_lock);
             let tag_file_path = self.tag_file_path.clone();
+            let config = self.config.clone();
 
             let thread = thread::spawn(move || {
-                Self::worker(receiver, tags_lock, tag_file_path);
+                Self::worker(receiver, tags_lock, tag_file_path, config);
             });
 
             threads.push(thread);
@@ -116,10 +124,12 @@ impl TagProcessor {
     /// * `file_names_rx` - Channel receiver for file names
     /// * `tags_lock` - Shared mutex for the tag collection
     /// * `tag_file_path` - Path to the tag file for relative path calculations
+    /// * `config` - Configuration for tag generation
     fn worker(
         file_names_rx: mpsc::Receiver<String>,
         tags_lock: Arc<Mutex<Vec<Tag>>>,
         tag_file_path: String,
+        config: Config,
     ) {
         let mut parser = Parser::new();
         let tag_file_path = Path::new(&tag_file_path);
@@ -137,8 +147,12 @@ impl TagProcessor {
 
             // Parse file if it has a recognizable extension
             if let Some(extension) = file_path.extension().and_then(|e| e.to_str()) {
-                let mut tags =
-                    parser.parse_file(&file_path_relative, &file_path.to_string_lossy(), extension);
+                let mut tags = parser.parse_file_with_config(
+                    &file_path_relative,
+                    &file_path.to_string_lossy(),
+                    extension,
+                    &config,
+                );
 
                 // Add tags to the shared collection
                 if let Ok(mut tags_guard) = tags_lock.lock() {

@@ -2,11 +2,11 @@
 
 //! Module for writing tag data to files.
 //!
-//! This module handles sorting and writing tags to the output file.
+//! This module handles sorting and writing tags to the output file or standard output.
 
+use crate::tag::Tag;
 use std::fs::File;
-use std::io::{BufWriter, Write};
-use treetags::Tag;
+use std::io::{self, BufWriter, Write};
 
 /// A structure for writing tags to a file.
 ///
@@ -34,24 +34,28 @@ impl TagWriter {
     ///
     /// This method first sorts the tags by name and then writes them
     /// to the specified file.
+    /// If file_path is "-", tags are written to standard output instead.
     ///
     /// # Arguments
     ///
     /// * `tags` - A mutable reference to a vector of tags to write
     pub fn write_tags(&self, tags: &mut Vec<Tag>) {
-        // Sort tags by name
-        tags.sort_by(|a, b| a.name.cmp(&b.name));
+        // Create a buffered writer for either stdout or a file
+        let mut writer: Box<dyn Write> = if self.file_path == "-" {
+            // Write to stdout
+            Box::new(BufWriter::new(io::stdout()))
+        } else {
+            // Open file for writing
+            let file = match File::create(&self.file_path) {
+                Ok(file) => file,
+                Err(e) => {
+                    eprintln!("Failed to create tag file: {}", e);
+                    return;
+                }
+            };
 
-        // Open file for writing
-        let file = match File::create(&self.file_path) {
-            Ok(file) => file,
-            Err(e) => {
-                eprintln!("Failed to create tag file: {}", e);
-                return;
-            }
+            Box::new(BufWriter::new(file))
         };
-
-        let mut writer = BufWriter::new(file);
 
         // Write tags to file
         for tag in tags {
