@@ -50,14 +50,15 @@ impl Tag {
                 .expect("expected function name to be a valid utf8 string"),
             file_name: String::from(file_path),
             // Need the trailing `;"\t` to not break parsing by fzf.vim and Telescope plugins
-            address: format!(
-                "/^{}$/;\"\t",
-                String::from_utf8(
+            address: {
+                let line_content = String::from_utf8(
                     code[(tag.name_range.start - tag.span.start.column)..tag.line_range.end]
-                        .to_vec()
+                        .to_vec(),
                 )
-                .expect("expected line range to be a valid utf8 string")
-            ),
+                .expect("expected line range to be a valid utf8 string");
+                let escaped_line = Self::escape_address(&line_content);
+                format!("/^{}$/;\"\t", escaped_line)
+            },
             kind: None,
             extension_fields: None,
         }
@@ -105,6 +106,19 @@ impl Tag {
 
         output.push('\n');
         output.into_bytes()
+    }
+    ///
+    /// Escapes backslashes and forward slashes in the address field
+    ///
+    /// # Arguments
+    ///
+    /// * `address` - The address string to escape
+    ///
+    /// # Returns
+    ///
+    /// A new string with backslashes and forward slashes escaped
+    fn escape_address(address: &str) -> String {
+        address.replace('\\', "\\\\").replace('/', "\\/")
     }
 }
 
@@ -412,5 +426,19 @@ mod tests {
 
         let expected = "MyEnum\ttypes.rs\t/^enum MyEnum {$/\tenum\n";
         assert_eq!(String::from_utf8(tag.into_bytes()).unwrap(), expected);
+    }
+
+    #[test]
+    fn test_escape_address() {
+        assert_eq!(
+            Tag::escape_address("/^fn test() {$/"),
+            "\\/^fn test() {$\\/"
+        );
+        assert_eq!(Tag::escape_address("\\n\\t"), "\\\\n\\\\t");
+        assert_eq!(
+            Tag::escape_address("/path/to/file\\with\\backslashes"),
+            "\\/path\\/to\\/file\\\\with\\\\backslashes"
+        );
+        assert_eq!(Tag::escape_address("no_special_chars"), "no_special_chars");
     }
 }
