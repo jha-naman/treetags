@@ -56,8 +56,16 @@ impl Tag {
                         .to_vec(),
                 )
                 .expect("expected line range to be a valid utf8 string");
-                let escaped_line = Self::escape_address(&line_content);
-                format!("/^{}$/;\"\t", escaped_line)
+
+                let mut escaped_line = Self::escape_address(&line_content);
+
+                // Truncate line_content to 96 characters maximum
+                if escaped_line.len() > 96 {
+                    escaped_line.truncate(96);
+                    format!("/^{}/;\"\t", escaped_line) // No '$' if truncated
+                } else {
+                    format!("/^{}$/;\"\t", escaped_line)
+                }
             },
             kind: None,
             extension_fields: None,
