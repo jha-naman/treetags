@@ -1,0 +1,32 @@
+Blue	source.rs	/^        Blue,$/;"	e	enum:example::Color
+Circle	source.rs	/^    pub struct Circle {$/;"	s	module:example
+Circle	source.rs	/^    impl Circle {$/;"	c	module:example
+Circle	source.rs	/^    impl Shape for Circle {$/;"	c	trait:example::Shape
+Color	source.rs	/^    pub enum Color {$/;"	g	module:example
+Coordinate	source.rs	/^    pub type Coordinate = (f64, f64);$/;"	t	module:example
+Custom	source.rs	/^        Custom(u8, u8, u8),$/;"	e	enum:example::Color
+Green	source.rs	/^        Green,$/;"	e	enum:example::Color
+NestedStruct	source.rs	/^        pub struct NestedStruct {$/;"	s	module:example::nested_mod
+ORIGIN	source.rs	/^    pub static ORIGIN: Point = Point { x: 0.0, y: 0.0 };$/;"	v	module:example
+PI	source.rs	/^    pub const PI: f64 = 3.14159265359;$/;"	C	module:example
+Point	source.rs	/^    pub struct Point {$/;"	s	module:example
+Point	source.rs	/^    impl Point {$/;"	c	module:example
+Red	source.rs	/^        Red,$/;"	e	enum:example::Color
+Shape	source.rs	/^    pub trait Shape {$/;"	i	module:example
+area	source.rs	/^        fn area(&self) -> f64;$/;"	m	interface:example::Shape
+area	source.rs	/^        fn area(&self) -> f64 {$/;"	P	implementation:example::Circle
+center	source.rs	/^        center: Point,$/;"	m	struct:example::Circle
+color	source.rs	/^        color: Color,$/;"	m	struct:example::Circle
+create_point	source.rs	/^    macro_rules! create_point {$/;"	M	module:example
+distance	source.rs	/^        pub fn distance(&self, other: &Point) -> f64 {$/;"	P	implementation:example::Point
+example	source.rs	/^mod example {$/;"	n
+inner	source.rs	/^        mod inner {}$/;"	n	module:example::nested_mod
+nested_mod	source.rs	/^    mod nested_mod {$/;"	n	module:example
+new	source.rs	/^        pub fn new(x: f64, y: f64) -> Self {$/;"	P	implementation:example::Point
+new	source.rs	/^        pub fn new(center: Point, radius: f64) -> Self {$/;"	P	implementation:example::Circle
+perimeter	source.rs	/^        fn perimeter(&self) -> f64;$/;"	m	interface:example::Shape
+perimeter	source.rs	/^        fn perimeter(&self) -> f64 {$/;"	P	implementation:example::Circle
+radius	source.rs	/^        radius: f64,$/;"	m	struct:example::Circle
+x	source.rs	/^            pub x: f64,$/;"	m	struct:example::nested_mod::NestedStruct
+x	source.rs	/^        pub x: f64,$/;"	m	struct:example::Point
+y	source.rs	/^        pub y: f64,$/;"	m	struct:example::Point

@@ -1,0 +1,4 @@
+Point	source.go	/^type Point struct {$/;"	
+String	source.go	/^func (p Point) String() string {$/;"	
+Stringer	source.go	/^type Stringer interface {$/;"	
+main	source.go	/^func main() {}$/;"	

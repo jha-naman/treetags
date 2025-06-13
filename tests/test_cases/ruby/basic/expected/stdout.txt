@@ -1,0 +1,4 @@
+Bar	source.rb	/^module Bar < Object$/;"	
+Foo	source.rb	/^class Foo$/;"	
+baz	source.rb	/^    def baz$/;"	
+foo	source.rb	/^    def self.foo$/;"	

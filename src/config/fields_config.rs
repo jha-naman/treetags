@@ -74,8 +74,8 @@ impl FieldsConfig {
 
         for part in parts {
             let part = part.trim();
-            if part.starts_with('+') {
-                let field = &part[1..];
+            if let Some(prefix) = part.strip_prefix('+') {
+                let field = prefix;
                 match field {
                     "n" | "line" => {
                         config.enabled_fields.insert("line".to_string());
@@ -103,8 +103,8 @@ impl FieldsConfig {
                     }
                     _ => eprintln!("Warning: Unknown field: {}", field),
                 }
-            } else if part.starts_with('-') {
-                let field = &part[1..];
+            } else if let Some(prefix) = part.strip_prefix('-') {
+                let field = prefix;
                 match field {
                     "n" | "line" => {
                         config.enabled_fields.remove("line");

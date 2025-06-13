@@ -1,0 +1,5 @@
+Foo	source.py	/^class Foo:$/;"	
+__init__	source.py	/^	def __init__(self, bar):$/;"	
+bar	source.py	/^	def bar(self):$/;"	
+func	source.py	/^def func(x, y):$/;"	
+variable	source.py	/^variable = [1, 2]$/;"	
