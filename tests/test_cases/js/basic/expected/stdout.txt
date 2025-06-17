@@ -1,0 +1,7 @@
+Rectangle	source.js	/^class Rectangle {$/;"	
+area	source.js	/^  area() {$/;"	
+fn	source.js	/^const fn = (foo, bar) => {};$/;"	
+fn	source.js	/^String.prototype.fn = function() {};$/;"	
+fn	source.js	/^	fn: () => {},$/;"	
+func	source.js	/^var func = function() {};$/;"	
+inner	source.js	/^	function inner() {};$/;"	

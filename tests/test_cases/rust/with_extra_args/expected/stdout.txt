@@ -1,0 +1,32 @@
+Blue	source.rs	/^        Blue,$/;"	kind:e	line:33	file:source.rs	end:33	enum:example::Color
+Circle	source.rs	/^    pub struct Circle {$/;"	kind:s	line:37	file:source.rs	end:41
+Circle	source.rs	/^    impl Circle {$/;"	kind:c	line:43	file:source.rs	end:51
+Circle	source.rs	/^    impl Shape for Circle {$/;"	kind:c	line:53	file:source.rs	end:61	trait:example::Shape
+Color	source.rs	/^    pub enum Color {$/;"	kind:g	line:30	file:source.rs	end:35
+Coordinate	source.rs	/^    pub type Coordinate = (f64, f64);$/;"	kind:t	line:63	file:source.rs	end:63
+Custom	source.rs	/^        Custom(u8, u8, u8),$/;"	kind:e	line:34	file:source.rs	end:34	enum:example::Color
+Green	source.rs	/^        Green,$/;"	kind:e	line:32	file:source.rs	end:32	enum:example::Color
+NestedStruct	source.rs	/^        pub struct NestedStruct {$/;"	kind:s	line:4	file:source.rs	end:6
+ORIGIN	source.rs	/^    pub static ORIGIN: Point = Point { x: 0.0, y: 0.0 };$/;"	kind:v	line:73	file:source.rs	end:73
+PI	source.rs	/^    pub const PI: f64 = 3.14159265359;$/;"	kind:C	line:65	file:source.rs	end:65
+Point	source.rs	/^    pub struct Point {$/;"	kind:s	line:8	file:source.rs	end:11
+Point	source.rs	/^    impl Point {$/;"	kind:c	line:13	file:source.rs	end:23
+Red	source.rs	/^        Red,$/;"	kind:e	line:31	file:source.rs	end:31	enum:example::Color
+Shape	source.rs	/^    pub trait Shape {$/;"	kind:i	line:25	file:source.rs	end:28
+area	source.rs	/^        fn area(&self) -> f64;$/;"	kind:m	line:26	file:source.rs	signature:(&self) -> f64	interface:example::Shape	end:26
+area	source.rs	/^        fn area(&self) -> f64 {$/;"	kind:P	line:54	file:source.rs	signature:(&self) -> f64	implementation:example::Circle	end:56
+center	source.rs	/^        center: Point,$/;"	kind:m	line:38	file:source.rs	end:38	struct:example::Circle
+color	source.rs	/^        color: Color,$/;"	kind:m	line:40	file:source.rs	end:40	struct:example::Circle
+create_point	source.rs	/^    macro_rules! create_point {$/;"	kind:M	line:67	file:source.rs	end:71
+distance	source.rs	/^        pub fn distance(&self, other: &Point) -> f64 {$/;"	kind:P	line:18	file:source.rs	signature:(&self, other: &Point) -> f64	implementation:example::Point	end:22
+example	source.rs	/^mod example {$/;"	kind:n	line:1	file:source.rs	end:74
+inner	source.rs	/^        mod inner {}$/;"	kind:n	line:3	file:source.rs	end:3
+nested_mod	source.rs	/^    mod nested_mod {$/;"	kind:n	line:2	file:source.rs	end:7
+new	source.rs	/^        pub fn new(x: f64, y: f64) -> Self {$/;"	kind:P	line:14	file:source.rs	signature:(x: f64, y: f64) -> Self	implementation:example::Point	end:16
+new	source.rs	/^        pub fn new(center: Point, radius: f64) -> Self {$/;"	kind:P	line:44	file:source.rs	signature:(center: Point, radius: f64) -> Self	implementation:example::Circle	end:50
+perimeter	source.rs	/^        fn perimeter(&self) -> f64;$/;"	kind:m	line:27	file:source.rs	signature:(&self) -> f64	interface:example::Shape	end:27
+perimeter	source.rs	/^        fn perimeter(&self) -> f64 {$/;"	kind:P	line:58	file:source.rs	signature:(&self) -> f64	implementation:example::Circle	end:60
+radius	source.rs	/^        radius: f64,$/;"	kind:m	line:39	file:source.rs	end:39	struct:example::Circle
+x	source.rs	/^            pub x: f64,$/;"	kind:m	line:5	file:source.rs	end:5	struct:example::nested_mod::NestedStruct
+x	source.rs	/^        pub x: f64,$/;"	kind:m	line:9	file:source.rs	end:9	struct:example::Point
+y	source.rs	/^        pub y: f64,$/;"	kind:m	line:10	file:source.rs	end:10	struct:example::Point

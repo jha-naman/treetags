@@ -1,5 +1,7 @@
 use super::Parser;
-use std::collections::{HashMap, HashSet};
+use indexmap::IndexMap;
+use std::collections::HashMap;
+use std::collections::HashSet;
 use tree_sitter::{Node, TreeCursor};
 
 use crate::{split_by_newlines, tag};
@@ -146,39 +148,9 @@ impl TagKindConfig {
         config
     }
 
-    /// Create a configuration with only specific kinds enabled
-    pub fn with_kinds(kinds: &[&str]) -> Self {
-        let enabled_kinds = kinds.iter().map(|k| k.to_string()).collect();
-        let mut config = Self {
-            enabled_kinds,
-            needs_traversal_cache: HashMap::new(),
-        };
-        config.rebuild_traversal_cache();
-        config
-    }
-
-    /// Enable a specific tag kind
-    pub fn enable_kind(&mut self, kind: &str) -> &mut Self {
-        self.enabled_kinds.insert(kind.to_string());
-        self.rebuild_traversal_cache();
-        self
-    }
-
-    /// Disable a specific tag kind
-    pub fn disable_kind(&mut self, kind: &str) -> &mut Self {
-        self.enabled_kinds.remove(kind);
-        self.rebuild_traversal_cache();
-        self
-    }
-
     /// Check if a tag kind is enabled
     pub fn is_kind_enabled(&self, kind: &str) -> bool {
         self.enabled_kinds.contains(kind)
-    }
-
-    /// Get all enabled kinds
-    pub fn enabled_kinds(&self) -> &HashSet<String> {
-        &self.enabled_kinds
     }
 
     /// Check if we need to traverse into a specific node type for optimization
@@ -300,8 +272,8 @@ impl<'a> Context<'a> {
     }
 
     // Build extension fields based on the current scope stack
-    fn create_extension_fields(&self) -> HashMap<String, String> {
-        let mut fields = HashMap::new();
+    fn create_extension_fields(&self) -> IndexMap<String, String> {
+        let mut fields = IndexMap::new();
         let mut module_path = Vec::new();
 
         for (scope_type, name) in &self.scope_stack {
@@ -344,32 +316,6 @@ impl<'a> Context<'a> {
 }
 
 impl Parser {
-    pub fn generate_rust_tags(
-        &mut self,
-        code: &[u8], // Changed to slice for flexibility
-        file_path_relative_to_tag_file: &str,
-    ) -> Option<Vec<tag::Tag>> {
-        self.generate_rust_tags_with_config(
-            code,
-            file_path_relative_to_tag_file,
-            &TagKindConfig::default(),
-        )
-    }
-
-    pub fn generate_rust_tags_with_config(
-        &mut self,
-        code: &[u8], // Changed to slice for flexibility
-        file_path_relative_to_tag_file: &str,
-        tag_config: &TagKindConfig,
-    ) -> Option<Vec<tag::Tag>> {
-        self.generate_rust_tags_with_full_config(
-            code,
-            file_path_relative_to_tag_file,
-            tag_config,
-            &crate::config::Config::default(),
-        )
-    }
-
     pub fn generate_rust_tags_with_full_config(
         &mut self,
         code: &[u8], // Changed to slice for flexibility
@@ -461,14 +407,12 @@ fn walk(cursor: &mut TreeCursor, context: &mut Context) {
         }
 
         // --- 4. Pop Scope if necessary (before moving to sibling) ---
-        if scope_pushed {
-            if context.scope_stack.pop().is_none() {
-                // This should ideally not happen if push/pop logic is correct
-                eprintln!(
-                    "Warning: Popped from empty scope stack! Node: {:?}",
-                    node_kind
-                );
-            }
+        if scope_pushed && context.scope_stack.pop().is_none() {
+            // This should ideally not happen if push/pop logic is correct
+            eprintln!(
+                "Warning: Popped from empty scope stack! Node: {:?}",
+                node_kind
+            );
         }
 
         // --- 5. Move to the next sibling ---
@@ -551,7 +495,7 @@ fn create_tag(
     node: Node, // Pass the node for position info
     context: &mut Context,
     // Allow passing extra fields specific to the item being tagged
-    extra_fields: Option<HashMap<String, String>>,
+    extra_fields: Option<IndexMap<String, String>>,
 ) {
     if name.is_empty() || name == "_" {
         return; // Don't tag empty or placeholder names
@@ -564,32 +508,48 @@ fn create_tag(
 
     let row = node.start_position().row;
     let address = address_string_from_line(row, context);
-    let mut extension_fields = HashMap::new();
+    let mut extension_fields = IndexMap::new();
 
-    // Add line number if enabled (n field)
-    if context.user_config.fields_config.is_field_enabled("line") {
-        extension_fields.insert(String::from("line"), (row + 1).to_string());
-    }
+    // Insert fields in ctags order (alphabetical by field letter, with special cases first):
 
-    // Add kind in extension fields if enabled (k field)
+    // 1. Kind field (k) - if enabled as extension field
     if context.user_config.fields_config.is_field_enabled("kind") {
         extension_fields.insert(String::from("kind"), kind_char.to_string());
     }
 
-    // Add file field if enabled (f field) - indicates file-restricted scoping
+    // 2. Line number (n) - typically second
+    if context.user_config.fields_config.is_field_enabled("line") {
+        extension_fields.insert(String::from("line"), (row + 1).to_string());
+    }
+
+    // 3. Access field (a) - access modifier
+    if let Some(extras) = &extra_fields {
+        if let Some(access) = extras.get("access") {
+            if context.user_config.fields_config.is_field_enabled("access") {
+                extension_fields.insert("access".to_string(), access.clone());
+            }
+        }
+    }
+
+    // 4. File field (f) - file-restricted scoping
     if context.user_config.fields_config.is_field_enabled("file") {
-        extension_fields.insert(String::from("file"), "".to_string());
+        extension_fields.insert(String::from("file"), context.file_name.to_string());
     }
 
-    // Add end position if enabled (e field)
-    if context.user_config.fields_config.is_field_enabled("end") {
-        extension_fields.insert(
-            String::from("end"),
-            (node.end_position().row + 1).to_string(),
-        );
+    // 5. Signature field (S) - function signature
+    if let Some(extras) = &extra_fields {
+        if let Some(signature) = extras.get("signature") {
+            if context
+                .user_config
+                .fields_config
+                .is_field_enabled("signature")
+            {
+                extension_fields.insert("signature".to_string(), signature.clone());
+            }
+        }
     }
 
-    // Add scope information if enabled (s field)
+    // 6. Scope information (s) - scope of tag definition
     if context.user_config.fields_config.is_field_enabled("scope")
         || context.user_config.extras_config.qualified
     {
@@ -597,33 +557,36 @@ fn create_tag(
         extension_fields.extend(scope_fields);
     }
 
-    // Merge extra fields if provided and their corresponding field types are enabled
+    // 7. Typeref field (t) - type reference
+    if let Some(extras) = &extra_fields {
+        if let Some(typeref) = extras.get("typeref") {
+            if context
+                .user_config
+                .fields_config
+                .is_field_enabled("typeref")
+            {
+                extension_fields.insert("typeref".to_string(), typeref.clone());
+            }
+        }
+    }
+
+    // 8. End position (e) - end line number
+    if context.user_config.fields_config.is_field_enabled("end") {
+        extension_fields.insert(
+            String::from("end"),
+            (node.end_position().row + 1).to_string(),
+        );
+    }
+
+    // Handle remaining extra fields that weren't processed above
     if let Some(extras) = extra_fields {
         for (key, value) in extras {
+            // Skip fields we've already processed
+            if matches!(key.as_str(), "access" | "signature" | "typeref") {
+                continue;
+            }
+
             match key.as_str() {
-                "signature" => {
-                    if context
-                        .user_config
-                        .fields_config
-                        .is_field_enabled("signature")
-                    {
-                        extension_fields.insert(key, value);
-                    }
-                }
-                "access" => {
-                    if context.user_config.fields_config.is_field_enabled("access") {
-                        extension_fields.insert(key, value);
-                    }
-                }
-                "typeref" => {
-                    if context
-                        .user_config
-                        .fields_config
-                        .is_field_enabled("typeref")
-                    {
-                        extension_fields.insert(key, value);
-                    }
-                }
                 "implementation" | "trait" | "struct" | "enum" | "union" => {
                     if context
                         .user_config
@@ -742,7 +705,7 @@ fn process_identifiers_list(
                         get_node_name(cursor, context, &["identifier", "field_identifier"])
                     {
                         // Add enum/struct name context specifically for the variant tag
-                        let mut variant_fields = HashMap::new();
+                        let mut variant_fields = IndexMap::new();
                         variant_fields.insert(variant_type.to_string(), name.to_owned());
                         create_tag(
                             variant_name,
@@ -780,7 +743,7 @@ fn process_impl(cursor: &mut TreeCursor, context: &mut Context) -> Option<(Scope
     let node = cursor.node();
     let (trait_name, type_name) = find_impl_names(cursor, context)?;
 
-    let mut extra_fields = HashMap::new();
+    let mut extra_fields = IndexMap::new();
     let tag_name = type_name?.clone();
     let kind_char = "c";
 
@@ -849,7 +812,7 @@ fn process_function(
 ) {
     let node = cursor.node();
     if let Some(name) = get_node_name(cursor, context, &["identifier"]) {
-        let mut extra_fields = HashMap::new();
+        let mut extra_fields = IndexMap::new();
 
         // Only get the signature string if signature field is enabled
         if context
@@ -970,10 +933,7 @@ fn get_function_signature_string(
 ) -> Option<String> {
     // The `parameters` node in tree-sitter-rust typically includes the parentheses.
     // Its text would be like "(param1: Type1, param2: Type2)" or "()".
-    let params_text = match get_node_name(cursor, context, &["parameters"]) {
-        Some(pt) => pt,
-        None => return None, // Parameters are essential for a meaningful signature.
-    };
+    let params_text = get_node_name(cursor, context, &["parameters"])?;
 
     // For Return Type: "return_type" is a FIELD NAME on the function_item node.
     // The actual child node will have a KIND corresponding to the specific type (e.g., type_identifier).

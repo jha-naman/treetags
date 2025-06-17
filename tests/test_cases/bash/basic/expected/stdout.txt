@@ -1,0 +1,4 @@
+AnotherTest	source.sh	/^AnotherTest () {}$/;"	
+EOF	source.sh	/^cat > test.sh << EOF$/;"	
+Test	source.sh	/^function Test () {}$/;"	
+ll=	source.sh	/^alias ll="ls -lh"$/;"	

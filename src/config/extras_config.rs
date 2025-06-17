@@ -25,16 +25,16 @@ impl ExtrasConfig {
 
         for part in extras_str.split(',') {
             let part = part.trim();
-            if part.starts_with('+') {
-                match &part[1..] {
+            if let Some(prefix) = part.strip_prefix('+') {
+                match prefix {
                     "q" | "qualified" => config.qualified = true,
-                    "f" | "fileScope" => config.file_scope = true,
+                    "F" | "fileScope" => config.file_scope = true,
                     _ => eprintln!("Warning: Unknown extra: {}", part),
                 }
-            } else if part.starts_with('-') {
-                match &part[1..] {
+            } else if let Some(prefix) = part.strip_prefix('-') {
+                match prefix {
                     "q" | "qualified" => config.qualified = false,
-                    "f" | "fileScope" => config.file_scope = false,
+                    "F" | "fileScope" => config.file_scope = false,
                     _ => eprintln!("Warning: Unknown extra: {}", part),
                 }
             }
@@ -90,7 +90,7 @@ mod tests {
 
     #[test]
     fn test_plus_file_scope_short() {
-        let config = ExtrasConfig::from_string("+f");
+        let config = ExtrasConfig::from_string("+F");
 
         assert!(!config.qualified);
         assert!(config.file_scope);
@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn test_multiple_plus_options() {
-        let config = ExtrasConfig::from_string("+q,+f");
+        let config = ExtrasConfig::from_string("+q,+F");
 
         assert!(config.qualified);
         assert!(config.file_scope);
@@ -146,7 +146,7 @@ mod tests {
 
     #[test]
     fn test_minus_file_scope_short() {
-        let config = ExtrasConfig::from_string("-f");
+        let config = ExtrasConfig::from_string("-F");
 
         assert!(!config.qualified);
         assert!(!config.file_scope);
@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn test_plus_then_minus() {
-        let config = ExtrasConfig::from_string("+q,+f,-q");
+        let config = ExtrasConfig::from_string("+q,+F,-q");
 
         assert!(!config.qualified); // Should be disabled by -q
         assert!(config.file_scope); // Should remain enabled
@@ -170,7 +170,7 @@ mod tests {
 
     #[test]
     fn test_minus_then_plus() {
-        let config = ExtrasConfig::from_string("-q,-f,+q");
+        let config = ExtrasConfig::from_string("-q,-F,+q");
 
         assert!(config.qualified); // Should be enabled by +q
         assert!(!config.file_scope); // Should remain disabled
@@ -178,7 +178,7 @@ mod tests {
 
     #[test]
     fn test_whitespace_handling() {
-        let config = ExtrasConfig::from_string(" +q , +f ");
+        let config = ExtrasConfig::from_string(" +q , +F ");
 
         assert!(config.qualified);
         assert!(config.file_scope);
@@ -186,7 +186,7 @@ mod tests {
 
     #[test]
     fn test_unknown_options_ignored() {
-        let config = ExtrasConfig::from_string("+q,+unknown,+f");
+        let config = ExtrasConfig::from_string("+q,+unknown,+F");
 
         assert!(config.qualified);
         assert!(config.file_scope);
@@ -195,7 +195,7 @@ mod tests {
 
     #[test]
     fn test_complex_combination() {
-        let config = ExtrasConfig::from_string("+qualified,-fileScope,+f,-q,+qualified");
+        let config = ExtrasConfig::from_string("+qualified,-fileScope,+F,-q,+qualified");
 
         assert!(config.qualified); // Last +qualified should win
         assert!(config.file_scope); // +f should win over -fileScope

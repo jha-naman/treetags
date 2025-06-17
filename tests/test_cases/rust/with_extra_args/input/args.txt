@@ -1,0 +1,2 @@
+--fields=nksSafet --extras=+F -f '-'
+source.rs

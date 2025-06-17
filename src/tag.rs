@@ -7,7 +7,7 @@
 //! across a codebase. This module handles the parsing and formatting of tags
 //! in a format compatible with Vi/Vim.
 
-use std::collections::HashMap;
+use indexmap::IndexMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -29,7 +29,7 @@ pub struct Tag {
     /// The tag kind
     pub kind: Option<String>,
     /// The extension fields associated with the tag
-    pub extension_fields: Option<HashMap<String, String>>,
+    pub extension_fields: Option<IndexMap<String, String>>,
 }
 
 impl Tag {
@@ -78,11 +78,20 @@ impl Tag {
     ///
     /// A vector of bytes representing the tag in the format:
     /// `name\tfile_name\taddress[;"\tkind:kind_value"][;"\tfield_name:field_value"]...\n`
-    pub fn into_bytes(&self) -> Vec<u8> {
+    pub fn bytes(&self) -> Vec<u8> {
         let mut output = format!("{}\t{}\t{}", self.name, self.file_name, self.address);
 
+        // Only output shorthand kind if we don't have extension fields with a kind field
+        let has_kind_extension = self
+            .extension_fields
+            .as_ref()
+            .map(|fields| fields.contains_key("kind"))
+            .unwrap_or(false);
+
         if let Some(ref kind) = self.kind {
-            output.push_str(&format!("\t{}", kind));
+            if !has_kind_extension {
+                output.push_str(&format!("\t{}", kind));
+            }
         }
 
         if let Some(ref fields) = self.extension_fields {
@@ -102,11 +111,20 @@ impl Tag {
 
             // Process all non-module fields
             for (key, value) in fields.iter().filter(|(k, _)| *k != "module") {
-                // For other fields, prepend module value if it exists
-                let formatted_value = if let Some(module) = module_value {
-                    format!("{}::{}", module, value)
-                } else {
-                    value.clone()
+                // Only prepend module value for scope-related fields, not metadata fields
+                let formatted_value = match key.as_str() {
+                    "line" | "end" | "kind" | "file" | "signature" | "access" => {
+                        // These fields should never have module prefixes
+                        value.clone()
+                    }
+                    _ => {
+                        // For scope-related fields, prepend module value if it exists
+                        if let Some(module) = module_value {
+                            format!("{}::{}", module, value)
+                        } else {
+                            value.clone()
+                        }
+                    }
                 };
                 output.push_str(&format!("\t{}:{}", key, formatted_value));
             }
@@ -184,7 +202,7 @@ pub fn parse_tag_line(line: &str) -> Option<Tag> {
 
     // Process extension fields (starting from index 3)
     if parts.len() > 3 {
-        let mut fields_map = HashMap::new();
+        let mut fields_map = IndexMap::new();
 
         for field in parts.iter().skip(3) {
             // Skip empty fields
@@ -291,9 +309,9 @@ mod tests {
         assert!(parse_tag_line(line).is_none());
     }
 
-    // Tests for `into_bytes`
+    // Tests for `bytes`
     #[test]
-    fn test_into_bytes_basic() {
+    fn test_bytes_basic() {
         let tag = Tag {
             name: "test_function".to_string(),
             file_name: "test.rs".to_string(),
@@ -303,11 +321,11 @@ mod tests {
         };
 
         let expected = "test_function\ttest.rs\t/^fn test_function() {$/\tfunction\n";
-        assert_eq!(String::from_utf8(tag.into_bytes()).unwrap(), expected);
+        assert_eq!(String::from_utf8(tag.bytes()).unwrap(), expected);
     }
 
     #[test]
-    fn test_into_bytes_no_kind() {
+    fn test_bytes_no_kind() {
         let tag = Tag {
             name: "TEST_CONSTANT".to_string(),
             file_name: "constants.rs".to_string(),
@@ -317,12 +335,12 @@ mod tests {
         };
 
         let expected = "TEST_CONSTANT\tconstants.rs\t/^const TEST_CONSTANT: i32 = 42;$/\n";
-        assert_eq!(String::from_utf8(tag.into_bytes()).unwrap(), expected);
+        assert_eq!(String::from_utf8(tag.bytes()).unwrap(), expected);
     }
 
     #[test]
-    fn test_into_bytes_with_module_only() {
-        let mut extension_fields = HashMap::new();
+    fn test_bytes_with_module_only() {
+        let mut extension_fields = IndexMap::new();
         extension_fields.insert("module".to_string(), "example".to_string());
 
         let tag = Tag {
@@ -334,12 +352,12 @@ mod tests {
         };
 
         let expected = "Model\tmodel.rs\t/^struct Model {$/\tstruct\tmodule:example\n";
-        assert_eq!(String::from_utf8(tag.into_bytes()).unwrap(), expected);
+        assert_eq!(String::from_utf8(tag.bytes()).unwrap(), expected);
     }
 
     #[test]
-    fn test_into_bytes_with_non_module_field() {
-        let mut extension_fields = HashMap::new();
+    fn test_bytes_with_non_module_field() {
+        let mut extension_fields = IndexMap::new();
         extension_fields.insert("implementation".to_string(), "Circle".to_string());
 
         let tag = Tag {
@@ -351,12 +369,12 @@ mod tests {
         };
 
         let expected = "draw\tshapes.rs\t/^fn draw(&self) {$/\tmethod\timplementation:Circle\n";
-        assert_eq!(String::from_utf8(tag.into_bytes()).unwrap(), expected);
+        assert_eq!(String::from_utf8(tag.bytes()).unwrap(), expected);
     }
 
     #[test]
-    fn test_into_bytes_with_module_and_implementation() {
-        let mut extension_fields = HashMap::new();
+    fn test_bytes_with_module_and_implementation() {
+        let mut extension_fields = IndexMap::new();
         extension_fields.insert("implementation".to_string(), "Circle".to_string());
         extension_fields.insert("module".to_string(), "example".to_string());
 
@@ -371,12 +389,12 @@ mod tests {
         // Module should be prepended to the implementation value and module key should not appear
         let expected =
             "draw\tshapes.rs\t/^fn draw(&self) {$/\tmethod\timplementation:example::Circle\n";
-        assert_eq!(String::from_utf8(tag.into_bytes()).unwrap(), expected);
+        assert_eq!(String::from_utf8(tag.bytes()).unwrap(), expected);
     }
 
     #[test]
-    fn test_into_bytes_with_module_and_trait() {
-        let mut extension_fields = HashMap::new();
+    fn test_bytes_with_module_and_trait() {
+        let mut extension_fields = IndexMap::new();
         extension_fields.insert("trait".to_string(), "Shape".to_string());
         extension_fields.insert("module".to_string(), "example".to_string());
 
@@ -391,12 +409,12 @@ mod tests {
         // Module should be prepended to the trait value and module key should not appear
         let expected =
             "area\ttraits.rs\t/^fn area(&self) -> f64 {$/\tmethod\ttrait:example::Shape\n";
-        assert_eq!(String::from_utf8(tag.into_bytes()).unwrap(), expected);
+        assert_eq!(String::from_utf8(tag.bytes()).unwrap(), expected);
     }
 
     #[test]
-    fn test_into_bytes_with_multiple_extension_fields() {
-        let mut extension_fields = HashMap::new();
+    fn test_bytes_with_multiple_extension_fields() {
+        let mut extension_fields = IndexMap::new();
         extension_fields.insert("trait".to_string(), "Shape".to_string());
         extension_fields.insert("implementation".to_string(), "Circle".to_string());
         extension_fields.insert("module".to_string(), "geometry".to_string());
@@ -410,7 +428,7 @@ mod tests {
         };
 
         // Module should be prepended to all other fields and module key should not appear
-        let bytes = tag.into_bytes();
+        let bytes = tag.bytes();
         let output = String::from_utf8(bytes).unwrap();
 
         // Since HashMap iteration order is not guaranteed, check for individual components
@@ -423,17 +441,17 @@ mod tests {
     }
 
     #[test]
-    fn test_into_bytes_with_no_extension_fields() {
+    fn test_bytes_with_no_extension_fields() {
         let tag = Tag {
             name: "MyEnum".to_string(),
             file_name: "types.rs".to_string(),
             address: "/^enum MyEnum {$/".to_string(),
             kind: Some("enum".to_string()),
-            extension_fields: Some(HashMap::new()), // Empty HashMap
+            extension_fields: Some(IndexMap::new()), // Empty IndexMap
         };
 
         let expected = "MyEnum\ttypes.rs\t/^enum MyEnum {$/\tenum\n";
-        assert_eq!(String::from_utf8(tag.into_bytes()).unwrap(), expected);
+        assert_eq!(String::from_utf8(tag.bytes()).unwrap(), expected);
     }
 
     #[test]

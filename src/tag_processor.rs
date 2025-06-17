@@ -132,15 +132,23 @@ impl TagProcessor {
         config: Config,
     ) {
         let mut parser = Parser::new();
-        let tag_file_path = Path::new(&tag_file_path);
-        let tag_file_dir = tag_file_path.parent().unwrap_or(Path::new(""));
+        let tag_file_dir = if tag_file_path == "-" {
+            // If writing to stdout, use current directory as the base
+            std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf())
+        } else {
+            let tag_file_path = Path::new(&tag_file_path);
+            tag_file_path
+                .parent()
+                .unwrap_or(Path::new(""))
+                .to_path_buf()
+        };
 
         // Process each file
         while let Ok(file_name) = file_names_rx.recv() {
             let file_path = std::env::current_dir().unwrap().join(&file_name);
 
             // Get relative path to tag file
-            let file_path_relative = match file_path.strip_prefix(tag_file_dir) {
+            let file_path_relative = match file_path.strip_prefix(&tag_file_dir) {
                 Ok(path) => path.to_string_lossy().into_owned(),
                 Err(_) => file_name.clone(),
             };

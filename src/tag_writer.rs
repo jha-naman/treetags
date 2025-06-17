@@ -59,7 +59,7 @@ impl TagWriter {
 
         // Write tags to file
         for tag in tags {
-            if let Err(e) = writer.write_all(&tag.into_bytes()) {
+            if let Err(e) = writer.write_all(&tag.bytes()) {
                 eprintln!("Failed to write tag: {}", e);
             }
         }
