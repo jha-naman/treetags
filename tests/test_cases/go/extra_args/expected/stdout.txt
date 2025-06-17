@@ -1,0 +1,20 @@
+treetags	source.go	/^package treetags$/;"	p	line:1
+main	source.go	/^func main() {}$/;"	f	line:8	package:treetags	signature:()
+foo	source.go	/^func foo(bar, baz string, arr []string) (error, map[string]string) {}$/;"	f	line:9	package:treetags	typeref:typename:(error, map[string]string)	signature:(bar, baz string, arr []string)
+x	source.go	/^var x, y int$/;"	v	line:11	package:treetags	typeref:typename:int
+y	source.go	/^var x, y int$/;"	v	line:11	package:treetags	typeref:typename:int
+a	source.go	/^	a, b int$/;"	v	line:13	package:treetags	typeref:typename:int
+b	source.go	/^	a, b int$/;"	v	line:13	package:treetags	typeref:typename:int
+c	source.go	/^	c map[string]string$/;"	v	line:14	package:treetags	typeref:typename:map[string]string
+i	source.go	/^	i interface{}$/;"	v	line:15	package:treetags	typeref:typename:interface{}
+z	source.go	/^	z = "zed"$/;"	v	line:16	package:treetags
+foo	source.go	/^const foo = "foo"$/;"	c	line:18	package:treetags
+bar	source.go	/^	bar = "bar"$/;"	c	line:20	package:treetags
+Alias	source.go	/^type Alias map[string]int$/;"	t	line:23	package:treetags	typeref:typename:map[string]int
+AnotherOne	source.go	/^type AnotherOne Alias$/;"	t	line:24	package:treetags	typeref:typename:Alias
+Stringer	source.go	/^type Stringer interface {$/;"	i	line:26	package:treetags	end:28
+Point	source.go	/^type Point struct {$/;"	s	line:30	package:treetags	end:32
+x	source.go	/^x, y int$/;"	m	line:31	struct:treetags.Point	typeref:typename:int
+y	source.go	/^x, y int$/;"	m	line:31	struct:treetags.Point	typeref:typename:int
+String	source.go	/^func (p Point) String() string {$/;"	f	line:34	struct:treetags.Point	typeref:typename:string	signature:()	end:36
+Bar	source.go	/^func (f *Point) Bar(baz string) map[string]string {$/;"	f	line:38	struct:treetags.Point	typeref:typename:map[string]string	signature:(baz string)	end:40

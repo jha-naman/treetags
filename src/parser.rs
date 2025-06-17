@@ -14,13 +14,13 @@ use tree_sitter::Parser as TSParser;
 use tree_sitter_tags::TagsConfiguration;
 use tree_sitter_tags::TagsContext;
 
+mod go;
+mod helper;
 mod rust;
 
 /// Parser manages the parsing configurations for all supported languages
 /// and provides methods to generate tags from source files.
 pub struct Parser {
-    /// Configuration for Go language
-    pub go_config: TagsConfiguration,
     /// Configuration for JavaScript language
     pub js_config: TagsConfiguration,
     /// Configuration for Ruby language
@@ -64,7 +64,6 @@ impl Parser {
     /// Creates a new Parser instance with configurations for all supported languages
     pub fn new() -> Self {
         Self {
-            go_config: get_tags_config(tree_sitter_go::LANGUAGE.into(), tree_sitter_go::TAGS_QUERY),
             js_config: get_tags_config(
                 tree_sitter_javascript::LANGUAGE.into(),
                 tree_sitter_javascript::TAGS_QUERY,
@@ -133,6 +132,9 @@ impl Parser {
                 file_path_relative_to_tag_file,
                 config,
             ),
+            "go" => {
+                self.generate_go_tags_with_user_config(code, file_path_relative_to_tag_file, config)
+            }
             _ => None,
         }
     }
@@ -195,6 +197,29 @@ impl Parser {
         )
     }
 
+    /// Generates Go tags with user configuration
+    pub fn generate_go_tags_with_user_config(
+        &mut self,
+        code: &[u8],
+        file_path_relative_to_tag_file: &str,
+        config: &crate::config::Config,
+    ) -> Option<Vec<tag::Tag>> {
+        // Parse go-kinds configuration
+        let tag_config = if config.go_kinds.is_empty() {
+            helper::TagKindConfig::new_go() // Default: all kinds enabled
+        } else {
+            helper::TagKindConfig::from_go_kinds_string(&config.go_kinds)
+        };
+
+        // Call the new method that accepts user config
+        self.generate_go_tags_with_full_config(
+            code,
+            file_path_relative_to_tag_file,
+            &tag_config,
+            config,
+        )
+    }
+
     /// Parses source code and generates tags
     ///
     /// # Arguments
@@ -213,7 +238,6 @@ impl Parser {
         extension: &str,
     ) -> Vec<tag::Tag> {
         let config = match extension {
-            "go" => Some(&self.go_config),
             "js" => Some(&self.js_config),
             "jsx" => Some(&self.js_config),
             "rb" => Some(&self.ruby_config),

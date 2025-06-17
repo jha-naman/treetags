@@ -1,0 +1,2 @@
+--extras=+F -f '-' --format=2 --excmd=pattern --fields=nksSafet --sort=no --append=no --language-force=go --go-kinds=picsmtfv
+source.go

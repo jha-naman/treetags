@@ -83,6 +83,10 @@ pub struct Config {
     #[arg(long = "rust-kinds", default_value = "", verbatim_doc_comment)]
     pub rust_kinds: String,
 
+    /// Go language specific kinds to generate tags for
+    #[arg(long = "go-kinds", default_value = "")]
+    pub go_kinds: String,
+
     /// Parsed fields configuration  
     #[clap(skip)]
     pub fields_config: FieldsConfig,
