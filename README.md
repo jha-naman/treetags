@@ -120,3 +120,11 @@ Options:
   -h, --help
           Print help
 ```
+
+## Running Integration Tests
+
+Integration tests are built from test cases on demand
+
+```bash
+cargo build  # Generates test files
+cargo test   # Runs all tests including generated ones
