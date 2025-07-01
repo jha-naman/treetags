@@ -1,10 +1,9 @@
+use super::helper::{self, LanguageContext, TagKindConfig};
 use super::Parser;
 use indexmap::IndexMap;
-use std::collections::HashMap;
-use std::collections::HashSet;
 use tree_sitter::{Node, TreeCursor};
 
-use crate::{split_by_newlines, tag};
+use crate::tag;
 
 // Represents the type of scope for context tracking
 #[derive(Debug)]
@@ -17,258 +16,32 @@ enum ScopeType {
     Implementation, // Can store both trait and type info if needed
 }
 
-// Configuration for which tag kinds to generate
-#[derive(Debug, Clone)]
-pub struct TagKindConfig {
-    enabled_kinds: HashSet<String>,
-    // Cache for optimization - whether we need to traverse certain node types
-    needs_traversal_cache: HashMap<String, bool>,
-}
-
-impl TagKindConfig {
-    /// Create a new configuration with all kinds enabled by default
-    pub fn new() -> Self {
-        let mut enabled_kinds = HashSet::new();
-        // Add all possible tag kinds
-        enabled_kinds.insert("n".to_string()); // module
-        enabled_kinds.insert("s".to_string()); // struct
-        enabled_kinds.insert("g".to_string()); // enum
-        enabled_kinds.insert("u".to_string()); // union
-        enabled_kinds.insert("i".to_string()); // trait/interface
-        enabled_kinds.insert("c".to_string()); // implementation
-        enabled_kinds.insert("f".to_string()); // function
-        enabled_kinds.insert("P".to_string()); // method/procedure
-        enabled_kinds.insert("m".to_string()); // method signature
-        enabled_kinds.insert("e".to_string()); // enum variant
-        enabled_kinds.insert("T".to_string()); // associated type
-        enabled_kinds.insert("C".to_string()); // constant
-        enabled_kinds.insert("v".to_string()); // variable/static
-        enabled_kinds.insert("t".to_string()); // type alias
-        enabled_kinds.insert("M".to_string()); // macro
-
-        let mut config = Self {
-            enabled_kinds,
-            needs_traversal_cache: HashMap::new(),
-        };
-        config.rebuild_traversal_cache();
-        config
-    }
-
-    /// Create a configuration from a kinds string (e.g., "nsf" or "n,s,f")
-    pub fn from_kinds_string(kinds_str: &str) -> Self {
-        let mut enabled_kinds = HashSet::new();
-
-        // Handle both comma-separated and concatenated formats
-        let kinds: Vec<&str> = if kinds_str.contains(',') {
-            kinds_str.split(',').map(|s| s.trim()).collect()
-        } else {
-            // Split each character as a separate kind
-            kinds_str
-                .chars()
-                .map(|c| match c {
-                    'n' => "n",
-                    's' => "s",
-                    'g' => "g",
-                    'u' => "u",
-                    'i' => "i",
-                    'c' => "c",
-                    'f' => "f",
-                    'P' => "P",
-                    'm' => "m",
-                    'e' => "e",
-                    'T' => "T",
-                    'C' => "C",
-                    'v' => "v",
-                    't' => "t",
-                    'M' => "M",
-                    _ => "", // Ignore unknown kinds
-                })
-                .filter(|s| !s.is_empty())
-                .collect()
-        };
-
-        for kind in kinds {
-            match kind {
-                "n" | "module" => {
-                    enabled_kinds.insert("n".to_string());
-                }
-                "s" | "struct" => {
-                    enabled_kinds.insert("s".to_string());
-                }
-                "g" | "enum" => {
-                    enabled_kinds.insert("g".to_string());
-                }
-                "u" | "union" => {
-                    enabled_kinds.insert("u".to_string());
-                }
-                "i" | "trait" | "interface" => {
-                    enabled_kinds.insert("i".to_string());
-                }
-                "c" | "impl" | "implementation" => {
-                    enabled_kinds.insert("c".to_string());
-                }
-                "f" | "function" => {
-                    enabled_kinds.insert("f".to_string());
-                }
-                "P" | "method" | "procedure" => {
-                    enabled_kinds.insert("P".to_string());
-                }
-                "m" | "field" => {
-                    enabled_kinds.insert("m".to_string());
-                }
-                "e" | "enumerator" | "variant" => {
-                    enabled_kinds.insert("e".to_string());
-                }
-                "T" | "typedef" | "associated_type" => {
-                    enabled_kinds.insert("T".to_string());
-                }
-                "C" | "constant" => {
-                    enabled_kinds.insert("C".to_string());
-                }
-                "v" | "variable" | "static" => {
-                    enabled_kinds.insert("v".to_string());
-                }
-                "t" | "type" | "alias" => {
-                    enabled_kinds.insert("t".to_string());
-                }
-                "M" | "macro" => {
-                    enabled_kinds.insert("M".to_string());
-                }
-                _ => {
-                    eprintln!("Warning: Unknown Rust tag kind: {}", kind);
-                }
-            }
-        }
-
-        let mut config = Self {
-            enabled_kinds,
-            needs_traversal_cache: HashMap::new(),
-        };
-        config.rebuild_traversal_cache();
-        config
-    }
-
-    /// Check if a tag kind is enabled
-    pub fn is_kind_enabled(&self, kind: &str) -> bool {
-        self.enabled_kinds.contains(kind)
-    }
-
-    /// Check if we need to traverse into a specific node type for optimization
-    pub fn needs_traversal(&self, node_kind: &str) -> bool {
-        self.needs_traversal_cache
-            .get(node_kind)
-            .copied()
-            .unwrap_or(true)
-    }
-
-    /// Rebuild the traversal optimization cache
-    fn rebuild_traversal_cache(&mut self) {
-        self.needs_traversal_cache.clear();
-
-        // Define what child tags each node type can contain
-        // Only traverse if we need the parent tag OR any potential child tags
-
-        // Modules can contain everything
-        self.needs_traversal_cache.insert(
-            "mod_item".to_string(),
-            self.is_kind_enabled("n") || self.needs_any_child_tags(),
-        );
-
-        // Structs can contain fields (tagged as 'm')
-        self.needs_traversal_cache.insert(
-            "struct_item".to_string(),
-            self.is_kind_enabled("s") || self.is_kind_enabled("m"),
-        );
-
-        // Enums can contain variants (tagged as 'e')
-        self.needs_traversal_cache.insert(
-            "enum_item".to_string(),
-            self.is_kind_enabled("g") || self.is_kind_enabled("e"),
-        );
-
-        // Unions are simple - no child tags typically
-        self.needs_traversal_cache
-            .insert("union_item".to_string(), self.is_kind_enabled("u"));
-
-        // Traits can contain methods ('m'), associated types ('T'), constants ('C')
-        self.needs_traversal_cache.insert(
-            "trait_item".to_string(),
-            self.is_kind_enabled("i")
-                || self.is_kind_enabled("m")
-                || self.is_kind_enabled("T")
-                || self.is_kind_enabled("C"),
-        );
-
-        // Impl blocks can contain methods ('P'), associated types ('T'), constants ('C')
-        self.needs_traversal_cache.insert(
-            "impl_item".to_string(),
-            self.is_kind_enabled("c")
-                || self.is_kind_enabled("P")
-                || self.is_kind_enabled("T")
-                || self.is_kind_enabled("C"),
-        );
-
-        // Functions are leaf nodes - no child tags
-        self.needs_traversal_cache.insert(
-            "function_item".to_string(),
-            self.is_kind_enabled("f") || self.is_kind_enabled("P"),
-        );
-
-        self.needs_traversal_cache.insert(
-            "function_signature_item".to_string(),
-            self.is_kind_enabled("m"),
-        );
-
-        // Other leaf nodes
-        self.needs_traversal_cache
-            .insert("associated_type".to_string(), self.is_kind_enabled("T"));
-        self.needs_traversal_cache
-            .insert("const_item".to_string(), self.is_kind_enabled("C"));
-        self.needs_traversal_cache
-            .insert("static_item".to_string(), self.is_kind_enabled("v"));
-        self.needs_traversal_cache
-            .insert("type_item".to_string(), self.is_kind_enabled("t"));
-        self.needs_traversal_cache
-            .insert("macro_definition".to_string(), self.is_kind_enabled("M"));
-    }
-
-    /// Helper to check if we need any child tags (for modules)
-    fn needs_any_child_tags(&self) -> bool {
-        // If any tag type is enabled, modules might need traversal
-        !self.enabled_kinds.is_empty()
-    }
-}
-
-impl Default for TagKindConfig {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-// Stores context during traversal
-struct Context<'a> {
-    source_code: &'a str,
-    lines: Vec<Vec<u8>>,
-    file_name: &'a str,
-    tags: &'a mut Vec<tag::Tag>,
-    tag_config: &'a TagKindConfig,
-    user_config: &'a crate::config::Config,
-    // Use a stack to keep track of nested scopes (module, struct, trait, etc.)
+/// Enhanced Context for Rust with scope tracking
+struct RustContext<'a> {
+    base: helper::Context<'a>,
     scope_stack: Vec<(ScopeType, String)>,
 }
 
-impl<'a> Context<'a> {
-    // Helper to get the text content of a node
-    fn node_text(&self, node: &Node) -> &'a str {
-        node.utf8_text(self.source_code.as_bytes())
-            .unwrap_or_else(|_| {
-                eprintln!(
-                    "Warning: Failed to get UTF-8 text for node at range {:?}-{:?}",
-                    node.start_position(),
-                    node.end_position()
-                );
-                "" // Return empty string on error
-            })
+impl<'a> RustContext<'a> {
+    fn new(
+        source_code: &'a str,
+        lines: Vec<Vec<u8>>,
+        file_name: &'a str,
+        tags: &'a mut Vec<tag::Tag>,
+        tag_config: &'a TagKindConfig,
+        user_config: &'a crate::config::Config,
+    ) -> Self {
+        Self {
+            base: helper::Context {
+                source_code,
+                lines,
+                file_name,
+                tags,
+                tag_config,
+                user_config,
+            },
+            scope_stack: Vec::new(),
+        }
     }
 
     // Build extension fields based on the current scope stack
@@ -315,116 +88,56 @@ impl<'a> Context<'a> {
     }
 }
 
+impl<'a> LanguageContext for RustContext<'a> {
+    type ScopeType = ScopeType;
+
+    fn get_tag_config(&self) -> &TagKindConfig {
+        self.base.tag_config
+    }
+
+    fn push_scope(&mut self, scope_type: Self::ScopeType, name: String) {
+        self.scope_stack.push((scope_type, name));
+    }
+
+    fn pop_scope(&mut self) -> Option<(Self::ScopeType, String)> {
+        self.scope_stack.pop()
+    }
+
+    fn process_node(&mut self, cursor: &mut TreeCursor) -> Option<(Self::ScopeType, String)> {
+        process_node(cursor, self)
+    }
+}
+
 impl Parser {
     pub fn generate_rust_tags_with_full_config(
         &mut self,
         code: &[u8], // Changed to slice for flexibility
         file_path_relative_to_tag_file: &str,
-        tag_config: &TagKindConfig,
+        tag_config: &helper::TagKindConfig,
         user_config: &crate::config::Config,
     ) -> Option<Vec<tag::Tag>> {
-        // Ensure the code is valid UTF-8
-        let source_code = match std::str::from_utf8(code) {
-            Ok(s) => s,
-            Err(_) => {
-                eprintln!(
-                    "Warning: Input for {} is not valid UTF-8, skipping.",
-                    file_path_relative_to_tag_file
+        helper::generate_tags_with_config(
+            &mut self.ts_parser,
+            tree_sitter_rust::LANGUAGE.into(),
+            code,
+            file_path_relative_to_tag_file,
+            |source_code, lines, cursor, tags| {
+                let mut context = RustContext::new(
+                    source_code,
+                    lines,
+                    file_path_relative_to_tag_file,
+                    tags,
+                    tag_config,
+                    user_config,
                 );
-                return None;
-            }
-        };
-
-        // Split the source code into lines for address generation
-        let lines = split_by_newlines::split_by_newlines(code);
-
-        self.ts_parser
-            .set_language(&tree_sitter_rust::LANGUAGE.into())
-            .expect("Error loading Rust grammar");
-
-        // Parse the source code using the parser from self
-        let tree = self.ts_parser.parse(source_code, None)?; // Use ? for concise error handling
-
-        let mut tags = Vec::new();
-        {
-            // New scope for cursor and context to avoid lifetime issues when returning tags
-            let mut cursor = tree.walk();
-
-            // Need to move the cursor to the root node's first child to start traversal
-            if !cursor.goto_first_child() {
-                return Some(tags); // Empty file or parse error
-            }
-
-            let mut context = Context {
-                file_name: file_path_relative_to_tag_file,
-                lines,
-                source_code,
-                tags: &mut tags,
-                tag_config,
-                user_config,
-                scope_stack: vec![], // Initialize empty scope stack
-            };
-
-            walk(&mut cursor, &mut context);
-        }
-
-        Some(tags)
-    }
-}
-
-// Depth-First Tree Traversal with Scope Management and Early Termination
-fn walk(cursor: &mut TreeCursor, context: &mut Context) {
-    loop {
-        let node = cursor.node();
-        let node_kind = node.kind();
-
-        // Early termination: skip traversing this subtree if we don't need any tags from it
-        if !context.tag_config.needs_traversal(node_kind) {
-            // Skip to next sibling without processing this node or its children
-            if !cursor.goto_next_sibling() {
-                break; // No more siblings, return to parent level
-            }
-            continue;
-        }
-
-        // --- 1. Process the current node ---
-        // Returns Option<(ScopeType, Name)> if a new scope is entered
-        let scope_info = process_node(cursor, context);
-
-        // --- 2. Manage Scope Stack ---
-        let mut scope_pushed = false;
-        if let Some((scope_type, scope_name)) = scope_info {
-            // Avoid pushing empty names which can happen for anonymous blocks
-            if !scope_name.is_empty() {
-                context.scope_stack.push((scope_type, scope_name));
-                scope_pushed = true;
-            }
-        }
-
-        // --- 3. Recurse into children ---
-        if cursor.goto_first_child() {
-            walk(cursor, context);
-        }
-
-        // --- 4. Pop Scope if necessary (before moving to sibling) ---
-        if scope_pushed && context.scope_stack.pop().is_none() {
-            // This should ideally not happen if push/pop logic is correct
-            eprintln!(
-                "Warning: Popped from empty scope stack! Node: {:?}",
-                node_kind
-            );
-        }
-
-        // --- 5. Move to the next sibling ---
-        if !cursor.goto_next_sibling() {
-            cursor.goto_parent(); // Return cursor to current node after visiting children
-            break; // No more siblings, return to parent level
-        }
+                helper::walk_generic(cursor, &mut context);
+            },
+        )
     }
 }
 
 // Dispatches node processing based on kind, returns scope info if node defines one
-fn process_node(cursor: &mut TreeCursor, context: &mut Context) -> Option<(ScopeType, String)> {
+fn process_node(cursor: &mut TreeCursor, context: &mut RustContext) -> Option<(ScopeType, String)> {
     // Returns (ScopeType, Name) if scope changes
     let node = cursor.node();
     // println!("Node: {} @ {:?} Scope: {:?}", node.kind(), String::from_utf8_lossy(&context.lines[node.start_position().row]), context.scope_stack); // Debug print
@@ -493,7 +206,7 @@ fn create_tag(
     name: String,
     kind_char: &str,
     node: Node, // Pass the node for position info
-    context: &mut Context,
+    context: &mut RustContext,
     // Allow passing extra fields specific to the item being tagged
     extra_fields: Option<IndexMap<String, String>>,
 ) {
@@ -502,44 +215,65 @@ fn create_tag(
     }
 
     // Check if this tag kind is enabled in the configuration
-    if !context.tag_config.is_kind_enabled(kind_char) {
+    if !context.base.tag_config.is_kind_enabled(kind_char) {
         return; // Skip creating this tag if the kind is disabled
     }
 
     let row = node.start_position().row;
-    let address = address_string_from_line(row, context);
+    let address = helper::address_string_from_line(row, &context.base);
     let mut extension_fields = IndexMap::new();
 
     // Insert fields in ctags order (alphabetical by field letter, with special cases first):
 
     // 1. Kind field (k) - if enabled as extension field
-    if context.user_config.fields_config.is_field_enabled("kind") {
+    if context
+        .base
+        .user_config
+        .fields_config
+        .is_field_enabled("kind")
+    {
         extension_fields.insert(String::from("kind"), kind_char.to_string());
     }
 
     // 2. Line number (n) - typically second
-    if context.user_config.fields_config.is_field_enabled("line") {
+    if context
+        .base
+        .user_config
+        .fields_config
+        .is_field_enabled("line")
+    {
         extension_fields.insert(String::from("line"), (row + 1).to_string());
     }
 
     // 3. Access field (a) - access modifier
     if let Some(extras) = &extra_fields {
         if let Some(access) = extras.get("access") {
-            if context.user_config.fields_config.is_field_enabled("access") {
+            if context
+                .base
+                .user_config
+                .fields_config
+                .is_field_enabled("access")
+            {
                 extension_fields.insert("access".to_string(), access.clone());
             }
         }
     }
 
     // 4. File field (f) - file-restricted scoping
-    if context.user_config.fields_config.is_field_enabled("file") {
-        extension_fields.insert(String::from("file"), context.file_name.to_string());
+    if context
+        .base
+        .user_config
+        .fields_config
+        .is_field_enabled("file")
+    {
+        extension_fields.insert(String::from("file"), context.base.file_name.to_string());
     }
 
     // 5. Signature field (S) - function signature
     if let Some(extras) = &extra_fields {
         if let Some(signature) = extras.get("signature") {
             if context
+                .base
                 .user_config
                 .fields_config
                 .is_field_enabled("signature")
@@ -550,8 +284,12 @@ fn create_tag(
     }
 
     // 6. Scope information (s) - scope of tag definition
-    if context.user_config.fields_config.is_field_enabled("scope")
-        || context.user_config.extras_config.qualified
+    if context
+        .base
+        .user_config
+        .fields_config
+        .is_field_enabled("scope")
+        || context.base.user_config.extras_config.qualified
     {
         let scope_fields = context.create_extension_fields();
         extension_fields.extend(scope_fields);
@@ -561,6 +299,7 @@ fn create_tag(
     if let Some(extras) = &extra_fields {
         if let Some(typeref) = extras.get("typeref") {
             if context
+                .base
                 .user_config
                 .fields_config
                 .is_field_enabled("typeref")
@@ -571,7 +310,12 @@ fn create_tag(
     }
 
     // 8. End position (e) - end line number
-    if context.user_config.fields_config.is_field_enabled("end") {
+    if context
+        .base
+        .user_config
+        .fields_config
+        .is_field_enabled("end")
+    {
         extension_fields.insert(
             String::from("end"),
             (node.end_position().row + 1).to_string(),
@@ -589,19 +333,28 @@ fn create_tag(
             match key.as_str() {
                 "implementation" | "trait" | "struct" | "enum" | "union" => {
                     if context
+                        .base
                         .user_config
                         .fields_config
                         .is_field_enabled("implementation")
-                        || context.user_config.fields_config.is_field_enabled("scope")
-                        || context.user_config.extras_config.qualified
+                        || context
+                            .base
+                            .user_config
+                            .fields_config
+                            .is_field_enabled("scope")
+                        || context.base.user_config.extras_config.qualified
                     {
                         extension_fields.insert(key, value);
                     }
                 }
                 _ => {
                     // For other fields, include them if scope/qualified is enabled
-                    if context.user_config.fields_config.is_field_enabled("scope")
-                        || context.user_config.extras_config.qualified
+                    if context
+                        .base
+                        .user_config
+                        .fields_config
+                        .is_field_enabled("scope")
+                        || context.base.user_config.extras_config.qualified
                     {
                         extension_fields.insert(key, value);
                     }
@@ -610,9 +363,9 @@ fn create_tag(
         }
     }
 
-    context.tags.push(tag::Tag {
+    context.base.tags.push(tag::Tag {
         name,
-        file_name: context.file_name.to_string(),
+        file_name: context.base.file_name.to_string(),
         address,
         kind: Some(String::from(kind_char)),
         extension_fields: if extension_fields.is_empty() {
@@ -624,9 +377,12 @@ fn create_tag(
 }
 // --- Specific Node Processors (returning Scope Info) ---
 
-fn process_module(cursor: &mut TreeCursor, context: &mut Context) -> Option<(ScopeType, String)> {
+fn process_module(
+    cursor: &mut TreeCursor,
+    context: &mut RustContext,
+) -> Option<(ScopeType, String)> {
     let node = cursor.node();
-    if let Some(name) = get_node_name(cursor, context, &["identifier"]) {
+    if let Some(name) = helper::get_node_name(cursor, &context.base, &["identifier"]) {
         create_tag(name.clone(), "n", node, context, None); // 'n' for module
         Some((ScopeType::Module, name))
     } else {
@@ -634,9 +390,12 @@ fn process_module(cursor: &mut TreeCursor, context: &mut Context) -> Option<(Sco
     }
 }
 
-fn process_struct(cursor: &mut TreeCursor, context: &mut Context) -> Option<(ScopeType, String)> {
+fn process_struct(
+    cursor: &mut TreeCursor,
+    context: &mut RustContext,
+) -> Option<(ScopeType, String)> {
     let node = cursor.node();
-    if let Some(name) = get_node_name(cursor, context, &["type_identifier"]) {
+    if let Some(name) = helper::get_node_name(cursor, &context.base, &["type_identifier"]) {
         create_tag(name.clone(), "s", node, context, None); // 's' for struct
         process_identifiers_list(cursor, context, &name, "m");
         cursor.goto_parent();
@@ -646,9 +405,12 @@ fn process_struct(cursor: &mut TreeCursor, context: &mut Context) -> Option<(Sco
     }
 }
 
-fn process_union(cursor: &mut TreeCursor, context: &mut Context) -> Option<(ScopeType, String)> {
+fn process_union(
+    cursor: &mut TreeCursor,
+    context: &mut RustContext,
+) -> Option<(ScopeType, String)> {
     let node = cursor.node();
-    if let Some(name) = get_node_name(cursor, context, &["type_identifier"]) {
+    if let Some(name) = helper::get_node_name(cursor, &context.base, &["type_identifier"]) {
         create_tag(name.clone(), "u", node, context, None); // 'u' for union
         Some((ScopeType::Union, name))
     } else {
@@ -656,9 +418,9 @@ fn process_union(cursor: &mut TreeCursor, context: &mut Context) -> Option<(Scop
     }
 }
 
-fn process_enum(cursor: &mut TreeCursor, context: &mut Context) -> Option<(ScopeType, String)> {
+fn process_enum(cursor: &mut TreeCursor, context: &mut RustContext) -> Option<(ScopeType, String)> {
     let node = cursor.node();
-    let enum_name = get_node_name(cursor, context, &["type_identifier"]);
+    let enum_name = helper::get_node_name(cursor, &context.base, &["type_identifier"]);
 
     match &enum_name {
         None => None,
@@ -676,7 +438,7 @@ fn process_enum(cursor: &mut TreeCursor, context: &mut Context) -> Option<(Scope
 
 fn process_identifiers_list(
     cursor: &mut TreeCursor,
-    context: &mut Context,
+    context: &mut RustContext,
     name: &str,
     tag_kind: &str,
 ) {
@@ -701,9 +463,11 @@ fn process_identifiers_list(
                 let kind = cursor.node().kind();
                 if kind == "enum_variant" || kind == "field_declaration" {
                     let variant_node = cursor.node();
-                    if let Some(variant_name) =
-                        get_node_name(cursor, context, &["identifier", "field_identifier"])
-                    {
+                    if let Some(variant_name) = helper::get_node_name(
+                        cursor,
+                        &context.base,
+                        &["identifier", "field_identifier"],
+                    ) {
                         // Add enum/struct name context specifically for the variant tag
                         let mut variant_fields = IndexMap::new();
                         variant_fields.insert(variant_type.to_string(), name.to_owned());
@@ -728,9 +492,12 @@ fn process_identifiers_list(
     }
 }
 
-fn process_trait(cursor: &mut TreeCursor, context: &mut Context) -> Option<(ScopeType, String)> {
+fn process_trait(
+    cursor: &mut TreeCursor,
+    context: &mut RustContext,
+) -> Option<(ScopeType, String)> {
     let node = cursor.node();
-    if let Some(name) = get_node_name(cursor, context, &["type_identifier"]) {
+    if let Some(name) = helper::get_node_name(cursor, &context.base, &["type_identifier"]) {
         create_tag(name.clone(), "i", node, context, None); // 'i' for trait
         Some((ScopeType::Trait, name))
     } else {
@@ -739,7 +506,7 @@ fn process_trait(cursor: &mut TreeCursor, context: &mut Context) -> Option<(Scop
 }
 
 // Process 'impl_item' -> impl Foo { ... } or impl Bar for Foo { ... }
-fn process_impl(cursor: &mut TreeCursor, context: &mut Context) -> Option<(ScopeType, String)> {
+fn process_impl(cursor: &mut TreeCursor, context: &mut RustContext) -> Option<(ScopeType, String)> {
     let node = cursor.node();
     let (trait_name, type_name) = find_impl_names(cursor, context)?;
 
@@ -763,7 +530,7 @@ fn process_impl(cursor: &mut TreeCursor, context: &mut Context) -> Option<(Scope
 
 fn find_impl_names(
     cursor: &mut TreeCursor,
-    context: &Context,
+    context: &RustContext,
 ) -> Option<(Option<String>, Option<String>)> {
     let mut trait_name = None;
     let mut type_name = None;
@@ -777,7 +544,7 @@ fn find_impl_names(
         let child_node = cursor.node();
         match child_node.kind() {
             "type_identifier" | "scoped_type_identifier" | "generic_type" => {
-                let name = context.node_text(&child_node).to_string();
+                let name = context.base.node_text(&child_node).to_string();
                 if found_for {
                     if type_name.is_none() {
                         type_name = Some(name);
@@ -807,20 +574,22 @@ fn find_impl_names(
 // Processes 'function_item' and 'function_signature_item'
 fn process_function(
     cursor: &mut TreeCursor,
-    context: &mut Context,
+    context: &mut RustContext,
     kind_char: &str, // e.g., "f"
 ) {
     let node = cursor.node();
-    if let Some(name) = get_node_name(cursor, context, &["identifier"]) {
+    if let Some(name) = helper::get_node_name(cursor, &context.base, &["identifier"]) {
         let mut extra_fields = IndexMap::new();
 
         // Only get the signature string if signature field is enabled
         if context
+            .base
             .user_config
             .fields_config
             .is_field_enabled("signature")
         {
-            if let Some(signature_str) = get_function_signature_string(node, cursor, context) {
+            if let Some(signature_str) = get_function_signature_string(node, cursor, &context.base)
+            {
                 extra_fields.insert(String::from("signature"), signature_str);
             }
         }
@@ -840,87 +609,50 @@ fn process_function(
 }
 
 // Processes 'associated_type' -> type Item;
-fn process_associated_type(cursor: &mut TreeCursor, context: &mut Context) {
+fn process_associated_type(cursor: &mut TreeCursor, context: &mut RustContext) {
     let node = cursor.node();
-    if let Some(name) = get_node_name(cursor, context, &["type_identifier"]) {
+    if let Some(name) = helper::get_node_name(cursor, &context.base, &["type_identifier"]) {
         // Using 'T' like type alias, context provides trait scope
         create_tag(name, "T", node, context, None);
     }
 }
 
 // Processes 'const_item'
-fn process_constant(cursor: &mut TreeCursor, context: &mut Context) {
+fn process_constant(cursor: &mut TreeCursor, context: &mut RustContext) {
     let node = cursor.node();
-    if let Some(name) = get_node_name(cursor, context, &["identifier"]) {
+    if let Some(name) = helper::get_node_name(cursor, &context.base, &["identifier"]) {
         create_tag(name, "C", node, context, None); // 'c' for constant
     }
 }
 
 // Processes 'static_item'
-fn process_variable(cursor: &mut TreeCursor, context: &mut Context) {
+fn process_variable(cursor: &mut TreeCursor, context: &mut RustContext) {
     let node = cursor.node();
-    if let Some(name) = get_node_name(cursor, context, &["identifier"]) {
+    if let Some(name) = helper::get_node_name(cursor, &context.base, &["identifier"]) {
         create_tag(name, "v", node, context, None); // 'v' for variable (ctags uses this for static)
     }
 }
 
 // Processes 'type_item' -> type MyType = ...;
-fn process_typedef(cursor: &mut TreeCursor, context: &mut Context) {
+fn process_typedef(cursor: &mut TreeCursor, context: &mut RustContext) {
     let node = cursor.node();
-    if let Some(name) = get_node_name(cursor, context, &["type_identifier"]) {
+    if let Some(name) = helper::get_node_name(cursor, &context.base, &["type_identifier"]) {
         create_tag(name, "t", node, context, None); // 'T' for type alias
     }
 }
 
 // Processes 'macro_definition' -> macro_rules! my_macro { ... }
-fn process_macro(cursor: &mut TreeCursor, context: &mut Context) {
+fn process_macro(cursor: &mut TreeCursor, context: &mut RustContext) {
     let node = cursor.node();
-    if let Some(name) = get_node_name(cursor, context, &["identifier", "metavariable"]) {
+    if let Some(name) =
+        helper::get_node_name(cursor, &context.base, &["identifier", "metavariable"])
+    {
         let clean_name = name.strip_suffix('!').unwrap_or(&name).to_string();
         create_tag(clean_name, "M", node, context, None); // 'M' for macro definition
     }
 }
 
 // --- Helper Functions ---
-
-// Finds the first child node matching any of the specified kinds and returns its text content.
-// IMPORTANT: Temporarily modifies the cursor but restores it.
-fn get_node_name(
-    cursor: &mut TreeCursor, // Needs to be mutable to move
-    context: &Context,
-    kinds: &[&str],
-) -> Option<String> {
-    if !cursor.goto_first_child() {
-        return None;
-    }
-    loop {
-        let current_node = cursor.node();
-        if kinds.contains(&current_node.kind()) {
-            cursor.goto_parent(); // Restore cursor
-            return Some(String::from(context.node_text(&current_node))); // Found the first match
-        }
-        if !cursor.goto_next_sibling() {
-            break;
-        }
-    }
-    cursor.goto_parent(); // Restore cursor
-
-    None
-}
-
-// Generates the ctags address string
-fn address_string_from_line(row: usize, context: &Context) -> String {
-    if row >= context.lines.len() {
-        return format!("/^{}$/;", row + 1);
-    }
-    let line_bytes = &context.lines[row];
-    let escaped = String::from_utf8_lossy(line_bytes)
-        .replace('\\', "\\\\")
-        .replace('/', "\\/")
-        .replace('^', "\\^")
-        .replace('$', "\\$");
-    format!("/^{}$/;\"", escaped)
-}
 
 // oo
 
@@ -929,11 +661,11 @@ fn address_string_from_line(row: usize, context: &Context) -> String {
 fn get_function_signature_string(
     func_node: Node,
     cursor: &mut TreeCursor,
-    context: &Context,
+    context: &helper::Context,
 ) -> Option<String> {
     // The `parameters` node in tree-sitter-rust typically includes the parentheses.
     // Its text would be like "(param1: Type1, param2: Type2)" or "()".
-    let params_text = get_node_name(cursor, context, &["parameters"])?;
+    let params_text = helper::get_node_name(cursor, context, &["parameters"])?;
 
     // For Return Type: "return_type" is a FIELD NAME on the function_item node.
     // The actual child node will have a KIND corresponding to the specific type (e.g., type_identifier).

@@ -14,6 +14,7 @@ use tree_sitter::Parser as TSParser;
 use tree_sitter_tags::TagsConfiguration;
 use tree_sitter_tags::TagsContext;
 
+mod common;
 mod go;
 mod helper;
 mod rust;
@@ -183,9 +184,9 @@ impl Parser {
     ) -> Option<Vec<tag::Tag>> {
         // Parse rust-kinds configuration
         let tag_config = if config.rust_kinds.is_empty() {
-            rust::TagKindConfig::new() // Default: all kinds enabled
+            helper::TagKindConfig::new_rust() // Default: all kinds enabled
         } else {
-            rust::TagKindConfig::from_kinds_string(&config.rust_kinds)
+            helper::TagKindConfig::from_rust_kinds_string(&config.rust_kinds)
         };
 
         // Call the new method that accepts user config

@@ -1,12 +1,9 @@
-use super::helper::TagKindConfig;
-use super::helper::{self, Context};
+use super::helper::{self, Context, LanguageContext, TagKindConfig};
 use super::Parser;
 use indexmap::IndexMap;
-use std::collections::HashMap;
-use std::collections::HashSet;
 use tree_sitter::TreeCursor;
 
-use crate::{split_by_newlines, tag};
+use crate::tag;
 
 /// Get the preferred field ordering for Go
 fn get_field_order_for_go() -> Vec<&'static str> {
@@ -141,167 +138,6 @@ enum ScopeType {
     Interface,
 }
 
-impl TagKindConfig {
-    /// Create a new configuration with all kinds enabled by default for Go
-    pub fn new_go() -> Self {
-        let mut enabled_kinds = HashSet::new();
-        // Add all possible Go tag kinds
-        enabled_kinds.insert("p".to_string()); // package
-        enabled_kinds.insert("f".to_string()); // function
-        enabled_kinds.insert("c".to_string()); // constant
-        enabled_kinds.insert("t".to_string()); // type
-        enabled_kinds.insert("v".to_string()); // variable
-        enabled_kinds.insert("s".to_string()); // struct
-        enabled_kinds.insert("i".to_string()); // interface
-        enabled_kinds.insert("m".to_string()); // struct member
-        enabled_kinds.insert("M".to_string()); // struct anonymous member
-        enabled_kinds.insert("n".to_string()); // interface method specification
-        enabled_kinds.insert("P".to_string()); // imported package
-        enabled_kinds.insert("a".to_string()); // type alias
-
-        let mut config = Self {
-            enabled_kinds,
-            needs_traversal_cache: HashMap::new(),
-        };
-        config.rebuild_go_traversal_cache();
-        config
-    }
-
-    /// Create a configuration from a kinds string for Go (e.g., "pfc" or "p,f,c")
-    pub fn from_go_kinds_string(kinds_str: &str) -> Self {
-        let mut enabled_kinds = HashSet::new();
-
-        // Handle both comma-separated and concatenated formats
-        let kinds: Vec<&str> = if kinds_str.contains(',') {
-            kinds_str.split(',').map(|s| s.trim()).collect()
-        } else {
-            // Split each character as a separate kind
-            kinds_str
-                .chars()
-                .map(|c| match c {
-                    'p' => "p",
-                    'f' => "f",
-                    'c' => "c",
-                    't' => "t",
-                    'v' => "v",
-                    's' => "s",
-                    'i' => "i",
-                    'm' => "m",
-                    'M' => "M",
-                    'n' => "n",
-                    'P' => "P",
-                    'a' => "a",
-                    _ => "", // Ignore unknown kinds
-                })
-                .filter(|s| !s.is_empty())
-                .collect()
-        };
-
-        for kind in kinds {
-            match kind {
-                "p" | "package" => {
-                    enabled_kinds.insert("p".to_string());
-                }
-                "f" | "function" => {
-                    enabled_kinds.insert("f".to_string());
-                }
-                "c" | "constant" => {
-                    enabled_kinds.insert("c".to_string());
-                }
-                "t" | "type" => {
-                    enabled_kinds.insert("t".to_string());
-                }
-                "v" | "variable" => {
-                    enabled_kinds.insert("v".to_string());
-                }
-                "s" | "struct" => {
-                    enabled_kinds.insert("s".to_string());
-                }
-                "i" | "interface" => {
-                    enabled_kinds.insert("i".to_string());
-                }
-                "m" | "member" => {
-                    enabled_kinds.insert("m".to_string());
-                }
-                "M" | "anonymous" => {
-                    enabled_kinds.insert("M".to_string());
-                }
-                "n" | "method" => {
-                    enabled_kinds.insert("n".to_string());
-                }
-                "P" | "import" => {
-                    enabled_kinds.insert("P".to_string());
-                }
-                "a" | "alias" => {
-                    enabled_kinds.insert("a".to_string());
-                }
-                _ => {
-                    eprintln!("Warning: Unknown Go tag kind: {}", kind);
-                }
-            }
-        }
-
-        let mut config = Self {
-            enabled_kinds,
-            needs_traversal_cache: HashMap::new(),
-        };
-        config.rebuild_go_traversal_cache();
-        config
-    }
-
-    /// Rebuild the traversal optimization cache for Go
-    fn rebuild_go_traversal_cache(&mut self) {
-        self.needs_traversal_cache.clear();
-
-        // Define what child tags each node type can contain
-        self.needs_traversal_cache
-            .insert("source_file".to_string(), !self.enabled_kinds.is_empty());
-
-        self.needs_traversal_cache
-            .insert("package_clause".to_string(), self.is_kind_enabled("p"));
-
-        self.needs_traversal_cache
-            .insert("import_declaration".to_string(), self.is_kind_enabled("P"));
-
-        self.needs_traversal_cache.insert(
-            "function_declaration".to_string(),
-            self.is_kind_enabled("f"),
-        );
-
-        self.needs_traversal_cache
-            .insert("method_declaration".to_string(), self.is_kind_enabled("f"));
-
-        self.needs_traversal_cache
-            .insert("const_declaration".to_string(), self.is_kind_enabled("c"));
-
-        self.needs_traversal_cache
-            .insert("var_declaration".to_string(), self.is_kind_enabled("v"));
-
-        self.needs_traversal_cache.insert(
-            "short_var_declaration".to_string(),
-            self.is_kind_enabled("v"),
-        );
-
-        self.needs_traversal_cache.insert(
-            "type_declaration".to_string(),
-            self.is_kind_enabled("t")
-                || self.is_kind_enabled("s")
-                || self.is_kind_enabled("i")
-                || self.is_kind_enabled("a"),
-        );
-
-        self.needs_traversal_cache.insert(
-            "struct_type".to_string(),
-            self.is_kind_enabled("s") || self.is_kind_enabled("m"),
-        );
-
-        self.needs_traversal_cache.insert(
-            "interface_type".to_string(),
-            self.is_kind_enabled("i") || self.is_kind_enabled("n"),
-        );
-    }
-}
-
 // Enhanced Context for Go with scope tracking
 struct GoContext<'a> {
     base: Context<'a>,
@@ -401,6 +237,26 @@ impl<'a> GoContext<'a> {
     }
 }
 
+impl<'a> LanguageContext for GoContext<'a> {
+    type ScopeType = ScopeType;
+
+    fn get_tag_config(&self) -> &TagKindConfig {
+        self.base.tag_config
+    }
+
+    fn push_scope(&mut self, scope_type: Self::ScopeType, name: String) {
+        self.scope_stack.push((scope_type, name));
+    }
+
+    fn pop_scope(&mut self) -> Option<(Self::ScopeType, String)> {
+        self.scope_stack.pop()
+    }
+
+    fn process_node(&mut self, cursor: &mut TreeCursor) -> Option<(Self::ScopeType, String)> {
+        process_go_node(cursor, self)
+    }
+}
+
 impl Parser {
     pub fn generate_go_tags_with_full_config(
         &mut self,
@@ -409,93 +265,23 @@ impl Parser {
         tag_config: &TagKindConfig,
         user_config: &crate::config::Config,
     ) -> Option<Vec<tag::Tag>> {
-        // Ensure the code is valid UTF-8
-        let source_code = match std::str::from_utf8(code) {
-            Ok(s) => s,
-            Err(_) => {
-                eprintln!(
-                    "Warning: Input for {} is not valid UTF-8, skipping.",
-                    file_path_relative_to_tag_file
+        helper::generate_tags_with_config(
+            &mut self.ts_parser,
+            tree_sitter_go::LANGUAGE.into(),
+            code,
+            file_path_relative_to_tag_file,
+            |source_code, lines, cursor, tags| {
+                let mut context = GoContext::new(
+                    source_code,
+                    lines,
+                    file_path_relative_to_tag_file,
+                    tags,
+                    tag_config,
+                    user_config,
                 );
-                return None;
-            }
-        };
-
-        // Split the source code into lines for address generation
-        let lines = split_by_newlines::split_by_newlines(code);
-
-        self.ts_parser
-            .set_language(&tree_sitter_go::LANGUAGE.into())
-            .expect("Error loading Go grammar");
-
-        // Parse the source code using the parser from self
-        let tree = self.ts_parser.parse(source_code, None)?;
-
-        let mut tags = Vec::new();
-        {
-            let mut cursor = tree.walk();
-
-            if !cursor.goto_first_child() {
-                return Some(tags);
-            }
-
-            let mut context = GoContext::new(
-                source_code,
-                lines,
-                file_path_relative_to_tag_file,
-                &mut tags,
-                tag_config,
-                user_config,
-            );
-
-            walk_go(&mut cursor, &mut context);
-        }
-
-        Some(tags)
-    }
-}
-
-// Depth-First Tree Traversal for Go
-fn walk_go(cursor: &mut TreeCursor, context: &mut GoContext) {
-    loop {
-        let node = cursor.node();
-        let node_kind = node.kind();
-
-        // Early termination: skip traversing this subtree if we don't need any tags from it
-        if !context.base.tag_config.needs_traversal(node_kind) {
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-            continue;
-        }
-
-        // Process the current node
-        let scope_info = process_go_node(cursor, context);
-
-        // Manage Scope Stack
-        let mut scope_pushed = false;
-        if let Some((scope_type, scope_name)) = scope_info {
-            if !scope_name.is_empty() {
-                context.scope_stack.push((scope_type, scope_name));
-                scope_pushed = true;
-            }
-        }
-
-        // Recurse into children
-        if cursor.goto_first_child() {
-            walk_go(cursor, context);
-            cursor.goto_parent(); // Return to current node after visiting children
-        }
-
-        // Pop Scope if necessary
-        if scope_pushed {
-            context.scope_stack.pop();
-        }
-
-        // Move to the next sibling
-        if !cursor.goto_next_sibling() {
-            break;
-        }
+                helper::walk_generic(cursor, &mut context);
+            },
+        )
     }
 }
 
@@ -581,13 +367,11 @@ fn process_imports(cursor: &mut TreeCursor, context: &mut GoContext) {
                             {
                                 let mut extra_fields = IndexMap::new();
                                 extra_fields.insert("package".to_string(), import_path);
-                                helper::create_tag_with_language(
+                                context.create_go_tag(
                                     alias_name,
                                     "P",
                                     spec_node,
-                                    &mut context.base,
                                     Some(extra_fields),
-                                    Some("go"),
                                 );
                             }
                         }
