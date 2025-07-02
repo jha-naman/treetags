@@ -1,4 +1,22 @@
-Point	source.go	/^type Point struct {$/;"	
-String	source.go	/^func (p Point) String() string {$/;"	
-Stringer	source.go	/^type Stringer interface {$/;"	
-main	source.go	/^func main() {}$/;"	
+Alias	source.go	/^type Alias map[string]int$/;"	t	package:treetags	typeref:typename:map[string]int
+AnotherOne	source.go	/^type AnotherOne Alias$/;"	t	package:treetags	typeref:typename:Alias
+Bar	source.go	/^func (f *Point) Bar(baz string) map[string]string {$/;"	f	struct:treetags.Point	typeref:typename:map[string]string
+Point	source.go	/^type Point struct {$/;"	s	package:treetags
+String	source.go	/^String() string$/;"	n	interface:treetags.Stringer	typeref:typename:string
+String	source.go	/^func (p Point) String() string {$/;"	f	struct:treetags.Point	typeref:typename:string
+Stringer	source.go	/^type Stringer interface {$/;"	i	package:treetags
+a	source.go	/^	a, b int$/;"	v	package:treetags	typeref:typename:int
+assert	source.go	/^	assert "github.com\/stretchr\/testify\/assert"$/;"	P	package:github.com/stretchr/testify/assert
+b	source.go	/^	a, b int$/;"	v	package:treetags	typeref:typename:int
+bar	source.go	/^	bar = "bar"$/;"	c	package:treetags
+c	source.go	/^	c map[string]string$/;"	v	package:treetags	typeref:typename:map[string]string
+foo	source.go	/^func foo(bar, baz string, arr []string) (error, map[string]string) {}$/;"	f	package:treetags	typeref:typename:(error, map[string]string)
+foo	source.go	/^const foo = "foo"$/;"	c	package:treetags
+i	source.go	/^	i interface{}$/;"	v	package:treetags	typeref:typename:interface{}
+main	source.go	/^func main() {}$/;"	f	package:treetags
+treetags	source.go	/^package treetags$/;"	p
+x	source.go	/^var x, y int$/;"	v	package:treetags	typeref:typename:int
+x	source.go	/^x, y int$/;"	m	struct:treetags.Point	typeref:typename:int
+y	source.go	/^var x, y int$/;"	v	package:treetags	typeref:typename:int
+y	source.go	/^x, y int$/;"	m	struct:treetags.Point	typeref:typename:int
+z	source.go	/^	z = "zed"$/;"	v	package:treetags

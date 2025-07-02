@@ -23,13 +23,13 @@ with tags generated from the list of files passed via command line.
 ## Supported Languages
 
 ### Full support with extension fields
+- [x] Go
 - [x] Rust
 
 ### Basic navigation support without extension fields
 - [x] C
 - [x] C++
 - [x] Elixir
-- [x] Go
 - [x] Java
 - [x] JavaScript
 - [x] Lua
@@ -117,6 +117,8 @@ Options:
           Available kinds: n(module), s(struct), g(enum), u(union), i(trait),
           f(function), c(impl), m(field), e(enum_variant), C(constant), v(variable),
           t(type_alias), M(macro) [default: ]
+      --go-kinds <GO_KINDS>
+          Go language specific kinds to generate tags for [default: ]
   -h, --help
           Print help
 ```
