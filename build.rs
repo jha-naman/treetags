@@ -1,27 +1,29 @@
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 fn main() {
-    let generated_tests_dir = Path::new("tests/generated");
+    let out_dir = env::var("OUT_DIR").unwrap();
+    let generated_tests_dir = Path::new(&out_dir).join("generated_tests");
 
     // Clean existing generated tests directory
     if generated_tests_dir.exists() {
-        fs::remove_dir_all(generated_tests_dir).unwrap();
+        fs::remove_dir_all(&generated_tests_dir).unwrap();
     }
 
     // Create the generated tests directory
-    fs::create_dir_all(generated_tests_dir).unwrap();
+    fs::create_dir_all(&generated_tests_dir).unwrap();
 
     let test_cases = discover_test_cases();
 
     // Generate individual test files
     for test_case in test_cases.iter() {
-        generate_individual_test_file(generated_tests_dir, test_case);
+        generate_individual_test_file(&generated_tests_dir, test_case);
     }
 
-    // Generate main.rs to include all test modules
-    generate_main_file(generated_tests_dir, &test_cases);
+    // Generate a single file that includes all test functions
+    generate_tests_include_file(&generated_tests_dir, &test_cases);
 
     println!("cargo:rerun-if-changed=tests/test_cases");
 }
@@ -75,20 +77,16 @@ fn generate_individual_test_file(tests_dir: &Path, test_case: &TestCase) {
     let test_file_path = tests_dir.join(format!("{}.rs", test_name));
 
     let test_content = format!(
-        r#"//! Auto-generated test for: {}
-
-use std::path::PathBuf;
-
-#[path = "../helpers/mod.rs"]
-mod helpers;
-
-use helpers::{{
-    test_runner::TestCase,
-    golden_test_runner::run_test_case,
-}};
+        r#"// Auto-generated test for: {}
 
 #[test]
 fn test_{}() {{
+    use std::path::PathBuf;
+    use crate::helpers::{{
+        test_runner::TestCase,
+        golden_test_runner::run_test_case,
+    }};
+
     let test_case = TestCase::new(
         "{}".to_string(),
         PathBuf::from("{}"),
@@ -111,18 +109,22 @@ fn test_{}() {{
     fs::write(&test_file_path, test_content).unwrap();
 }
 
-fn generate_main_file(tests_dir: &Path, test_cases: &[TestCase]) {
-    let main_file_path = tests_dir.join("main.rs");
+fn generate_tests_include_file(tests_dir: &Path, test_cases: &[TestCase]) {
+    let include_file_path = tests_dir.join("all_tests.rs");
 
-    let mut main_content = String::from("//! Auto-generated main file for integration tests\n\n");
+    let mut include_content =
+        String::from("// Auto-generated file that includes all test functions\n\n");
 
-    // Add mod declarations for each test case
+    // Include each test file
     for test_case in test_cases {
         let test_name = sanitize_test_name(&test_case.name);
-        main_content.push_str(&format!("mod {};\n", test_name));
+        include_content.push_str(&format!(
+            "include!(concat!(env!(\"OUT_DIR\"), \"/generated_tests/{}.rs\"));\n",
+            test_name
+        ));
     }
 
-    fs::write(&main_file_path, main_content).unwrap();
+    fs::write(&include_file_path, include_content).unwrap();
 }
 
 fn sanitize_test_name(name: &str) -> String {
