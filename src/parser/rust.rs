@@ -118,7 +118,7 @@ impl Parser {
     ) -> Option<Vec<tag::Tag>> {
         helper::generate_tags_with_config(
             &mut self.ts_parser,
-            tree_sitter_rust::LANGUAGE.into(),
+            crate::parsers::rust_parser::language().into(),
             code,
             file_path_relative_to_tag_file,
             |source_code, lines, cursor, tags| {

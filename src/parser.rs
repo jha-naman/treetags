@@ -19,6 +19,10 @@ mod go;
 mod helper;
 mod rust;
 
+// Import our custom Rust parser
+// mod parsers;
+// use parsers::rust_parser;
+
 /// Parser manages the parsing configurations for all supported languages
 /// and provides methods to generate tags from source files.
 pub struct Parser {
