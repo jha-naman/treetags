@@ -1,13 +1,14 @@
+use cc::Build;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
-use cc::Build;
 
 fn main() {
     // Compile the Rust parser with aggressive optimizations
     compile_rust_parser();
-    
+    compile_ocaml_parser();
+
     // Continue with existing test generation
     let out_dir = env::var("OUT_DIR").unwrap();
     let generated_tests_dir = Path::new(&out_dir).join("generated_tests");
@@ -32,49 +33,93 @@ fn main() {
 
     println!("cargo:rerun-if-changed=tests/test_cases");
     println!("cargo:rerun-if-changed=src/parsers/rust");
+    println!("cargo:rerun-if-changed=src/parsers/ocaml");
 }
 
 /// Compile the Rust parser C code with aggressive size optimizations
 fn compile_rust_parser() {
     let mut build = Build::new();
-    
+
     build
         .file("src/parsers/rust/parser.c")
         .file("src/parsers/rust/scanner.c")
         .include("src/parsers/rust")
         // Aggressive size optimization flags
-        .flag_if_supported("-Os")                    // Optimize for size
-        .flag_if_supported("-ffunction-sections")    // Put each function in separate section
-        .flag_if_supported("-fdata-sections")        // Put each data item in separate section
-        .flag_if_supported("-fno-stack-protector")   // Remove stack protection overhead
-        .flag_if_supported("-fomit-frame-pointer")   // Remove frame pointer for smaller code
-        .flag_if_supported("-fno-unwind-tables")     // Remove unwind tables
+        .flag_if_supported("-Os") // Optimize for size
+        .flag_if_supported("-ffunction-sections") // Put each function in separate section
+        .flag_if_supported("-fdata-sections") // Put each data item in separate section
+        .flag_if_supported("-fno-stack-protector") // Remove stack protection overhead
+        .flag_if_supported("-fomit-frame-pointer") // Remove frame pointer for smaller code
+        .flag_if_supported("-fno-unwind-tables") // Remove unwind tables
         .flag_if_supported("-fno-asynchronous-unwind-tables") // Remove async unwind tables
-        .flag_if_supported("-fvisibility=hidden")    // Hide symbols by default
-        .flag_if_supported("-flto")                  // Link-time optimization
-        .flag_if_supported("-fno-ident")             // Remove compiler identification
-        .flag_if_supported("-s")                     // Strip symbols at object level
-        .flag_if_supported("-Wl,-s")                 // Strip symbols at link level
-        .flag_if_supported("-fmerge-all-constants")  // Merge identical constants
-        .flag_if_supported("-fno-exceptions")        // Remove exception handling
+        .flag_if_supported("-fvisibility=hidden") // Hide symbols by default
+        .flag_if_supported("-flto") // Link-time optimization
+        .flag_if_supported("-fno-ident") // Remove compiler identification
+        .flag_if_supported("-s") // Strip symbols at object level
+        .flag_if_supported("-Wl,-s") // Strip symbols at link level
+        .flag_if_supported("-fmerge-all-constants") // Merge identical constants
+        .flag_if_supported("-fno-exceptions") // Remove exception handling
         // Preprocessor definitions
-        .define("NDEBUG", None)                      // Remove debug assertions
-        .define("TREE_SITTER_HIDE_SYMBOLS", None)   // Hide internal symbols
-        .define("TREE_SITTER_NO_DEBUG", None)       // Remove debug code
+        .define("NDEBUG", None) // Remove debug assertions
+        .define("TREE_SITTER_HIDE_SYMBOLS", None) // Hide internal symbols
+        .define("TREE_SITTER_NO_DEBUG", None) // Remove debug code
         // Optimization level
         // .opt_level(3)                                // Maximum optimization
         .compile("tree_sitter_rust");
 
     // Add linker flags for additional size reduction
-    println!("cargo:rustc-link-arg=-Wl,--gc-sections");  // Remove unused sections
-    println!("cargo:rustc-link-arg=-Wl,--as-needed");    // Only link needed libraries
-    
+    println!("cargo:rustc-link-arg=-Wl,--gc-sections"); // Remove unused sections
+    println!("cargo:rustc-link-arg=-Wl,--as-needed"); // Only link needed libraries
+
     // For release builds, add symbol stripping
     if env::var("PROFILE").unwrap_or_default() == "release" {
-        println!("cargo:rustc-link-arg=-Wl,--strip-all");    // Strip all symbols
+        println!("cargo:rustc-link-arg=-Wl,--strip-all"); // Strip all symbols
     }
 
     println!("cargo:rustc-link-lib=static=tree_sitter_rust");
+}
+
+/// Compile the Ocaml parser C code with aggressive size optimizations
+fn compile_ocaml_parser() {
+    let mut build = Build::new();
+
+    build
+        .file("src/parsers/ocaml/parser.c")
+        .file("src/parsers/ocaml/scanner.c")
+        .include("src/parsers/ocaml")
+        // Aggressive size optimization flags
+        .flag_if_supported("-Os") // Optimize for size
+        .flag_if_supported("-ffunction-sections") // Put each function in separate section
+        .flag_if_supported("-fdata-sections") // Put each data item in separate section
+        .flag_if_supported("-fno-stack-protector") // Remove stack protection overhead
+        .flag_if_supported("-fomit-frame-pointer") // Remove frame pointer for smaller code
+        .flag_if_supported("-fno-unwind-tables") // Remove unwind tables
+        .flag_if_supported("-fno-asynchronous-unwind-tables") // Remove async unwind tables
+        .flag_if_supported("-fvisibility=hidden") // Hide symbols by default
+        .flag_if_supported("-flto") // Link-time optimization
+        .flag_if_supported("-fno-ident") // Remove compiler identification
+        .flag_if_supported("-s") // Strip symbols at object level
+        .flag_if_supported("-Wl,-s") // Strip symbols at link level
+        .flag_if_supported("-fmerge-all-constants") // Merge identical constants
+        .flag_if_supported("-fno-exceptions") // Remove exception handling
+        // Preprocessor definitions
+        .define("NDEBUG", None) // Remove debug assertions
+        .define("TREE_SITTER_HIDE_SYMBOLS", None) // Hide internal symbols
+        .define("TREE_SITTER_NO_DEBUG", None) // Remove debug code
+        // Optimization level
+        // .opt_level(3)                                // Maximum optimization
+        .compile("tree_sitter_ocaml");
+
+    // Add linker flags for additional size reduction
+    println!("cargo:rustc-link-arg=-Wl,--gc-sections"); // Remove unused sections
+    println!("cargo:rustc-link-arg=-Wl,--as-needed"); // Only link needed libraries
+
+    // For release builds, add symbol stripping
+    if env::var("PROFILE").unwrap_or_default() == "release" {
+        println!("cargo:rustc-link-arg=-Wl,--strip-all"); // Strip all symbols
+    }
+
+    println!("cargo:rustc-link-lib=static=tree_sitter_ocaml");
 }
 
 #[derive(Debug, Clone)]

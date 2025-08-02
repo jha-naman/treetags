@@ -5,8 +5,8 @@ use std::process;
 
 mod config;
 mod file_finder;
-pub mod parsers;
 mod parser;
+pub mod parsers;
 mod queries;
 mod shell_to_regex;
 mod split_by_newlines;

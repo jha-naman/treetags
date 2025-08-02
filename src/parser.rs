@@ -19,10 +19,6 @@ mod go;
 mod helper;
 mod rust;
 
-// Import our custom Rust parser
-// mod parsers;
-// use parsers::rust_parser;
-
 /// Parser manages the parsing configurations for all supported languages
 /// and provides methods to generate tags from source files.
 pub struct Parser {
@@ -91,8 +87,8 @@ impl Parser {
                 tree_sitter_java::TAGS_QUERY,
             ),
             ocaml_config: get_tags_config(
-                tree_sitter_ocaml::LANGUAGE_OCAML.into(),
-                tree_sitter_ocaml::TAGS_QUERY,
+                crate::parsers::ocaml_parser::LANGUAGE_OCAML.into(),
+                crate::parsers::ocaml_parser::TAGS_QUERY,
             ),
             php_config: get_tags_config(
                 tree_sitter_php::LANGUAGE_PHP.into(),

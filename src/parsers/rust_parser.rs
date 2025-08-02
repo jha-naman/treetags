@@ -1,5 +1,5 @@
 //! Rust parser module with optimized C compilation
-//! 
+//!
 //! This module provides the same interface as tree-sitter-rust crate
 //! but compiles the C parser code directly with aggressive optimizations.
 
@@ -14,4 +14,3 @@ extern "C" {
 pub fn language() -> Language {
     unsafe { Language::from_raw(tree_sitter_rust()) }
 }
-

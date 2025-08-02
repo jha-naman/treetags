@@ -19,8 +19,8 @@ let tags = parser.parse_file(&file_path_relative_to_tag_file, &file_path, extens
 
 pub mod config;
 pub mod file_finder;
-pub mod parsers;
 pub mod parser;
+pub mod parsers;
 pub mod queries;
 pub mod shell_to_regex;
 pub mod split_by_newlines;
