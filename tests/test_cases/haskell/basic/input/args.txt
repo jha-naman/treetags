@@ -1,0 +1,2 @@
+--sort yes -f '-'
+source.hs
