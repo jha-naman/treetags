@@ -1,0 +1,7 @@
+Baz	source.jl	/^abstract type Baz end$/;"	
+Foo	source.jl	/^struct Foo$/;"	
+Foo	source.jl	/^   Foo() = new(1.0)$/;"	
+Foo	source.jl	/^Foo(bar: Float64) = Foo(bar)$/;"	
+Foo	source.jl	/^Foo(bar: Float64) = Foo(bar)$/;"	
+add	source.jl	/^function add(a, b = 1; c = 0)$/;"	
+new	source.jl	/^   Foo() = new(1.0)$/;"	

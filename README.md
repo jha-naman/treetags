@@ -27,18 +27,21 @@ with tags generated from the list of files passed via command line.
 - [x] Rust
 
 ### Basic navigation support without extension fields
+- [x] Bash/Sh
 - [x] C
 - [x] C++
+- [x] C#
 - [x] Elixir
+- [x] Haskell
 - [x] Java
 - [x] JavaScript
+- [x] Julia
 - [x] Lua
 - [x] Ocaml
 - [x] PHP
 - [x] Python
 - [x] Ruby
-- [x] C#
-- [x] Bash/Sh
+- [x] Scala
 
 ## Installation
 Install Rust and C developmet toolchains to build `treetags`
@@ -69,7 +72,18 @@ Or, if you are using lua for configuration
 vim.g.gutentags_ctags_executable = 'treetags'
 ```
 
+## Running Integration Tests
+
+Integration tests are built from test cases on demand
+
+```bash
+cargo build  # Generates test files
+cargo test   # Runs all tests including generated ones
+```
+
 ## Usage
+
+Use the `--help` option to see supported command line arguments.
 
 ```
 $ target/release/treetags --help
@@ -81,52 +95,6 @@ Arguments:
   [FILE_NAMES]...  List of file names to be processed when `--append` option is passed
 
 Options:
-  -f <TAG_FILE>
-          Name to be used for the tagfile, should not contain path separator [default: tags]
-      --append <APPEND_RAW>
-          Append tags to existing tag file instead of reginerating the file from scratch.
-          Need to pass in list of file names for which new tags are to be generated.
-          Will panic if the tag file doesn't already exist in current or one of the parent
-          directories. [default: no]
-      --workers <WORKERS>
-          Number of threads to use for parsing files [default: 4]
-      --exclude <EXCLUDE>
-          Files/directories matching the pattern will not be used while generating tags
-      --options <OPTIONS>
-          Value passed in this arg is currently being ignored.
-          Kept for compatibility with `vim-gutentags` plugin. [default: ]
-      --sort <SORT_RAW>
-          Whether to sort the files or not.
-          Values of 'yes', 'on', 'true', '1' set it to true
-          Values of 'no', '0', 'off', 'false' set it to false [default: yes]
-      --extras <EXTRAS>
-          Enable extra tag information (e.g., +q for qualified tags, +f for file scope) [default: ]
-      --format <FORMAT>
-          Value passed in this arg is currently being ignored.
-          Kept for compatibility with `tagbar` plugin. [default: ]
-      --excmd <EXCMD>
-          Value passed in this arg is currently being ignored.
-          Kept for compatibility with `tagbar` plugin. [default: ]
-      --fields <FIELDS>
-          Include selected extension fields (e.g., +l for line numbers, +S for signatures) [default: ]
-      --language-force <LANGUAGE_FORCE>
-          Value passed in this arg is currently being ignored.
-          Kept for compatibility with `tagbar` plugin. [default: ]
-      --rust-kinds <RUST_KINDS>
-          Comma-separated list of Rust tag kinds to generate.
-          Available kinds: n(module), s(struct), g(enum), u(union), i(trait),
-          f(function), c(impl), m(field), e(enum_variant), C(constant), v(variable),
-          t(type_alias), M(macro) [default: ]
-      --go-kinds <GO_KINDS>
-          Go language specific kinds to generate tags for [default: ]
-  -h, --help
-          Print help
+  ... # Options omitted for brevity
 ```
 
-## Running Integration Tests
-
-Integration tests are built from test cases on demand
-
-```bash
-cargo build  # Generates test files
-cargo test   # Runs all tests including generated ones

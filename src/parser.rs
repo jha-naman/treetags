@@ -48,6 +48,12 @@ pub struct Parser {
     pub csharp_config: TagsConfiguration,
     /// Configuration for Bash language,
     pub bash_config: TagsConfiguration,
+    /// Configuration for Scala language
+    pub scala_config: TagsConfiguration,
+    /// Configuration for Julia language
+    pub julia_config: TagsConfiguration,
+    /// Configuration for Haskell language
+    pub haskell_config: TagsConfiguration,
     /// Context for generating tags
     pub tags_context: TagsContext,
     /// Parser for generating tags using tree walking
@@ -113,6 +119,18 @@ impl Parser {
             bash_config: get_tags_config(
                 tree_sitter_bash::LANGUAGE.into(),
                 queries::BASH_TAGS_QUERY,
+            ),
+            scala_config: get_tags_config(
+                tree_sitter_scala::LANGUAGE.into(),
+                queries::SCALA_TAGS_QUERY,
+            ),
+            julia_config: get_tags_config(
+                tree_sitter_julia::LANGUAGE.into(),
+                queries::JULIA_TAGS_QUERY,
+            ),
+            haskell_config: get_tags_config(
+                tree_sitter_haskell::LANGUAGE.into(),
+                queries::HASKELL_TAGS_QUERY,
             ),
             tags_context: TagsContext::new(),
             ts_parser: TSParser::new(),
@@ -257,6 +275,9 @@ impl Parser {
             "cs" => Some(&self.csharp_config),
             "sh" => Some(&self.bash_config),
             "bash" => Some(&self.bash_config),
+            "scala" => Some(&self.scala_config),
+            "jl" => Some(&self.julia_config),
+            "hs" => Some(&self.haskell_config),
             _ => None,
         };
 
