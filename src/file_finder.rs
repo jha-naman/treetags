@@ -151,8 +151,8 @@ pub fn determine_tag_file_path(tag_file_name: &str, append: bool) -> Result<Stri
     }
 
     match find_tag_file(tag_file_name) {
-        Some(tag_file) => Ok(tag_file),
-        None => {
+        Ok(tag_file) => Ok(tag_file),
+        Err(_) => {
             if append {
                 Err(format!("Could not find hte tag file: {}", tag_file_name))
             } else {
@@ -174,24 +174,51 @@ pub fn determine_tag_file_path(tag_file_name: &str, append: bool) -> Result<Stri
 ///
 /// # Returns
 ///
-/// Option containing the path to the tag file if found, None otherwise
-pub fn find_tag_file(filename: &str) -> Option<String> {
-    let mut current_dir = std::env::current_dir().ok()?;
+/// Result containing the path to the tag file if found, or an error message if not found
+pub fn find_tag_file(filename: &str) -> Result<String, String> {
+    let mut current_dir =
+        std::env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
 
     // Check if the file exists in the current directory
-    if File::open(current_dir.join(filename)).is_ok() {
-        return Some(current_dir.join(filename).to_string_lossy().into_owned());
+    match File::open(current_dir.join(filename)) {
+        Ok(_) => return Ok(current_dir.join(filename).to_string_lossy().into_owned()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            // File not found, continue searching in parent directories
+        }
+        Err(e) => {
+            return Err(format!(
+                "Failed to open tag file '{}' in directory '{}': {}",
+                filename,
+                current_dir.display(),
+                e
+            ));
+        }
     }
 
     // Check parent directories
     while let Some(parent) = current_dir.parent() {
         current_dir = parent.to_path_buf();
-        if File::open(current_dir.join(filename)).is_ok() {
-            return Some(current_dir.join(filename).to_string_lossy().into_owned());
+        match File::open(current_dir.join(filename)) {
+            Ok(_) => return Ok(current_dir.join(filename).to_string_lossy().into_owned()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                // File not found, continue searching in parent directories
+                continue;
+            }
+            Err(e) => {
+                return Err(format!(
+                    "Failed to open tag file '{}' in directory '{}': {}",
+                    filename,
+                    current_dir.display(),
+                    e
+                ));
+            }
         }
     }
 
-    None
+    Err(format!(
+        "Tag file '{}' not found in current directory or any parent directory",
+        filename
+    ))
 }
 
 /// Parses an existing tag file and returns its tags.
