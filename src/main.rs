@@ -45,7 +45,13 @@ fn main() {
     // } else {
     //     Path::new(&tag_file_path)
     // };
-    let file_finder = FileFinder::new(search_base, config.exclude.clone());
+    let file_finder = match FileFinder::from_patterns(search_base, config.exclude.clone()) {
+        Ok(finder) => finder,
+        Err(err) => {
+            eprintln!("{}", err);
+            process::exit(1);
+        }
+    };
     let files = if !config.file_names.is_empty() {
         // Process both files and directories from the command line arguments
         file_finder.get_files_from_paths(&config.file_names)

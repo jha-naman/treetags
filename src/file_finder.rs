@@ -24,7 +24,7 @@ pub struct FileFinder {
 }
 
 impl FileFinder {
-    /// Creates a new FileFinder instance.
+    /// Creates a new FileFinder instance from exclude patterns.
     ///
     /// # Arguments
     ///
@@ -33,15 +33,19 @@ impl FileFinder {
     ///
     /// # Returns
     ///
-    /// A new FileFinder instance configured with the given parameters
-    pub fn new(tag_file_path: &Path, exclude_patterns: Vec<String>) -> Self {
+    /// A Result containing a new FileFinder instance or an error message
+    pub fn from_patterns(
+        tag_file_path: &Path,
+        exclude_patterns: Vec<String>,
+    ) -> Result<Self, String> {
         let dir_path = if tag_file_path.to_str() == Some("-") {
             // If writing to stdout, use current directory as the root
-            std::env::current_dir().expect("Failed to access current directory")
+            std::env::current_dir()
+                .map_err(|e| format!("Failed to access current directory: {}", e))?
         } else {
             tag_file_path
                 .parent()
-                .expect("Failed to access tag file's parent directory")
+                .ok_or_else(|| "Failed to access tag file's parent directory".to_string())?
                 .to_path_buf()
         };
 
@@ -50,13 +54,13 @@ impl FileFinder {
             .map(|pattern| shell_to_regex::shell_to_regex(pattern))
             .collect::<Vec<_>>();
 
-        let exclude_patterns =
-            RegexSet::new(exclude_regexes).expect("Failed to compile exclude patterns");
+        let exclude_patterns = RegexSet::new(exclude_regexes)
+            .map_err(|e| format!("Failed to compile exclude patterns: {}", e))?;
 
-        Self {
+        Ok(Self {
             dir_path,
             exclude_patterns,
-        }
+        })
     }
 
     /// Recursively finds all files in the directory that don't match exclude patterns.
