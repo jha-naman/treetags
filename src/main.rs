@@ -52,12 +52,23 @@ fn main() {
             process::exit(1);
         }
     };
-    let files = if !config.file_names.is_empty() {
+    let file_result = if !config.file_names.is_empty() {
         // Process both files and directories from the command line arguments
         file_finder.get_files_from_paths(&config.file_names)
     } else {
         file_finder.get_files_from_dir()
     };
+
+    // Print any warnings about file access issues
+    file_result.print_errors();
+
+    // Exit if no files were found and there were errors
+    if file_result.files.is_empty() && file_result.has_errors() {
+        eprintln!("No files found due to errors");
+        process::exit(1);
+    }
+
+    let files = file_result.files;
 
     // Process files and generate tags
     let tag_processor = TagProcessor::new(tag_file_path.clone(), config.workers, config.clone());
