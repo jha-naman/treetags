@@ -32,7 +32,7 @@ with tags generated from the list of files passed via command line.
 - [x] C++
 - [x] C#
 - [x] Elixir
-- [x] Haskell
+- [x] ~Haskell~
 - [x] Java
 - [x] JavaScript
 - [x] Julia
