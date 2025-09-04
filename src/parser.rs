@@ -254,8 +254,9 @@ impl Parser {
             "js" | "jsx" => Some(&self.js_config),
             "rb" => Some(&self.ruby_config),
             "py" | "pyw" => Some(&self.python_config),
-            "c" | "h" => Some(&self.c_config),
-            "cpp" | "cc" | "cxx" | "hh" | "hpp" | "hxx" => Some(&self.cpp_config),
+            "c" | "h" | "i" => Some(&self.c_config),
+            "cc" | "cpp" | "CPP" | "cxx" | "c++" | "cp" | "C" | "cppm" | "ixx" | "ii" | "H"
+            | "hh" | "hpp" | "HPP" | "hxx" | "h++" | "tcc" => Some(&self.cpp_config),
             "java" => Some(&self.java_config),
             "ml" => Some(&self.ocaml_config),
             "php" => Some(&self.php_config),
