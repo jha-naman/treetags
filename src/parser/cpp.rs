@@ -298,52 +298,85 @@ fn create_tag(
     });
 }
 
+// --- Helper Functions ---
+
+fn process_named_item(
+    cursor: &mut TreeCursor,
+    context: &mut CppContext,
+    identifier_kinds: &[&str], // e.g., &["type_identifier"], &["identifier"]
+    tag_kind: &str,            // e.g., "n", "c", "s", "u", "d", "t"
+    scope_type: Option<ScopeType>, // Some(scope_type) for scoped items, None for non-scoped
+) -> Option<(ScopeType, String)> {
+    let node = cursor.node();
+    let mut name = String::new();
+
+    iterate_children!(cursor, |child_node| {
+        if identifier_kinds.contains(&child_node.kind()) {
+            name = context.base.node_text(&child_node).to_string();
+            Break
+        } else {
+            Continue
+        }
+    });
+
+    if !name.is_empty() {
+        create_tag(name.clone(), tag_kind, node, context, None);
+        if let Some(scope_type) = scope_type {
+            Some((scope_type, name))
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
 // --- Specific Node Processors ---
 
 fn process_namespace(
     cursor: &mut TreeCursor,
     context: &mut CppContext,
 ) -> Option<(ScopeType, String)> {
-    let node = cursor.node();
-    if let Some(name) = helper::get_node_name(cursor, &context.base, &["namespace_identifier"]) {
-        create_tag(name.clone(), "n", node, context, None);
-        Some((ScopeType::Namespace, name))
-    } else {
-        None
-    }
+    process_named_item(
+        cursor,
+        context,
+        &["namespace_identifier"],
+        "n",
+        Some(ScopeType::Namespace),
+    )
 }
 
 fn process_class(cursor: &mut TreeCursor, context: &mut CppContext) -> Option<(ScopeType, String)> {
-    let node = cursor.node();
-    if let Some(name) = helper::get_node_name(cursor, &context.base, &["type_identifier"]) {
-        create_tag(name.clone(), "c", node, context, None);
-        Some((ScopeType::Class, name))
-    } else {
-        None
-    }
+    process_named_item(
+        cursor,
+        context,
+        &["type_identifier"],
+        "c",
+        Some(ScopeType::Class),
+    )
 }
 
 fn process_struct(
     cursor: &mut TreeCursor,
     context: &mut CppContext,
 ) -> Option<(ScopeType, String)> {
-    let node = cursor.node();
-    if let Some(name) = helper::get_node_name(cursor, &context.base, &["type_identifier"]) {
-        create_tag(name.clone(), "s", node, context, None);
-        Some((ScopeType::Struct, name))
-    } else {
-        None
-    }
+    process_named_item(
+        cursor,
+        context,
+        &["type_identifier"],
+        "s",
+        Some(ScopeType::Struct),
+    )
 }
 
 fn process_union(cursor: &mut TreeCursor, context: &mut CppContext) -> Option<(ScopeType, String)> {
-    let node = cursor.node();
-    if let Some(name) = helper::get_node_name(cursor, &context.base, &["type_identifier"]) {
-        create_tag(name.clone(), "u", node, context, None);
-        Some((ScopeType::Union, name))
-    } else {
-        None
-    }
+    process_named_item(
+        cursor,
+        context,
+        &["type_identifier"],
+        "u",
+        Some(ScopeType::Union),
+    )
 }
 
 fn process_enum(cursor: &mut TreeCursor, context: &mut CppContext) -> Option<(ScopeType, String)> {
@@ -612,18 +645,35 @@ fn process_field_declaration(
     context: &mut CppContext,
 ) -> Option<(ScopeType, String)> {
     let node = cursor.node();
-    if let Some(name) =
-        helper::get_node_name(cursor, &context.base, &["field_identifier", "identifier"])
-    {
+    let mut field_name = String::new();
+    let mut type_info = String::new();
+
+    iterate_children!(cursor, |child_node| {
+        match child_node.kind() {
+            "field_identifier" | "identifier" => {
+                field_name = context.base.node_text(&child_node).to_string();
+                Continue
+            }
+            "primitive_type"
+            | "type_identifier"
+            | "qualified_identifier"
+            | "sized_type_specifier" => {
+                type_info = context.base.node_text(&child_node).to_string();
+                Continue
+            }
+            _ => Continue,
+        }
+    });
+
+    if !field_name.is_empty() {
         let mut extra_fields = IndexMap::new();
 
-        // Try to get the type information
-        if let Some(type_info) = get_declaration_type(node, &context.base) {
+        if !type_info.is_empty() {
             extra_fields.insert("typeref".to_string(), format!("typename:{}", type_info));
         }
 
         create_tag(
-            name,
+            field_name,
             "m",
             node,
             context,
@@ -641,43 +691,12 @@ fn process_macro_definition(
     cursor: &mut TreeCursor,
     context: &mut CppContext,
 ) -> Option<(ScopeType, String)> {
-    let node = cursor.node();
-    if let Some(name) = helper::get_node_name(cursor, &context.base, &["identifier"]) {
-        create_tag(name, "d", node, context, None);
-    }
-    None
+    process_named_item(cursor, context, &["identifier"], "d", None)
 }
 
 fn process_typedef(
     cursor: &mut TreeCursor,
     context: &mut CppContext,
 ) -> Option<(ScopeType, String)> {
-    let node = cursor.node();
-    if let Some(name) = helper::get_node_name(cursor, &context.base, &["type_identifier"]) {
-        create_tag(name, "t", node, context, None);
-    }
-    None
-}
-
-// --- Helper Functions ---
-
-fn get_declaration_type(decl_node: Node, context: &helper::Context) -> Option<String> {
-    // Look for type information in declarations
-    for i in 0..decl_node.child_count() {
-        if let Some(child) = decl_node.child(i) {
-            match child.kind() {
-                "primitive_type"
-                | "type_identifier"
-                | "qualified_identifier"
-                | "sized_type_specifier" => {
-                    let type_text = context.node_text(&child).to_string();
-                    if !type_text.is_empty() {
-                        return Some(type_text);
-                    }
-                }
-                _ => continue,
-            }
-        }
-    }
-    None
+    process_named_item(cursor, context, &["type_identifier"], "t", None)
 }
