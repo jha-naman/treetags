@@ -15,6 +15,7 @@ use tree_sitter_tags::TagsConfiguration;
 use tree_sitter_tags::TagsContext;
 
 mod common;
+mod cpp;
 mod go;
 mod helper;
 mod rust;
@@ -148,6 +149,9 @@ impl Parser {
             "go" => {
                 self.generate_go_tags_with_user_config(code, file_path_relative_to_tag_file, config)
             }
+            "cc" | "cpp" | "CPP" | "cxx" | "c++" | "cp" | "C" | "cppm" | "ixx" | "ii" | "H"
+            | "hh" | "hpp" | "HPP" | "hxx" | "h++" | "tcc" => self
+                .generate_cpp_tags_with_user_config(code, file_path_relative_to_tag_file, config),
             _ => None,
         }
     }
@@ -226,6 +230,29 @@ impl Parser {
 
         // Call the new method that accepts user config
         self.generate_go_tags_with_full_config(
+            code,
+            file_path_relative_to_tag_file,
+            &tag_config,
+            config,
+        )
+    }
+
+    /// Generates C++ tags with user configuration
+    pub fn generate_cpp_tags_with_user_config(
+        &mut self,
+        code: &[u8],
+        file_path_relative_to_tag_file: &str,
+        config: &crate::config::Config,
+    ) -> Option<Vec<tag::Tag>> {
+        // Parse cpp-kinds configuration
+        let tag_config = if config.cpp_kinds.is_empty() {
+            helper::TagKindConfig::new_cpp() // Default: all kinds enabled
+        } else {
+            helper::TagKindConfig::from_cpp_kinds_string(&config.cpp_kinds)
+        };
+
+        // Call the new method that accepts user config
+        self.generate_cpp_tags_with_full_config(
             code,
             file_path_relative_to_tag_file,
             &tag_config,

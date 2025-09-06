@@ -87,6 +87,10 @@ pub struct Config {
     #[arg(long = "go-kinds", default_value = "")]
     pub go_kinds: String,
 
+    /// C++ language specific kinds to generate tags for
+    #[arg(long = "kinds-c", default_value = "")]
+    pub cpp_kinds: String,
+
     /// Parsed fields configuration  
     #[clap(skip)]
     pub fields_config: FieldsConfig,
