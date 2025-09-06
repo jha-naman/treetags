@@ -25,6 +25,38 @@ pub fn get_node_name(cursor: &mut TreeCursor, context: &Context, kinds: &[&str])
     None
 }
 
+/// Control flow for child iteration
+pub enum IterationControl {
+    Continue,
+    Break,
+}
+
+// Re-export for convenience
+pub use IterationControl::{Break, Continue};
+
+/// Iterate over the children of the cursor's current node
+macro_rules! iterate_children {
+    ($cursor:expr, |$node:ident| $body:block) => {
+        if $cursor.goto_first_child() {
+            loop {
+                let $node = $cursor.node();
+                let control = $body;
+                match control {
+                    $crate::parser::helper::Break => break,
+                    $crate::parser::helper::Continue => {}
+                }
+                if !$cursor.goto_next_sibling() {
+                    break;
+                }
+            }
+            $cursor.goto_parent();
+        }
+    };
+}
+
+// Make the macro available to other modules
+pub(crate) use iterate_children;
+
 /// Generates the ctags address string
 pub fn address_string_from_line(row: usize, context: &Context) -> String {
     if row >= context.lines.len() {
