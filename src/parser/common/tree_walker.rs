@@ -7,7 +7,6 @@ use crate::{split_by_newlines, tag};
 pub trait LanguageContext {
     type ScopeType;
 
-    fn get_tag_config(&self) -> &TagKindConfig;
     fn push_scope(&mut self, scope_type: Self::ScopeType, name: String);
     fn pop_scope(&mut self) -> Option<(Self::ScopeType, String)>;
     fn process_node(&mut self, cursor: &mut TreeCursor) -> Option<(Self::ScopeType, String)>;
@@ -79,17 +78,6 @@ pub fn generate_tags_with_config(
 /// that implements the LanguageContext trait
 pub fn walk_generic<C: LanguageContext>(cursor: &mut TreeCursor, context: &mut C) {
     loop {
-        let node = cursor.node();
-        let node_kind = node.kind();
-
-        // Early termination: skip traversing this subtree if we don't need any tags from it
-        if !context.get_tag_config().needs_traversal(node_kind) {
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-            continue;
-        }
-
         // Process the current node
         let scope_info = context.process_node(cursor);
 
