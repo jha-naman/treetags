@@ -292,4 +292,128 @@ impl TagKindConfig {
             self.is_kind_enabled("i") || self.is_kind_enabled("n"),
         );
     }
+
+    /// Create a new configuration with all kinds enabled by default for C++
+    pub fn new_cpp() -> Self {
+        let mut enabled_kinds = HashSet::new();
+        // Add all possible C++ tag kinds
+        enabled_kinds.insert("d".to_string()); // macro definitions
+        enabled_kinds.insert("e".to_string()); // enumerators
+        enabled_kinds.insert("f".to_string()); // function definitions
+        enabled_kinds.insert("g".to_string()); // enumeration names
+        enabled_kinds.insert("h".to_string()); // included header files
+        enabled_kinds.insert("l".to_string()); // local variables [off]
+        enabled_kinds.insert("m".to_string()); // class, struct, and union members
+        enabled_kinds.insert("p".to_string()); // function prototypes [off]
+        enabled_kinds.insert("s".to_string()); // structure names
+        enabled_kinds.insert("t".to_string()); // typedefs
+        enabled_kinds.insert("u".to_string()); // union names
+        enabled_kinds.insert("v".to_string()); // variable definitions
+        enabled_kinds.insert("x".to_string()); // external and forward variable declarations [off]
+        enabled_kinds.insert("z".to_string()); // function parameters inside function or prototype definitions [off]
+        enabled_kinds.insert("L".to_string()); // goto labels [off]
+        enabled_kinds.insert("D".to_string()); // parameters inside macro definitions [off]
+        enabled_kinds.insert("c".to_string()); // classes
+        enabled_kinds.insert("n".to_string()); // namespaces
+        enabled_kinds.insert("A".to_string()); // namespace aliases [off]
+        enabled_kinds.insert("N".to_string()); // names imported via using scope::symbol [off]
+        enabled_kinds.insert("U".to_string()); // using namespace statements [off]
+        enabled_kinds.insert("Z".to_string()); // template parameters [off]
+
+        let mut config = Self {
+            enabled_kinds,
+            needs_traversal_cache: HashMap::new(),
+        };
+        config.rebuild_cpp_traversal_cache();
+        config
+    }
+
+    /// Create a configuration from a kinds string for C++ (e.g., "defg" or "d,e,f,g")
+    pub fn from_cpp_kinds_string(kinds_str: &str) -> Self {
+        const CPP_KIND_MAPPING: &[(&[&str], &str)] = &[
+            (&["d", "macro"], "d"),
+            (&["e", "enumerator"], "e"),
+            (&["f", "function"], "f"),
+            (&["g", "enum"], "g"),
+            (&["h", "header"], "h"),
+            (&["l", "local"], "l"),
+            (&["m", "member"], "m"),
+            (&["p", "prototype"], "p"),
+            (&["s", "struct"], "s"),
+            (&["t", "typedef"], "t"),
+            (&["u", "union"], "u"),
+            (&["v", "variable"], "v"),
+            (&["x", "external"], "x"),
+            (&["z", "parameter"], "z"),
+            (&["L", "label"], "L"),
+            (&["D", "macroparam"], "D"),
+            (&["c", "class"], "c"),
+            (&["n", "namespace"], "n"),
+            (&["A", "alias"], "A"),
+            (&["N", "using"], "N"),
+            (&["U", "usingnamespace"], "U"),
+            (&["Z", "template"], "Z"),
+        ];
+        Self::from_string(kinds_str, CPP_KIND_MAPPING, |config| {
+            config.rebuild_cpp_traversal_cache()
+        })
+    }
+
+    /// Rebuild the traversal optimization cache for C++
+    fn rebuild_cpp_traversal_cache(&mut self) {
+        self.needs_traversal_cache.clear();
+
+        self.needs_traversal_cache.insert(
+            "translation_unit".to_string(),
+            !self.enabled_kinds.is_empty(),
+        );
+
+        self.needs_traversal_cache.insert(
+            "namespace_definition".to_string(),
+            self.is_kind_enabled("n") || self.needs_any_child_tags(),
+        );
+
+        self.needs_traversal_cache.insert(
+            "class_specifier".to_string(),
+            self.is_kind_enabled("c") || self.is_kind_enabled("m"),
+        );
+
+        self.needs_traversal_cache.insert(
+            "struct_specifier".to_string(),
+            self.is_kind_enabled("s") || self.is_kind_enabled("m"),
+        );
+
+        self.needs_traversal_cache.insert(
+            "union_specifier".to_string(),
+            self.is_kind_enabled("u") || self.is_kind_enabled("m"),
+        );
+
+        self.needs_traversal_cache.insert(
+            "enum_specifier".to_string(),
+            self.is_kind_enabled("g") || self.is_kind_enabled("e"),
+        );
+
+        self.needs_traversal_cache
+            .insert("function_definition".to_string(), self.is_kind_enabled("f"));
+
+        self.needs_traversal_cache
+            .insert("function_declarator".to_string(), self.is_kind_enabled("p"));
+
+        self.needs_traversal_cache.insert(
+            "declaration".to_string(),
+            self.is_kind_enabled("v") || self.is_kind_enabled("t"),
+        );
+
+        self.needs_traversal_cache
+            .insert("field_declaration".to_string(), self.is_kind_enabled("m"));
+
+        self.needs_traversal_cache
+            .insert("preproc_def".to_string(), self.is_kind_enabled("d"));
+
+        self.needs_traversal_cache
+            .insert("preproc_include".to_string(), self.is_kind_enabled("h"));
+
+        self.needs_traversal_cache
+            .insert("type_definition".to_string(), self.is_kind_enabled("t"));
+    }
 }
