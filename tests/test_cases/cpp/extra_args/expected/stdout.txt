@@ -1,0 +1,39 @@
+Box	source.cpp	/^class Box {$/;"	c
+Dog	source.cpp	/^class Dog {$/;"	c
+Dog	source.cpp	/^    Dog();$/;"	p	class:Dog
+Dog	source.cpp	/^Dog::Dog()$/;"	f	class:Dog
+ECarTypes	source.cpp	/^enum ECarTypes : uint8_t$/;"	g	typeref:typename:uint8_t
+GetPreferredCarType	source.cpp	/^ECarTypes GetPreferredCarType()$/;"	f	typeref:typename:ECarTypes
+Hatchback	source.cpp	/^    Hatchback, \/\/ 1$/;"	e	enum:ECarTypes
+Hybrid	source.cpp	/^    Hybrid \/\/ 255$/;"	e	enum:ECarTypes
+OwnedDog	source.cpp	/^class OwnedDog : public Dog {$/;"	c
+Point	source.cpp	/^class Point {$/;"	c
+Point	source.cpp	/^    Point() { };$/;"	f	class:Point
+Point	source.cpp	/^    Point (double a, double b) :$/;"	f	class:Point
+SUV	source.cpp	/^    SUV = 254, \/\/ 254$/;"	e	enum:ECarTypes
+Sedan	source.cpp	/^    Sedan, \/\/ 0$/;"	e	enum:ECarTypes
+bar	source.cpp	/^    void bar()$/;"	f	namespace:Baz	typeref:typename:void
+bark	source.cpp	/^    void bark() const { std::cout << name << " barks!\\n"; }$/;"	f	class:Dog	typeref:typename:void
+barkThreeTimes	source.cpp	/^void barkThreeTimes(const T& input)$/;"	f	typeref:typename:void
+fn	source.cpp	/^void fn();$/;"	p	typeref:typename:void
+fn	source.cpp	/^void fn(void);$/;"	p	typeref:typename:void
+foo	source.cpp	/^    void foo()$/;"	f	namespace:Baz	typeref:typename:void
+insert	source.cpp	/^    void insert(const T&) { }$/;"	f	class:Box	typeref:typename:void
+main	source.cpp	/^int main(int argc, char** argv) {$/;"	f	typeref:typename:int
+operator +	source.cpp	/^    Point operator+(const Point& rhs) const;$/;"	p	class:Point	typeref:typename:Point
+operator +	source.cpp	/^Point Point::operator+(const Point& rhs) const$/;"	f	typeref:typename:Point	class:Point
+operator +=	source.cpp	/^    Point& operator+=(const Point& rhs);$/;"	p	class:Point	typeref:typename:Point
+operator +=	source.cpp	/^Point& Point::operator+=(const Point& rhs)$/;"	f	typeref:typename:Point	class:Point
+print	source.cpp	/^void print(char const* msg)$/;"	f	typeref:typename:void
+print	source.cpp	/^    virtual void print() const;$/;"	p	class:Dog	typeref:typename:void
+print	source.cpp	/^void Dog::print() const$/;"	f	typeref:typename:void	class:Dog
+print	source.cpp	/^    void print() const override;$/;"	p	class:OwnedDog	typeref:typename:void
+print	source.cpp	/^void OwnedDog::print() const$/;"	f	typeref:typename:void	class:OwnedDog
+setName	source.cpp	/^    void setName(const std::string& dogsName);$/;"	p	class:Dog	typeref:typename:void
+setName	source.cpp	/^void Dog::setName(const std::string& dogsName)$/;"	f	typeref:typename:void	class:Dog
+setOwner	source.cpp	/^    void setOwner(const std::string& dogsOwner);$/;"	p	class:OwnedDog	typeref:typename:void
+setOwner	source.cpp	/^void OwnedDog::setOwner(const std::string& dogsOwner)$/;"	f	typeref:typename:void	class:OwnedDog
+setWeight	source.cpp	/^    void setWeight(int dogsWeight);$/;"	p	class:Dog	typeref:typename:void
+setWeight	source.cpp	/^void Dog::setWeight(int dogsWeight)$/;"	f	typeref:typename:void	class:Dog
+~Dog	source.cpp	/^    virtual ~Dog();$/;"	p	class:Dog
+~Dog	source.cpp	/^Dog::~Dog()$/;"	f	class:Dog

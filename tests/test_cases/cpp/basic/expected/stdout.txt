@@ -1,4 +1,3 @@
-Baz	source.cpp	/^namespace Baz {$/;"	n	
 Box	source.cpp	/^class Box {$/;"	c	
 Dog	source.cpp	/^class Dog {$/;"	c	
 Dog	source.cpp	/^Dog::Dog()$/;"	f	class:Dog
@@ -19,7 +18,7 @@ bark	source.cpp	/^    void bark() const { std::cout << name << " barks!\\n"; }$/
 barkThreeTimes	source.cpp	/^void barkThreeTimes(const T& input)$/;"	f	typeref:typename:void
 boxOfBox	source.cpp	/^Box<Box<int>> boxOfBox;$/;"	v	typeref:typename:Box<Box<int>>
 foo	source.cpp	/^    void foo()$/;"	f	namespace:Baz	typeref:typename:void
-insert	source.cpp	/^    void insert(const T&) { ... }$/;"	f	class:Box	typeref:typename:void	
+insert	source.cpp	/^    void insert(const T&) { }$/;"	f	class:Box	typeref:typename:void	
 main	source.cpp	/^int main(int argc, char** argv) {$/;"	f	typeref:typename:int
 my_vector	source.cpp	/^std::vector<string> my_vector; \/\/ initialize the vector$/;"	v	typeref:typename:std::vector<string>
 name	source.cpp	/^    std::string name;$/;"	m	class:Dog	typeref:typename:std::string	

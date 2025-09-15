@@ -246,7 +246,7 @@ impl Parser {
     ) -> Option<Vec<tag::Tag>> {
         // Parse cpp-kinds configuration
         let tag_config = if config.cpp_kinds.is_empty() {
-            helper::TagKindConfig::new_cpp() // Default: all kinds enabled
+            helper::TagKindConfig::new_cpp()
         } else {
             helper::TagKindConfig::from_cpp_kinds_string(&config.cpp_kinds)
         };

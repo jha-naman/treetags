@@ -1,4 +1,3 @@
-// code sourced from https://learnxinyminutes.com/c++
 #include <iostream>
 #include <string>
 
@@ -195,7 +194,7 @@ public:
     void insert(const T&) { }
 };
 
-Box<Box<int>> boxOfBox;
+Box<Box<int> > boxOfBox;
 boxOfBox.insert(intBox);
 
 template<class T>

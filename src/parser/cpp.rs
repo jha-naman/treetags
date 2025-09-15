@@ -343,13 +343,24 @@ fn process_namespace(
 }
 
 fn process_class(cursor: &mut TreeCursor, context: &mut CppContext) -> Option<(ScopeType, String)> {
-    process_named_item(
-        cursor,
-        context,
-        &["type_identifier"],
-        "c",
-        Some(ScopeType::Class),
-    )
+    let mut name = "".to_string();
+
+    iterate_children!(cursor, |child_node| {
+        match child_node.kind() {
+            "type_identifier" => {
+                name = context.base.node_text(&child_node).to_string();
+                create_tag(name.clone(), "c", child_node, context, None);
+                Continue
+            }
+            _ => Continue,
+        }
+    });
+
+    if name.is_empty() {
+        None
+    } else {
+        Some((ScopeType::Class, name))
+    }
 }
 
 fn process_struct(
@@ -506,7 +517,7 @@ fn extract_function_name_from_declarator(
 
     iterate_children!(cursor, |declarator_child| {
         match declarator_child.kind() {
-            "identifier" | "field_identifier" => {
+            "identifier" | "field_identifier" | "destructor_name" => {
                 fn_name = context.base.node_text(&declarator_child).to_string();
                 Break
             }
@@ -558,7 +569,6 @@ fn process_declaration(
 ) -> Option<(ScopeType, String)> {
     let mut type_info = String::new();
     let mut variable_names = Vec::new();
-
     iterate_children!(cursor, |child_node| {
         match child_node.kind() {
             // Type specifiers
@@ -574,6 +584,20 @@ fn process_declaration(
             // Qualified types like std::string
             "qualified_identifier" => {
                 type_info = context.base.node_text(&child_node).to_string();
+                Continue
+            }
+            // Function declarator - handle function prototypes
+            "function_declarator" => {
+                let fn_name =
+                    extract_function_name_from_declarator(cursor, context, &mut IndexMap::new());
+                if !fn_name.is_empty() {
+                    let mut proto_fields = IndexMap::new();
+                    if !type_info.is_empty() {
+                        proto_fields
+                            .insert("typeref".to_string(), format!("typename:{}", type_info));
+                    }
+                    create_tag(fn_name, "p", child_node, context, Some(proto_fields));
+                }
                 Continue
             }
             // Variable declarators
@@ -597,6 +621,20 @@ fn process_declaration(
                         }
                         _ => Continue,
                     }
+                });
+                Continue
+            }
+            // Declarator (for simple variable declarations)
+            "declarator" => {
+                iterate_children!(cursor, |decl_child| {
+                    match decl_child.kind() {
+                        "identifier" => {
+                            let var_name = context.base.node_text(&decl_child).to_string();
+                            variable_names.push((var_name, decl_child));
+                        }
+                        _ => {}
+                    }
+                    Continue
                 });
                 Continue
             }
@@ -643,6 +681,7 @@ fn process_field_declaration(
     let node = cursor.node();
     let mut field_name = String::new();
     let mut type_info = String::new();
+    let mut is_method_prototype = false;
 
     iterate_children!(cursor, |child_node| {
         match child_node.kind() {
@@ -657,6 +696,21 @@ fn process_field_declaration(
                 type_info = context.base.node_text(&child_node).to_string();
                 Continue
             }
+            "function_declarator" => {
+                is_method_prototype = true;
+                field_name = extract_method_name_from_declarator(cursor, context);
+                Continue
+            }
+            "reference_declarator" => {
+                iterate_children!(cursor, |ref_child| {
+                    if ref_child.kind() == "function_declarator" {
+                        is_method_prototype = true;
+                        field_name = extract_method_name_from_declarator(cursor, context);
+                    }
+                    Continue
+                });
+                Continue
+            }
             _ => Continue,
         }
     });
@@ -668,9 +722,15 @@ fn process_field_declaration(
             extra_fields.insert("typeref".to_string(), format!("typename:{}", type_info));
         }
 
+        let tag_kind = if is_method_prototype {
+            "p" // prototype
+        } else {
+            "m" // member
+        };
+
         create_tag(
             field_name,
-            "m",
+            tag_kind,
             node,
             context,
             if extra_fields.is_empty() {
@@ -695,4 +755,36 @@ fn process_typedef(
     context: &mut CppContext,
 ) -> Option<(ScopeType, String)> {
     process_named_item(cursor, context, &["type_identifier"], "t", None)
+}
+
+fn extract_method_name_from_declarator(
+    cursor: &mut TreeCursor,
+    context: &mut CppContext,
+) -> String {
+    let mut method_name = String::new();
+
+    iterate_children!(cursor, |declarator_child| {
+        match declarator_child.kind() {
+            "identifier" | "field_identifier" => {
+                method_name = context.base.node_text(&declarator_child).to_string();
+                Break
+            }
+            "operator_name" => {
+                let operator_text = context.base.node_text(&declarator_child).to_string();
+                if operator_text.starts_with("operator") && operator_text.len() > 8 {
+                    method_name = format!("operator {}", &operator_text[8..]);
+                } else {
+                    method_name = operator_text;
+                }
+                Break
+            }
+            "destructor_name" => {
+                method_name = context.base.node_text(&declarator_child).to_string();
+                Break
+            }
+            _ => Continue,
+        }
+    });
+
+    method_name
 }
