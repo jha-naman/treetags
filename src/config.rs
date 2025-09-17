@@ -88,8 +88,12 @@ pub struct Config {
     pub go_kinds: String,
 
     /// C++ language specific kinds to generate tags for
-    #[arg(long = "kinds-c", default_value = "")]
+    #[arg(long = "kinds-c++", default_value = "")]
     pub cpp_kinds: String,
+
+    /// C language specific kinds to generate tags for
+    #[arg(long = "kinds-c", default_value = "")]
+    pub c_kinds: String,
 
     /// Parsed fields configuration  
     #[clap(skip)]
