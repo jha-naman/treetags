@@ -1,11 +1,189 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 /// Configuration for which tag kinds to generate
 #[derive(Debug, Clone)]
 pub struct TagKindConfig {
     pub enabled_kinds: HashSet<String>,
-    // Cache for optimization - whether we need to traverse certain node types
-    pub needs_traversal_cache: HashMap<String, bool>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TEST_KIND_MAPPING: &[(&[&str], &str)] = &[
+        (&["f", "function"], "f"),
+        (&["s", "struct"], "s"),
+        (&["c", "class"], "c"),
+        (&["m", "member"], "m"),
+        (&["v", "variable"], "v"),
+    ];
+
+    fn test_default_kinds() -> HashSet<String> {
+        let mut defaults = HashSet::new();
+        defaults.insert("f".to_string());
+        defaults.insert("s".to_string());
+        defaults.insert("c".to_string());
+        defaults
+    }
+
+    #[test]
+    fn test_from_string_override_mode_concatenated() {
+        let config = TagKindConfig::from_string("fsm", TEST_KIND_MAPPING, &test_default_kinds());
+
+        assert!(config.is_kind_enabled("f"));
+        assert!(config.is_kind_enabled("s"));
+        assert!(config.is_kind_enabled("m"));
+        assert!(!config.is_kind_enabled("c")); // Not in input, should be disabled
+        assert!(!config.is_kind_enabled("v"));
+    }
+
+    #[test]
+    fn test_from_string_override_mode_comma_separated() {
+        let config =
+            TagKindConfig::from_string("f,struct,m", TEST_KIND_MAPPING, &test_default_kinds());
+
+        assert!(config.is_kind_enabled("f"));
+        assert!(config.is_kind_enabled("s")); // "struct" maps to "s"
+        assert!(config.is_kind_enabled("m"));
+        assert!(!config.is_kind_enabled("c")); // Not in input, should be disabled
+        assert!(!config.is_kind_enabled("v"));
+    }
+
+    #[test]
+    fn test_from_string_modifier_mode_concatenated() {
+        let config = TagKindConfig::from_string("+m-c", TEST_KIND_MAPPING, &test_default_kinds());
+
+        assert!(config.is_kind_enabled("f")); // From defaults
+        assert!(config.is_kind_enabled("s")); // From defaults
+        assert!(!config.is_kind_enabled("c")); // Removed by -c
+        assert!(config.is_kind_enabled("m")); // Added by +m
+        assert!(!config.is_kind_enabled("v"));
+    }
+
+    #[test]
+    fn test_from_string_modifier_mode_comma_separated() {
+        let config = TagKindConfig::from_string(
+            "+member, -class, +variable",
+            TEST_KIND_MAPPING,
+            &test_default_kinds(),
+        );
+
+        assert!(config.is_kind_enabled("f")); // From defaults
+        assert!(config.is_kind_enabled("s")); // From defaults
+        assert!(!config.is_kind_enabled("c")); // Removed by -class
+        assert!(config.is_kind_enabled("m")); // Added by +member
+        assert!(config.is_kind_enabled("v")); // Added by +variable
+    }
+
+    #[test]
+    fn test_from_string_modifier_mode_mixed() {
+        let config = TagKindConfig::from_string("+m-s+v", TEST_KIND_MAPPING, &test_default_kinds());
+
+        assert!(config.is_kind_enabled("f")); // From defaults
+        assert!(!config.is_kind_enabled("s")); // Removed by -s
+        assert!(config.is_kind_enabled("c")); // From defaults
+        assert!(config.is_kind_enabled("m")); // Added by +m
+        assert!(config.is_kind_enabled("v")); // Added by +v
+    }
+
+    #[test]
+    fn test_from_string_empty_input() {
+        let config = TagKindConfig::from_string("", TEST_KIND_MAPPING, &test_default_kinds());
+
+        // Empty input in override mode should result in no enabled kinds
+        assert!(!config.is_kind_enabled("f"));
+        assert!(!config.is_kind_enabled("s"));
+        assert!(!config.is_kind_enabled("c"));
+        assert!(!config.is_kind_enabled("m"));
+        assert!(!config.is_kind_enabled("v"));
+    }
+
+    #[test]
+    fn test_from_cpp_kinds_string_default() {
+        let config = TagKindConfig::from_cpp_kinds_string("");
+
+        // Should have no kinds enabled for empty input (override mode)
+        assert!(!config.is_kind_enabled("d"));
+        assert!(!config.is_kind_enabled("e"));
+        assert!(!config.is_kind_enabled("f"));
+    }
+
+    #[test]
+    fn test_from_cpp_kinds_string_override_mode() {
+        let config = TagKindConfig::from_cpp_kinds_string("def");
+
+        // Only specified kinds should be enabled
+        assert!(config.is_kind_enabled("d")); // macro
+        assert!(config.is_kind_enabled("e")); // enumerator
+        assert!(config.is_kind_enabled("f")); // function
+        assert!(!config.is_kind_enabled("g")); // enum - not specified
+        assert!(!config.is_kind_enabled("h")); // header - not specified
+        assert!(!config.is_kind_enabled("m")); // member - not specified
+    }
+
+    #[test]
+    fn test_from_cpp_kinds_string_override_mode_comma() {
+        let config = TagKindConfig::from_cpp_kinds_string("macro,function,class");
+
+        assert!(config.is_kind_enabled("d")); // macro
+        assert!(config.is_kind_enabled("f")); // function
+        assert!(config.is_kind_enabled("c")); // class
+        assert!(!config.is_kind_enabled("e")); // enumerator - not specified
+        assert!(!config.is_kind_enabled("g")); // enum - not specified
+    }
+
+    #[test]
+    fn test_from_cpp_kinds_string_modifier_mode() {
+        let config = TagKindConfig::from_cpp_kinds_string("+c-m");
+
+        // Should start with defaults and apply modifications
+        assert!(config.is_kind_enabled("d")); // macro - from defaults
+        assert!(config.is_kind_enabled("e")); // enumerator - from defaults
+        assert!(config.is_kind_enabled("f")); // function - from defaults
+        assert!(config.is_kind_enabled("g")); // enum - from defaults
+        assert!(config.is_kind_enabled("h")); // header - from defaults
+        assert!(!config.is_kind_enabled("m")); // member - removed by -m
+        assert!(config.is_kind_enabled("s")); // struct - from defaults
+        assert!(config.is_kind_enabled("t")); // typedef - from defaults
+        assert!(config.is_kind_enabled("u")); // union - from defaults
+        assert!(config.is_kind_enabled("v")); // variable - from defaults
+        assert!(config.is_kind_enabled("c")); // class - added by +c
+    }
+
+    #[test]
+    fn test_from_cpp_kinds_string_modifier_mode_comma() {
+        let config = TagKindConfig::from_cpp_kinds_string("+class, -member, +local");
+
+        // Should start with defaults and apply modifications
+        assert!(config.is_kind_enabled("d")); // macro - from defaults
+        assert!(config.is_kind_enabled("f")); // function - from defaults
+        assert!(!config.is_kind_enabled("m")); // member - removed by -member
+        assert!(config.is_kind_enabled("c")); // class - added by +class
+        assert!(config.is_kind_enabled("l")); // local - added by +local
+    }
+
+    #[test]
+    fn test_from_cpp_kinds_string_all_defaults() {
+        let config = TagKindConfig::from_cpp_kinds_string("+");
+
+        // Just "+" should enable all defaults (though this is a bit of an edge case)
+        // The + without a kind should be ignored, leaving us with defaults
+        assert!(config.is_kind_enabled("d")); // macro
+        assert!(config.is_kind_enabled("e")); // enumerator
+        assert!(config.is_kind_enabled("f")); // function
+        assert!(config.is_kind_enabled("g")); // enum
+        assert!(config.is_kind_enabled("h")); // header
+        assert!(config.is_kind_enabled("m")); // member
+        assert!(config.is_kind_enabled("s")); // struct
+        assert!(config.is_kind_enabled("t")); // typedef
+        assert!(config.is_kind_enabled("u")); // union
+        assert!(config.is_kind_enabled("v")); // variable
+        assert!(config.is_kind_enabled("c")); // class
+
+        // Non-default kinds should not be enabled
+        assert!(!config.is_kind_enabled("l")); // local
+        assert!(!config.is_kind_enabled("p")); // prototype
+    }
 }
 
 impl TagKindConfig {
@@ -29,12 +207,7 @@ impl TagKindConfig {
         enabled_kinds.insert("t".to_string()); // type alias
         enabled_kinds.insert("M".to_string()); // macro
 
-        let mut config = Self {
-            enabled_kinds,
-            needs_traversal_cache: HashMap::new(),
-        };
-        config.rebuild_rust_traversal_cache();
-        config
+        Self { enabled_kinds }
     }
 
     /// Create a new configuration with all kinds enabled by default for Go
@@ -54,23 +227,127 @@ impl TagKindConfig {
         enabled_kinds.insert("P".to_string()); // imported package
         enabled_kinds.insert("a".to_string()); // type alias
 
-        let mut config = Self {
-            enabled_kinds,
-            needs_traversal_cache: HashMap::new(),
-        };
-        config.rebuild_go_traversal_cache();
-        config
+        Self { enabled_kinds }
     }
 
-    /// Create a configuration from a kinds string (e.g. "f,s,c" or "fsc")
+    /// Create a configuration from a kinds string with support for default kinds and +/- modifiers
+    ///
+    /// # Arguments
+    /// * `kinds_str` - The kinds string (e.g., "+f,-m", "fsc", "f,s,c")
+    /// * `kind_mapping` - Mapping from aliases to canonical kind codes
+    /// * `default_kinds` - Set of kinds enabled by default for this language
+    ///
+    /// # Behavior
+    /// - If no +/- prefixes are used: only explicitly listed kinds are enabled (override mode)
+    /// - If +/- prefixes are used: start with default_kinds, then apply modifications
+    /// - `+kind`: add kind to enabled set
+    /// - `-kind`: remove kind from enabled set
     pub fn from_string(
         kinds_str: &str,
         kind_mapping: &[(&[&str], &str)],
-        rebuild_cache_fn: impl FnOnce(&mut Self),
+        default_kinds: &HashSet<String>,
     ) -> Self {
         let mut enabled_kinds = HashSet::new();
 
-        let full_kind_map: HashMap<&str, &str> = kind_mapping
+        // Build the full mapping from aliases to canonical forms
+        let full_kind_map: std::collections::HashMap<&str, &str> = kind_mapping
+            .iter()
+            .flat_map(|(aliases, canonical)| aliases.iter().map(move |alias| (*alias, *canonical)))
+            .collect();
+
+        // Check if any entry has +/- prefix to determine mode
+        let has_modifiers = kinds_str.chars().any(|c| c == '+' || c == '-')
+            || kinds_str.split(',').any(|s| {
+                let trimmed = s.trim();
+                trimmed.starts_with('+') || trimmed.starts_with('-')
+            });
+
+        if has_modifiers {
+            // Modifier mode: start with defaults and apply changes
+            enabled_kinds = default_kinds.clone();
+
+            let entries: Vec<String> = if kinds_str.contains(',') {
+                kinds_str
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect()
+            } else {
+                // For non-comma format, we need to parse character by character with +/- prefixes
+                let mut entries = Vec::new();
+                let mut chars = kinds_str.chars().peekable();
+
+                while let Some(ch) = chars.next() {
+                    if ch == '+' || ch == '-' {
+                        if let Some(next_ch) = chars.next() {
+                            if !next_ch.is_whitespace() {
+                                entries.push(format!("{}{}", ch, next_ch));
+                            }
+                        }
+                    } else if !ch.is_whitespace() {
+                        entries.push(ch.to_string());
+                    }
+                }
+                entries
+            };
+
+            for entry in entries {
+                let (operation, kind_str) = if entry.starts_with('+') {
+                    ('+', &entry[1..])
+                } else if entry.starts_with('-') {
+                    ('-', &entry[1..])
+                } else {
+                    ('+', entry.as_str()) // Default to add if no prefix
+                };
+
+                if let Some(canonical) = full_kind_map.get(kind_str) {
+                    match operation {
+                        '+' => {
+                            enabled_kinds.insert((*canonical).to_string());
+                        }
+                        '-' => {
+                            enabled_kinds.remove(*canonical);
+                        }
+                        _ => unreachable!(),
+                    }
+                } else {
+                    eprintln!("Warning: Unknown tag kind: {}", kind_str);
+                }
+            }
+        } else {
+            // Override mode: only include explicitly listed kinds
+            if kinds_str.contains(',') {
+                for kind in kinds_str
+                    .split(',')
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+                {
+                    if let Some(canonical) = full_kind_map.get(kind) {
+                        enabled_kinds.insert((*canonical).to_string());
+                    } else {
+                        eprintln!("Warning: Unknown tag kind: {}", kind);
+                    }
+                }
+            } else {
+                for kind_char in kinds_str.chars().filter(|c| !c.is_whitespace()) {
+                    let kind_str = &kind_char.to_string();
+                    if let Some(canonical) = full_kind_map.get(kind_str.as_str()) {
+                        enabled_kinds.insert((*canonical).to_string());
+                    } else {
+                        eprintln!("Warning: Unknown tag kind: {}", kind_char);
+                    }
+                }
+            }
+        }
+
+        Self { enabled_kinds }
+    }
+
+    /// Create a configuration from a kinds string (e.g. "f,s,c" or "fsc")
+    pub fn from_string_legacy(kinds_str: &str, kind_mapping: &[(&[&str], &str)]) -> Self {
+        let mut enabled_kinds = HashSet::new();
+
+        let full_kind_map: std::collections::HashMap<&str, &str> = kind_mapping
             .iter()
             .flat_map(|(aliases, canonical)| aliases.iter().map(move |alias| (*alias, *canonical)))
             .collect();
@@ -98,12 +375,7 @@ impl TagKindConfig {
             }
         }
 
-        let mut config = Self {
-            enabled_kinds,
-            needs_traversal_cache: HashMap::new(),
-        };
-        rebuild_cache_fn(&mut config);
-        config
+        Self { enabled_kinds }
     }
 
     /// Create a configuration from a kinds string for Rust (e.g., "nsf" or "n,s,f")
@@ -125,9 +397,7 @@ impl TagKindConfig {
             (&["t", "type", "alias"], "t"),
             (&["M", "macro"], "M"),
         ];
-        Self::from_string(kinds_str, RUST_KIND_MAPPING, |config| {
-            config.rebuild_rust_traversal_cache()
-        })
+        Self::from_string_legacy(kinds_str, RUST_KIND_MAPPING)
     }
 
     /// Create a configuration from a kinds string for Go (e.g., "pfc" or "p,f,c")
@@ -146,9 +416,7 @@ impl TagKindConfig {
             (&["P", "import"], "P"),
             (&["a", "alias"], "a"),
         ];
-        Self::from_string(kinds_str, GO_KIND_MAPPING, |config| {
-            config.rebuild_go_traversal_cache()
-        })
+        Self::from_string_legacy(kinds_str, GO_KIND_MAPPING)
     }
 
     /// Check if a tag kind is enabled
@@ -156,179 +424,26 @@ impl TagKindConfig {
         self.enabled_kinds.contains(kind)
     }
 
-    /// Check if we need to traverse into a specific node type for optimization
-    pub fn needs_traversal(&self, node_kind: &str) -> bool {
-        self.needs_traversal_cache
-            .get(node_kind)
-            .copied()
-            .unwrap_or(true)
-    }
-
-    /// Rebuild the traversal optimization cache for Rust
-    fn rebuild_rust_traversal_cache(&mut self) {
-        self.needs_traversal_cache.clear();
-
-        // Define what child tags each node type can contain
-        // Only traverse if we need the parent tag OR any potential child tags
-
-        // Modules can contain everything
-        self.needs_traversal_cache.insert(
-            "mod_item".to_string(),
-            self.is_kind_enabled("n") || self.needs_any_child_tags(),
-        );
-
-        // Structs can contain fields (tagged as 'm')
-        self.needs_traversal_cache.insert(
-            "struct_item".to_string(),
-            self.is_kind_enabled("s") || self.is_kind_enabled("m"),
-        );
-
-        // Enums can contain variants (tagged as 'e')
-        self.needs_traversal_cache.insert(
-            "enum_item".to_string(),
-            self.is_kind_enabled("g") || self.is_kind_enabled("e"),
-        );
-
-        // Unions are simple - no child tags typically
-        self.needs_traversal_cache
-            .insert("union_item".to_string(), self.is_kind_enabled("u"));
-
-        // Traits can contain methods ('m'), associated types ('T'), constants ('C')
-        self.needs_traversal_cache.insert(
-            "trait_item".to_string(),
-            self.is_kind_enabled("i")
-                || self.is_kind_enabled("m")
-                || self.is_kind_enabled("T")
-                || self.is_kind_enabled("C"),
-        );
-
-        // Impl blocks can contain methods ('P'), associated types ('T'), constants ('C')
-        self.needs_traversal_cache.insert(
-            "impl_item".to_string(),
-            self.is_kind_enabled("c")
-                || self.is_kind_enabled("P")
-                || self.is_kind_enabled("T")
-                || self.is_kind_enabled("C"),
-        );
-
-        // Functions are leaf nodes - no child tags
-        self.needs_traversal_cache.insert(
-            "function_item".to_string(),
-            self.is_kind_enabled("f") || self.is_kind_enabled("P"),
-        );
-
-        self.needs_traversal_cache.insert(
-            "function_signature_item".to_string(),
-            self.is_kind_enabled("m"),
-        );
-
-        // Other leaf nodes
-        self.needs_traversal_cache
-            .insert("associated_type".to_string(), self.is_kind_enabled("T"));
-        self.needs_traversal_cache
-            .insert("const_item".to_string(), self.is_kind_enabled("C"));
-        self.needs_traversal_cache
-            .insert("static_item".to_string(), self.is_kind_enabled("v"));
-        self.needs_traversal_cache
-            .insert("type_item".to_string(), self.is_kind_enabled("t"));
-        self.needs_traversal_cache
-            .insert("macro_definition".to_string(), self.is_kind_enabled("M"));
-    }
-
-    /// Helper to check if we need any child tags (for modules)
-    fn needs_any_child_tags(&self) -> bool {
-        // If any tag type is enabled, modules might need traversal
-        !self.enabled_kinds.is_empty()
-    }
-
-    /// Rebuild the traversal optimization cache for Go
-    fn rebuild_go_traversal_cache(&mut self) {
-        self.needs_traversal_cache.clear();
-
-        // Define what child tags each node type can contain
-        self.needs_traversal_cache
-            .insert("source_file".to_string(), !self.enabled_kinds.is_empty());
-
-        self.needs_traversal_cache
-            .insert("package_clause".to_string(), self.is_kind_enabled("p"));
-
-        self.needs_traversal_cache
-            .insert("import_declaration".to_string(), self.is_kind_enabled("P"));
-
-        self.needs_traversal_cache.insert(
-            "function_declaration".to_string(),
-            self.is_kind_enabled("f"),
-        );
-
-        self.needs_traversal_cache
-            .insert("method_declaration".to_string(), self.is_kind_enabled("f"));
-
-        self.needs_traversal_cache
-            .insert("const_declaration".to_string(), self.is_kind_enabled("c"));
-
-        self.needs_traversal_cache
-            .insert("var_declaration".to_string(), self.is_kind_enabled("v"));
-
-        self.needs_traversal_cache.insert(
-            "short_var_declaration".to_string(),
-            self.is_kind_enabled("v"),
-        );
-
-        self.needs_traversal_cache.insert(
-            "type_declaration".to_string(),
-            self.is_kind_enabled("t")
-                || self.is_kind_enabled("s")
-                || self.is_kind_enabled("i")
-                || self.is_kind_enabled("a"),
-        );
-
-        self.needs_traversal_cache.insert(
-            "struct_type".to_string(),
-            self.is_kind_enabled("s") || self.is_kind_enabled("m"),
-        );
-
-        self.needs_traversal_cache.insert(
-            "interface_type".to_string(),
-            self.is_kind_enabled("i") || self.is_kind_enabled("n"),
-        );
-    }
-
     /// Create a new configuration with all kinds enabled by default for C++
     pub fn new_cpp() -> Self {
         let mut enabled_kinds = HashSet::new();
-        // Add all possible C++ tag kinds
-        enabled_kinds.insert("d".to_string()); // macro definitions
-        enabled_kinds.insert("e".to_string()); // enumerators
-        enabled_kinds.insert("f".to_string()); // function definitions
-        enabled_kinds.insert("g".to_string()); // enumeration names
-        enabled_kinds.insert("h".to_string()); // included header files
-        enabled_kinds.insert("l".to_string()); // local variables [off]
-        enabled_kinds.insert("m".to_string()); // class, struct, and union members
-        enabled_kinds.insert("p".to_string()); // function prototypes [off]
-        enabled_kinds.insert("s".to_string()); // structure names
-        enabled_kinds.insert("t".to_string()); // typedefs
-        enabled_kinds.insert("u".to_string()); // union names
-        enabled_kinds.insert("v".to_string()); // variable definitions
-        enabled_kinds.insert("x".to_string()); // external and forward variable declarations [off]
-        enabled_kinds.insert("z".to_string()); // function parameters inside function or prototype definitions [off]
-        enabled_kinds.insert("L".to_string()); // goto labels [off]
-        enabled_kinds.insert("D".to_string()); // parameters inside macro definitions [off]
-        enabled_kinds.insert("c".to_string()); // classes
-        enabled_kinds.insert("n".to_string()); // namespaces
-        enabled_kinds.insert("A".to_string()); // namespace aliases [off]
-        enabled_kinds.insert("N".to_string()); // names imported via using scope::symbol [off]
-        enabled_kinds.insert("U".to_string()); // using namespace statements [off]
-        enabled_kinds.insert("Z".to_string()); // template parameters [off]
 
-        let mut config = Self {
-            enabled_kinds,
-            needs_traversal_cache: HashMap::new(),
-        };
-        config.rebuild_cpp_traversal_cache();
-        config
+        enabled_kinds.insert("c".to_string()); // class
+        enabled_kinds.insert("d".to_string()); // macro
+        enabled_kinds.insert("e".to_string()); // enumerator
+        enabled_kinds.insert("f".to_string()); // function
+        enabled_kinds.insert("g".to_string()); // enum
+        enabled_kinds.insert("h".to_string()); // header
+        enabled_kinds.insert("m".to_string()); // member
+        enabled_kinds.insert("s".to_string()); // struct
+        enabled_kinds.insert("t".to_string()); // typedef
+        enabled_kinds.insert("u".to_string()); // union
+        enabled_kinds.insert("v".to_string()); // variable
+
+        Self { enabled_kinds }
     }
 
-    /// Create a configuration from a kinds string for C++ (e.g., "defg" or "d,e,f,g")
+    /// Create a configuration from a kinds string for C++ (e.g., "defg", "+f,-m", or "d,e,f,g")
     pub fn from_cpp_kinds_string(kinds_str: &str) -> Self {
         const CPP_KIND_MAPPING: &[(&[&str], &str)] = &[
             (&["d", "macro"], "d"),
@@ -343,77 +458,32 @@ impl TagKindConfig {
             (&["t", "typedef"], "t"),
             (&["u", "union"], "u"),
             (&["v", "variable"], "v"),
-            (&["x", "external"], "x"),
+            (&["x", "externvar"], "x"),
             (&["z", "parameter"], "z"),
             (&["L", "label"], "L"),
             (&["D", "macroparam"], "D"),
             (&["c", "class"], "c"),
             (&["n", "namespace"], "n"),
             (&["A", "alias"], "A"),
-            (&["N", "using"], "N"),
-            (&["U", "usingnamespace"], "U"),
-            (&["Z", "template"], "Z"),
+            (&["N", "name"], "N"),
+            (&["U", "using"], "U"),
+            (&["Z", "tparam"], "Z"),
         ];
-        Self::from_string(kinds_str, CPP_KIND_MAPPING, |config| {
-            config.rebuild_cpp_traversal_cache()
-        })
-    }
 
-    /// Rebuild the traversal optimization cache for C++
-    fn rebuild_cpp_traversal_cache(&mut self) {
-        self.needs_traversal_cache.clear();
+        // Default enabled kinds for C++
+        let mut default_kinds = HashSet::new();
+        default_kinds.insert("c".to_string()); // class
+        default_kinds.insert("d".to_string()); // macro
+        default_kinds.insert("e".to_string()); // enumerator
+        default_kinds.insert("f".to_string()); // function
+        default_kinds.insert("g".to_string()); // enum
+        default_kinds.insert("h".to_string()); // header
+        default_kinds.insert("m".to_string()); // member
+        default_kinds.insert("s".to_string()); // struct
+        default_kinds.insert("t".to_string()); // typedef
+        default_kinds.insert("u".to_string()); // union
+        default_kinds.insert("v".to_string()); // variable
 
-        self.needs_traversal_cache.insert(
-            "translation_unit".to_string(),
-            !self.enabled_kinds.is_empty(),
-        );
-
-        self.needs_traversal_cache.insert(
-            "namespace_definition".to_string(),
-            self.is_kind_enabled("n") || self.needs_any_child_tags(),
-        );
-
-        self.needs_traversal_cache.insert(
-            "class_specifier".to_string(),
-            self.is_kind_enabled("c") || self.is_kind_enabled("m"),
-        );
-
-        self.needs_traversal_cache.insert(
-            "struct_specifier".to_string(),
-            self.is_kind_enabled("s") || self.is_kind_enabled("m"),
-        );
-
-        self.needs_traversal_cache.insert(
-            "union_specifier".to_string(),
-            self.is_kind_enabled("u") || self.is_kind_enabled("m"),
-        );
-
-        self.needs_traversal_cache.insert(
-            "enum_specifier".to_string(),
-            self.is_kind_enabled("g") || self.is_kind_enabled("e"),
-        );
-
-        self.needs_traversal_cache
-            .insert("function_definition".to_string(), self.is_kind_enabled("f"));
-
-        self.needs_traversal_cache
-            .insert("function_declarator".to_string(), self.is_kind_enabled("p"));
-
-        self.needs_traversal_cache.insert(
-            "declaration".to_string(),
-            self.is_kind_enabled("v") || self.is_kind_enabled("t"),
-        );
-
-        self.needs_traversal_cache
-            .insert("field_declaration".to_string(), self.is_kind_enabled("m"));
-
-        self.needs_traversal_cache
-            .insert("preproc_def".to_string(), self.is_kind_enabled("d"));
-
-        self.needs_traversal_cache
-            .insert("preproc_include".to_string(), self.is_kind_enabled("h"));
-
-        self.needs_traversal_cache
-            .insert("type_definition".to_string(), self.is_kind_enabled("t"));
+        Self::from_string(kinds_str, CPP_KIND_MAPPING, &default_kinds)
     }
 }

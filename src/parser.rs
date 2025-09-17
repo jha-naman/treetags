@@ -149,8 +149,8 @@ impl Parser {
             "go" => {
                 self.generate_go_tags_with_user_config(code, file_path_relative_to_tag_file, config)
             }
-            "cc" | "cpp" | "CPP" | "cxx" | "c++" | "cp" | "C" | "cppm" | "ixx" | "ii" | "H"
-            | "hh" | "hpp" | "HPP" | "hxx" | "h++" | "tcc" => self
+            "c" | "h" | "i" | "cc" | "cpp" | "CPP" | "cxx" | "c++" | "cp" | "C" | "cppm"
+            | "ixx" | "ii" | "H" | "hh" | "hpp" | "HPP" | "hxx" | "h++" | "tcc" => self
                 .generate_cpp_tags_with_user_config(code, file_path_relative_to_tag_file, config),
             _ => None,
         }
@@ -246,7 +246,7 @@ impl Parser {
     ) -> Option<Vec<tag::Tag>> {
         // Parse cpp-kinds configuration
         let tag_config = if config.cpp_kinds.is_empty() {
-            helper::TagKindConfig::new_cpp() // Default: all kinds enabled
+            helper::TagKindConfig::new_cpp()
         } else {
             helper::TagKindConfig::from_cpp_kinds_string(&config.cpp_kinds)
         };
