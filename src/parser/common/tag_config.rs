@@ -486,4 +486,59 @@ impl TagKindConfig {
 
         Self::from_string(kinds_str, CPP_KIND_MAPPING, &default_kinds)
     }
+
+    /// Create a new configuration with all kinds enabled by default for C
+    pub fn new_c() -> Self {
+        let mut enabled_kinds = HashSet::new();
+
+        enabled_kinds.insert("d".to_string()); // macro
+        enabled_kinds.insert("e".to_string()); // enumerator
+        enabled_kinds.insert("f".to_string()); // function
+        enabled_kinds.insert("g".to_string()); // enum
+        enabled_kinds.insert("h".to_string()); // header
+        enabled_kinds.insert("m".to_string()); // member
+        enabled_kinds.insert("s".to_string()); // struct
+        enabled_kinds.insert("t".to_string()); // typedef
+        enabled_kinds.insert("u".to_string()); // union
+        enabled_kinds.insert("v".to_string()); // variable
+
+        Self { enabled_kinds }
+    }
+
+    /// Create a configuration from a kinds string for C (e.g., "defg", "+f,-m", or "d,e,f,g")
+    pub fn from_c_kinds_string(kinds_str: &str) -> Self {
+        const C_KIND_MAPPING: &[(&[&str], &str)] = &[
+            (&["d", "macro"], "d"),
+            (&["e", "enumerator"], "e"),
+            (&["f", "function"], "f"),
+            (&["g", "enum"], "g"),
+            (&["h", "header"], "h"),
+            (&["l", "local"], "l"),
+            (&["m", "member"], "m"),
+            (&["p", "prototype"], "p"),
+            (&["s", "struct"], "s"),
+            (&["t", "typedef"], "t"),
+            (&["u", "union"], "u"),
+            (&["v", "variable"], "v"),
+            (&["x", "externvar"], "x"),
+            (&["z", "parameter"], "z"),
+            (&["L", "label"], "L"),
+            (&["D", "macroparam"], "D"),
+        ];
+
+        // Default enabled kinds for C
+        let mut default_kinds = HashSet::new();
+        default_kinds.insert("d".to_string()); // macro
+        default_kinds.insert("e".to_string()); // enumerator
+        default_kinds.insert("f".to_string()); // function
+        default_kinds.insert("g".to_string()); // enum
+        default_kinds.insert("h".to_string()); // header
+        default_kinds.insert("m".to_string()); // member
+        default_kinds.insert("s".to_string()); // struct
+        default_kinds.insert("t".to_string()); // typedef
+        default_kinds.insert("u".to_string()); // union
+        default_kinds.insert("v".to_string()); // variable
+
+        Self::from_string(kinds_str, C_KIND_MAPPING, &default_kinds)
+    }
 }

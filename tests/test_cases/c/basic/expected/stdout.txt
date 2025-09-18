@@ -1,0 +1,51 @@
+ADD	source.c	/^#define ADD(a, b) ((a) + (b))$/;"	d
+DAYS_IN_YEAR	source.c	/^#define DAYS_IN_YEAR 365$/;"	d
+EXAMPLE_H	source.c	/^#define EXAMPLE_H$/;"	d	
+EXAMPLE_NAME	source.c	/^#define EXAMPLE_NAME "Dennis Ritchie"$/;"	d
+FRI	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	e	enum:days	
+GREEN	source.c	/^enum traffic_light_state {GREEN, YELLOW, RED};$/;"	e	enum:traffic_light_state	
+MON	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	e	enum:days	
+Node	source.c	/^typedef struct Node$/;"	t	typeref:struct:Node
+Node	source.c	/^typedef struct Node$/;"	s	
+Node	source.c	/^    struct Node *next;$/;"	s	struct:Node
+RED	source.c	/^enum traffic_light_state {GREEN, YELLOW, RED};$/;"	e	enum:traffic_light_state	
+SAT	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	e	enum:days	
+SUN	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	e	enum:days	
+THU	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	e	enum:days	
+TUE	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	e	enum:days	
+WED	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	e	enum:days	
+YELLOW	source.c	/^enum traffic_light_state {GREEN, YELLOW, RED};$/;"	e	enum:traffic_light_state	
+__anon16f8bb470108	source.c	/^struct {$/;"	s
+__anon16f8bb470308	source.c	/^typedef struct {$/;"	s
+add_two_ints	source.c	/^int add_two_ints(int x1, int x2)$/;"	f	typeref:typename:int
+anonymous_struct_var	source.c	/^} anonymous_struct_var;$/;"	v
+area	source.c	/^int area(rect r)$/;"	f	typeref:typename:int
+areaptr	source.c	/^int areaptr(const rect *r)$/;"	f	typeref:typename:int
+days	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	g	
+function_1	source.c	/^void function_1()$/;"	f	typeref:typename:void
+height	source.c	/^  int height;$/;"	m	struct:rectangle	typeref:typename:int	
+height	source.c	/^  int height;$/;"	m	struct:__anon16f8bb470308	typeref:typename:int
+i	source.c	/^int i = 0;$/;"	v	typeref:typename:int
+j	source.c	/^static int j = 0;$/;"	v	typeref:typename:int	
+main	source.c	/^int main (int argc, char** argv)$/;"	f	typeref:typename:int
+my_fnp_type	source.c	/^typedef void (*my_fnp_type)(char *);$/;"	t	typeref:typename:void (*)(char *)	
+my_type	source.c	/^typedef int my_type;$/;"	t	typeref:typename:int	
+my_type_var	source.c	/^my_type my_type_var = 0;$/;"	v	typeref:typename:my_type
+next	source.c	/^    struct Node *next;$/;"	m	struct:Node	typeref:struct:Node *	
+r	source.c	/^rect r;$/;"	v	typeref:typename:rect
+r	source.c	/^struct rectangle r;$/;"	v	typeref:struct:rectangle
+rect	source.c	/^typedef struct rectangle rect;$/;"	t	typeref:struct:rectangle	
+rect	source.c	/^typedef struct {$/;"	t	typeref:struct:__anon16f8bb470208	
+rectangle	source.c	/^struct rectangle {$/;"	s	
+rectangle	source.c	/^typedef struct rectangle rect;$/;"	s
+rectangle	source.c	/^struct rectangle r;$/;"	s
+str_reverse_through_pointer	source.c	/^void str_reverse_through_pointer(char *str_in) {$/;"	f	typeref:typename:void
+swapTwoNumbers	source.c	/^void swapTwoNumbers(int *a, int *b)$/;"	f	typeref:typename:void
+testFunc	source.c	/^void testFunc() {$/;"	f	typeref:typename:void
+testFunc2	source.c	/^void testFunc2() {$/;"	f	typeref:typename:void
+traffic_light_state	source.c	/^enum traffic_light_state {GREEN, YELLOW, RED};$/;"	g	
+val	source.c	/^    int val;$/;"	m	struct:Node	typeref:typename:int	
+width	source.c	/^  int width;$/;"	m	struct:rectangle	typeref:typename:int	
+width	source.c	/^  int width;$/;"	m	struct:__anon16f8bb470308	typeref:typename:int
+x	source.c	/^  int x;$/;"	m	struct:__anon16f8bb470108	typeref:typename:int
+y	source.c	/^  int y;$/;"	m	struct:__anon16f8bb470108	typeref:typename:int

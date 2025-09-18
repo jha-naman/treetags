@@ -20,6 +20,8 @@ enum ScopeType {
 struct CppContext<'a> {
     base: helper::Context<'a>,
     scope_stack: Vec<(ScopeType, String)>,
+    sequence_counter: u16,
+    filename_hash: String,
 }
 
 impl<'a> CppContext<'a> {
@@ -32,6 +34,7 @@ impl<'a> CppContext<'a> {
         user_config: &'a crate::config::Config,
     ) -> Self {
         Self {
+            filename_hash: Self::calculate_filename_hash(file_name),
             base: helper::Context {
                 source_code,
                 lines,
@@ -41,7 +44,27 @@ impl<'a> CppContext<'a> {
                 user_config,
             },
             scope_stack: Vec::new(),
+            sequence_counter: 1,
         }
+    }
+
+    // Calculate djb2 hash of filename
+    fn calculate_filename_hash(filename: &str) -> String {
+        let mut hash: u32 = 5381;
+        for byte in filename.bytes() {
+            hash = hash.wrapping_mul(33).wrapping_add(byte as u32);
+        }
+        format!("{:08x}", hash)
+    }
+
+    // Generate anonymous identifier
+    fn generate_anonymous_name(&mut self, kind_id: u8) -> String {
+        let name = format!(
+            "__anon{}{:02x}{:02x}",
+            self.filename_hash, self.sequence_counter, kind_id
+        );
+        self.sequence_counter += 1;
+        name
     }
 
     // Build extension fields based on the current scope stack
@@ -136,6 +159,7 @@ fn process_node(cursor: &mut TreeCursor, context: &mut CppContext) -> Option<(Sc
         "declaration" => process_declaration(cursor, context),
         "field_declaration" => process_field_declaration(cursor, context),
         "preproc_def" => process_macro_definition(cursor, context),
+        "preproc_function_def" => process_macro_function_definition(cursor, context),
         "type_definition" => process_typedef(cursor, context),
         _ => None,
     }
@@ -367,13 +391,34 @@ fn process_struct(
     cursor: &mut TreeCursor,
     context: &mut CppContext,
 ) -> Option<(ScopeType, String)> {
-    process_named_item(
+    // Check if this struct declaration is local (inside a function)
+    let is_local = context
+        .scope_stack
+        .iter()
+        .any(|(scope_type, _)| matches!(scope_type, ScopeType::Function));
+
+    // Skip processing local struct declarations entirely
+    if is_local {
+        return None;
+    }
+
+    let result = process_named_item(
         cursor,
         context,
         &["type_identifier"],
         "s",
         Some(ScopeType::Struct),
-    )
+    );
+
+    // Handle anonymous struct
+    if result.is_none() {
+        let anon_name = context.generate_anonymous_name(8);
+        let node = cursor.node();
+        create_tag(anon_name.clone(), "s", node, context, None);
+        return Some((ScopeType::Struct, anon_name));
+    }
+
+    result
 }
 
 fn process_union(cursor: &mut TreeCursor, context: &mut CppContext) -> Option<(ScopeType, String)> {
@@ -572,18 +617,27 @@ fn process_declaration(
     iterate_children!(cursor, |child_node| {
         match child_node.kind() {
             // Type specifiers
-            "primitive_type" | "type_identifier" | "sized_type_specifier" => {
-                type_info = context.base.node_text(&child_node).to_string();
+            "primitive_type"
+            | "type_identifier"
+            | "sized_type_specifier"
+            | "template_type"
+            | "qualified_identifier" => {
+                type_info = format!(
+                    "typename:{}",
+                    context.base.node_text(&child_node).to_string()
+                );
                 Continue
             }
-            // Template types like Box<Box<int>>
-            "template_type" => {
-                type_info = context.base.node_text(&child_node).to_string();
-                Continue
-            }
-            // Qualified types like std::string
-            "qualified_identifier" => {
-                type_info = context.base.node_text(&child_node).to_string();
+            // Handle struct declarations like "struct rectangle r;"
+            "struct_specifier" => {
+                iterate_children!(cursor, |struct_child| {
+                    if struct_child.kind() == "type_identifier" {
+                        type_info = format!("struct:{}", context.base.node_text(&struct_child));
+                        Break
+                    } else {
+                        Continue
+                    }
+                });
                 Continue
             }
             // Function declarator - handle function prototypes
@@ -593,8 +647,7 @@ fn process_declaration(
                 if !fn_name.is_empty() {
                     let mut proto_fields = IndexMap::new();
                     if !type_info.is_empty() {
-                        proto_fields
-                            .insert("typeref".to_string(), format!("typename:{}", type_info));
+                        proto_fields.insert("typeref".to_string(), type_info.clone());
                     }
                     create_tag(fn_name, "p", child_node, context, Some(proto_fields));
                 }
@@ -651,15 +704,23 @@ fn process_declaration(
     // Create tags for all found variables
     for (var_name, var_node) in variable_names {
         if !var_name.is_empty() && var_name != "_" {
+            // Determine if this is a local variable (inside function) or global variable
+            let is_local = context
+                .scope_stack
+                .iter()
+                .any(|(scope_type, _)| matches!(scope_type, ScopeType::Function));
+
+            let kind = if is_local { "l" } else { "v" };
+
             let mut extra_fields = IndexMap::new();
 
             if !type_info.is_empty() {
-                extra_fields.insert("typeref".to_string(), format!("typename:{}", type_info));
+                extra_fields.insert("typeref".to_string(), type_info.clone());
             }
 
             create_tag(
                 var_name,
-                "v",
+                kind,
                 var_node,
                 context,
                 if extra_fields.is_empty() {
@@ -682,11 +743,35 @@ fn process_field_declaration(
     let mut field_name = String::new();
     let mut type_info = String::new();
     let mut is_method_prototype = false;
+    let mut is_pointer = false;
 
     iterate_children!(cursor, |child_node| {
         match child_node.kind() {
             "field_identifier" | "identifier" => {
                 field_name = context.base.node_text(&child_node).to_string();
+                Continue
+            }
+            "pointer_declarator" => {
+                is_pointer = true;
+                iterate_children!(cursor, |ptr_child| {
+                    if ptr_child.kind() == "field_identifier" {
+                        field_name = context.base.node_text(&ptr_child).to_string();
+                        Break
+                    } else {
+                        Continue
+                    }
+                });
+                Continue
+            }
+            "struct_specifier" => {
+                iterate_children!(cursor, |struct_child| {
+                    if struct_child.kind() == "type_identifier" {
+                        type_info = format!("struct:{}", context.base.node_text(&struct_child));
+                        Break
+                    } else {
+                        Continue
+                    }
+                });
                 Continue
             }
             "primitive_type"
@@ -719,7 +804,29 @@ fn process_field_declaration(
         let mut extra_fields = IndexMap::new();
 
         if !type_info.is_empty() {
-            extra_fields.insert("typeref".to_string(), format!("typename:{}", type_info));
+            let typeref_value = if is_pointer {
+                format!("{} *", type_info)
+            } else {
+                format!("typename:{}", type_info)
+            };
+            extra_fields.insert("typeref".to_string(), typeref_value);
+        }
+
+        // Add struct scope information for members
+        if let Some((ScopeType::Struct, struct_name)) = context
+            .scope_stack
+            .iter()
+            .rev()
+            .find(|(scope_type, _)| matches!(scope_type, ScopeType::Struct))
+        {
+            if context
+                .base
+                .user_config
+                .fields_config
+                .is_field_enabled("scope")
+            {
+                extra_fields.insert("struct".to_string(), struct_name.clone());
+            }
         }
 
         let tag_kind = if is_method_prototype {
@@ -750,11 +857,107 @@ fn process_macro_definition(
     process_named_item(cursor, context, &["identifier"], "d", None)
 }
 
+fn process_macro_function_definition(
+    cursor: &mut TreeCursor,
+    context: &mut CppContext,
+) -> Option<(ScopeType, String)> {
+    // For function-like macros, we want to extract the name from the "name" field
+    // which contains an identifier node
+    process_named_item(cursor, context, &["identifier"], "d", None)
+}
+
 fn process_typedef(
     cursor: &mut TreeCursor,
     context: &mut CppContext,
 ) -> Option<(ScopeType, String)> {
-    process_named_item(cursor, context, &["type_identifier"], "t", None)
+    let node = cursor.node();
+    let mut typedef_name = String::new();
+    let mut type_info = String::new();
+    let mut found_anonymous_struct = false;
+
+    iterate_children!(cursor, |child_node| {
+        match child_node.kind() {
+            "type_identifier" => {
+                typedef_name = context.base.node_text(&child_node).to_string();
+                Continue
+            }
+            "function_declarator" => {
+                iterate_children!(cursor, |func_child| {
+                    match func_child.kind() {
+                        "parenthesized_declarator" => {
+                            iterate_children!(cursor, |paren_child| {
+                                if paren_child.kind() == "pointer_declarator" {
+                                    iterate_children!(cursor, |ptr_child| {
+                                        if ptr_child.kind() == "type_identifier" {
+                                            typedef_name =
+                                                context.base.node_text(&ptr_child).to_string();
+                                        }
+                                        Continue
+                                    });
+                                }
+                                Continue
+                            });
+                            Continue
+                        }
+                        "parameter_list" => {
+                            let params = context.base.node_text(&func_child);
+                            type_info = format!("typename:void (*){}", params);
+                            Continue
+                        }
+                        _ => Continue,
+                    }
+                });
+                Continue
+            }
+            "primitive_type" | "sized_type_specifier" | "qualified_identifier" => {
+                type_info = format!("typename:{}", context.base.node_text(&child_node));
+                Continue
+            }
+            "struct_specifier" => {
+                iterate_children!(cursor, |struct_child| {
+                    match struct_child.kind() {
+                        "type_identifier" => {
+                            type_info = format!("struct:{}", context.base.node_text(&struct_child));
+                            Continue
+                        }
+                        "field_declaration_list" => {
+                            // This indicates an anonymous struct
+                            found_anonymous_struct = true;
+                            Continue
+                        }
+                        _ => Continue,
+                    }
+                });
+                Continue
+            }
+            _ => Continue,
+        }
+    });
+
+    // Handle anonymous struct typedef
+    if found_anonymous_struct && type_info.is_empty() && !typedef_name.is_empty() {
+        let anon_name = context.generate_anonymous_name(8);
+        type_info = format!("struct:{}", anon_name);
+    }
+
+    let mut extra_fields = IndexMap::new();
+    if !type_info.is_empty() {
+        extra_fields.insert("typeref".to_string(), type_info);
+    }
+
+    create_tag(
+        typedef_name,
+        "t",
+        node,
+        context,
+        if extra_fields.is_empty() {
+            None
+        } else {
+            Some(extra_fields)
+        },
+    );
+
+    None
 }
 
 fn extract_method_name_from_declarator(

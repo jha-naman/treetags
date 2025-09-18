@@ -149,8 +149,11 @@ impl Parser {
             "go" => {
                 self.generate_go_tags_with_user_config(code, file_path_relative_to_tag_file, config)
             }
-            "c" | "h" | "i" | "cc" | "cpp" | "CPP" | "cxx" | "c++" | "cp" | "C" | "cppm"
-            | "ixx" | "ii" | "H" | "hh" | "hpp" | "HPP" | "hxx" | "h++" | "tcc" => self
+            "c" | "h" | "i" => {
+                self.generate_c_tags_with_user_config(code, file_path_relative_to_tag_file, config)
+            }
+            "cc" | "cpp" | "CPP" | "cxx" | "c++" | "cp" | "C" | "cppm" | "ixx" | "ii" | "H"
+            | "hh" | "hpp" | "HPP" | "hxx" | "h++" | "tcc" => self
                 .generate_cpp_tags_with_user_config(code, file_path_relative_to_tag_file, config),
             _ => None,
         }
@@ -249,6 +252,29 @@ impl Parser {
             helper::TagKindConfig::new_cpp()
         } else {
             helper::TagKindConfig::from_cpp_kinds_string(&config.cpp_kinds)
+        };
+
+        // Call the new method that accepts user config
+        self.generate_cpp_tags_with_full_config(
+            code,
+            file_path_relative_to_tag_file,
+            &tag_config,
+            config,
+        )
+    }
+
+    /// Generates C tags with user configuration
+    pub fn generate_c_tags_with_user_config(
+        &mut self,
+        code: &[u8],
+        file_path_relative_to_tag_file: &str,
+        config: &crate::config::Config,
+    ) -> Option<Vec<tag::Tag>> {
+        // Parse c-kinds configuration
+        let tag_config = if config.c_kinds.is_empty() {
+            helper::TagKindConfig::new_c()
+        } else {
+            helper::TagKindConfig::from_c_kinds_string(&config.c_kinds)
         };
 
         // Call the new method that accepts user config
