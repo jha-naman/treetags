@@ -43,33 +43,47 @@ impl Tag {
     ///
     /// # Returns
     ///
-    /// A new `Tag` instance
-    pub fn new(tag: tree_sitter_tags::Tag, code: &[u8], file_path: &str) -> Self {
-        Tag {
-            name: String::from_utf8(code[tag.name_range.start..tag.name_range.end].to_vec())
-                .expect("expected function name to be a valid utf8 string"),
-            file_name: String::from(file_path),
-            // Need the trailing `;"\t` to not break parsing by fzf.vim and Telescope plugins
-            address: {
-                let line_content = String::from_utf8(
-                    code[(tag.name_range.start - tag.span.start.column)..tag.line_range.end]
-                        .to_vec(),
+    /// A Result containing a new `Tag` instance or an error message
+    pub fn from_ts_tag(
+        tag: tree_sitter_tags::Tag,
+        code: &[u8],
+        file_path: &str,
+    ) -> Result<Self, String> {
+        let name = String::from_utf8(code[tag.name_range.start..tag.name_range.end].to_vec())
+            .map_err(|e| {
+                format!(
+                    "Failed to decode tag name as UTF-8 in file '{}': {}",
+                    file_path, e
                 )
-                .expect("expected line range to be a valid utf8 string");
+            })?;
 
-                let mut escaped_line = Self::escape_address(&line_content);
+        let line_content = String::from_utf8(
+            code[(tag.name_range.start - tag.span.start.column)..tag.line_range.end].to_vec(),
+        )
+        .map_err(|e| {
+            format!(
+                "Failed to decode line content as UTF-8 in file '{}': {}",
+                file_path, e
+            )
+        })?;
 
-                // Truncate line_content to 96 characters maximum
-                if escaped_line.len() > 96 {
-                    escaped_line.truncate(96);
-                    format!("/^{}/;\"\t", escaped_line) // No '$' if truncated
-                } else {
-                    format!("/^{}$/;\"\t", escaped_line)
-                }
-            },
+        let mut escaped_line = Self::escape_address(&line_content);
+
+        // Truncate line_content to 96 characters maximum
+        let address = if escaped_line.len() > 96 {
+            escaped_line.truncate(96);
+            format!("/^{}/;\"\t", escaped_line) // No '$' if truncated
+        } else {
+            format!("/^{}$/;\"\t", escaped_line)
+        };
+
+        Ok(Tag {
+            name,
+            file_name: String::from(file_path),
+            address,
             kind: None,
             extension_fields: None,
-        }
+        })
     }
 
     /// Converts the tag into a byte representation suitable for writing to a tags file

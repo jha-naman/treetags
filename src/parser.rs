@@ -344,7 +344,13 @@ impl Parser {
                                 continue;
                             }
 
-                            tags.push(tag::Tag::new(tag, code, file_path_relative_to_tag_file));
+                            match tag::Tag::from_ts_tag(tag, code, file_path_relative_to_tag_file) {
+                                Ok(new_tag) => tags.push(new_tag),
+                                Err(error_msg) => {
+                                    eprintln!("{}", error_msg);
+                                    continue;
+                                }
+                            }
                         }
                     }
                 }
