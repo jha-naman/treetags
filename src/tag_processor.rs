@@ -155,16 +155,19 @@ impl TagProcessor {
 
             // Parse file if it has a recognizable extension
             if let Some(extension) = file_path.extension().and_then(|e| e.to_str()) {
-                let mut tags = parser.parse_file_with_config(
+                match parser.parse_file_with_config(
                     &file_path_relative,
                     &file_path.to_string_lossy(),
                     extension,
                     &config,
-                );
-
-                // Add tags to the shared collection
-                if let Ok(mut tags_guard) = tags_lock.lock() {
-                    tags_guard.append(&mut tags);
+                ) {
+                    Ok(mut tags) => {
+                        // Add tags to the shared collection
+                        if let Ok(mut tags_guard) = tags_lock.lock() {
+                            tags_guard.append(&mut tags);
+                        }
+                    }
+                    Err(error) => eprintln!("{}", error),
                 }
             }
         }

@@ -25,11 +25,11 @@ with tags generated from the list of files passed via command line.
 ### Full support with extension fields
 - [x] Go
 - [x] Rust
+- [x] C
+- [x] C++
 
 ### Basic navigation support without extension fields
 - [x] Bash/Sh
-- [x] C
-- [x] C++
 - [x] C#
 - [x] Elixir
 - [x] ~Haskell~

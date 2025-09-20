@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+ - Extension Fields support for C++
+ - Extension Fields support for C
+ - Better error handling
+    - For tag file detection and opening
+    - For UTF8 decoding during tag creation using treesitter queries
+    - For errors raised during reading source files for creating tags
+    - For errors raised during creating treesitter tag configuration from a tag query
+
 ## [0.2.2] 2025-09-01
 
 ### Added
