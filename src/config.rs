@@ -9,9 +9,11 @@ use std::path::Path;
 
 use extras_config::ExtrasConfig;
 use fields_config::FieldsConfig;
+use user_languages::UserLanguagesConfig;
 
 mod extras_config;
 mod fields_config;
+pub mod user_languages;
 
 /// Configuration options for the tag generator.
 ///
@@ -102,6 +104,10 @@ pub struct Config {
     /// Parsed extras configuration
     #[clap(skip)]
     pub extras_config: ExtrasConfig,
+
+    /// User-defined languages configuration
+    #[clap(skip)]
+    pub user_languages: UserLanguagesConfig,
 }
 
 impl Default for Config {
@@ -149,6 +155,7 @@ impl Config {
 
         config.extras_config = ExtrasConfig::from_string(&config.extras);
         config.fields_config = FieldsConfig::from_string(&config.fields);
+        config.user_languages = UserLanguagesConfig::load();
 
         config
     }
