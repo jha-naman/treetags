@@ -87,5 +87,5 @@ fn main() {
 
     // Write tags to file
     let tag_writer = TagWriter::new(tag_file_path);
-    tag_writer.write_tags(&mut tags);
+    tag_writer.write_tags(&mut tags, true, config.sort);
 }
