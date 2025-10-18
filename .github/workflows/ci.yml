@@ -1,0 +1,28 @@
+name: CI
+
+on: [push, pull_request]
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test and Format Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt
+
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Check formatting
+      run: cargo fmt --check
+
+    - name: Run tests
+      run: cargo test
