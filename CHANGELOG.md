@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] 2025-10-18
+
 ### Added
+ - Emit !_TAG_FILE_SORTED pseudo tag to enable faster searching of sorted tag files
  - Extension Fields support for C++
  - Extension Fields support for C
  - Better error handling
