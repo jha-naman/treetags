@@ -11,7 +11,10 @@ categories = ["development-tools", "command-line-utilities"]
 [dependencies]
 clap = { version = "4.5.27", features = ["derive"] }
 indexmap = "2.0"
+libloading = "0.8"
 regex = "1.11.1"
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
 tree-sitter = "0.24.7"
 tree-sitter-bash = "0.23.3"
 tree-sitter-c = "0.23.4"
@@ -33,6 +36,7 @@ tree-sitter-scala = "0.24.0"
 tree-sitter-tags = "0.24.7"
 tree-sitter-typescript = "0.23.2"
 walkdir = "2"
+xdg = "2.5"
 
 [dev-dependencies]
 assert_cmd = "2.0"
