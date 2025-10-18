@@ -1,3 +1,4 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
 ADD	source.c	/^#define ADD(a, b) ((a) + (b))$/;"	d
 DAYS_IN_YEAR	source.c	/^#define DAYS_IN_YEAR 365$/;"	d
 EXAMPLE_H	source.c	/^#define EXAMPLE_H$/;"	d	

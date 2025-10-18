@@ -1,3 +1,4 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
 AnotherTest	source.sh	/^AnotherTest () {}$/;"	
 EOF	source.sh	/^cat > test.sh << EOF$/;"	
 Test	source.sh	/^function Test () {}$/;"	

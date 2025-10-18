@@ -1,3 +1,4 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
 Bar	source.scala	/^object Bar {$/;"	
 Foo	source.scala	/^class Foo(a: String) {$/;"	
 Person	source.scala	/^case class Person(first_name: String, last_name: String)$/;"	

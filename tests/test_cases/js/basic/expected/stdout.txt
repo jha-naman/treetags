@@ -1,3 +1,4 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
 Rectangle	source.js	/^class Rectangle {$/;"	
 area	source.js	/^  area() {$/;"	
 fn	source.js	/^const fn = (foo, bar) => {};$/;"	

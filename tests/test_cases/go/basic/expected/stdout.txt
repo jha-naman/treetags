@@ -1,3 +1,4 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
 Alias	source.go	/^type Alias map[string]int$/;"	t	package:treetags	typeref:typename:map[string]int
 AnotherOne	source.go	/^type AnotherOne Alias$/;"	t	package:treetags	typeref:typename:Alias
 Bar	source.go	/^func (f *Point) Bar(baz string) map[string]string {$/;"	f	struct:treetags.Point	typeref:typename:map[string]string

@@ -1,3 +1,4 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
 Blue	source.rs	/^        Blue,$/;"	e	enum:example::Color
 Circle	source.rs	/^    pub struct Circle {$/;"	s	module:example
 Circle	source.rs	/^    impl Circle {$/;"	c	module:example

@@ -1,3 +1,4 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
 Baz	source.jl	/^abstract type Baz end$/;"	
 Foo	source.jl	/^struct Foo$/;"	
 Foo	source.jl	/^   Foo() = new(1.0)$/;"	

@@ -1,3 +1,4 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
 Bar	source.rb	/^module Bar < Object$/;"	
 Foo	source.rb	/^class Foo$/;"	
 baz	source.rb	/^    def baz$/;"	

@@ -1,3 +1,4 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
 Foo	source.py	/^class Foo:$/;"	
 __init__	source.py	/^	def __init__(self, bar):$/;"	
 bar	source.py	/^	def bar(self):$/;"	

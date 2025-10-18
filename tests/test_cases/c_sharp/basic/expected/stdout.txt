@@ -1,3 +1,4 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
 AnotherEnumEntity	source.cs	/^			AnotherEnumEntity,$/;"	
 DelegateTest	source.cs	/^		public delegate int DelegateTest();$/;"	
 Enum	source.cs	/^		public enum Enum {$/;"	

@@ -1,3 +1,4 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
 Box	source.cpp	/^class Box {$/;"	c
 Dog	source.cpp	/^class Dog {$/;"	c
 Dog	source.cpp	/^    Dog();$/;"	p	class:Dog

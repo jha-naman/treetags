@@ -1,3 +1,4 @@
+!_TAG_FILE_SORTED	0	/0=unsorted, 1=sorted/
 treetags	source.go	/^package treetags$/;"	p	line:1
 main	source.go	/^func main() {}$/;"	f	line:8	package:treetags	signature:()
 foo	source.go	/^func foo(bar, baz string, arr []string) (error, map[string]string) {}$/;"	f	line:9	package:treetags	typeref:typename:(error, map[string]string)	signature:(bar, baz string, arr []string)
