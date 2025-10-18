@@ -1,0 +1,29 @@
+name: Test
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  testing:
+    runs-on: ubuntu-latest
+
+    env:
+      # Is APT::Immediate-Configure=false enough?
+      DEBIAN_FRONTEND noninteractive
+      
+    steps:
+      - uses: actions/checkout@v5
+      - name: update package information
+        run: sudo apt-get -y -o APT::Immediate-Configure=false update
+      - name: install tools for building
+        run: sudo apt-get -y -o APT::Immediate-Configure=false install cargo-1.85 rustfmt-1.85
+      - name: build treetags
+        run: cargo-1.85 build
+      - name: run tests
+        run: PATH=/usr/lib/rust-1.85/bin:$PATH cargo-1.86 test
+      - name: verify code formatting
+        run: PATH=/usr/lib/rust-1.85/bin:$PATH cargo-1.85 fmt --check
+        
