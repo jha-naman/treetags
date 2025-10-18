@@ -39,7 +39,7 @@ impl TagWriter {
     /// # Arguments
     ///
     /// * `tags` - A mutable reference to a vector of tags to write
-    pub fn write_tags(&self, tags: &mut Vec<Tag>) {
+    pub fn write_tags(&self, tags: &mut Vec<Tag>, emit_pseudo_tags: bool, sorted: bool) {
         // Create a buffered writer for either stdout or a file
         let mut writer: Box<dyn Write> = if self.file_path == "-" {
             // Write to stdout
@@ -56,6 +56,17 @@ impl TagWriter {
 
             Box::new(BufWriter::new(file))
         };
+
+        if emit_pseudo_tags {
+            let s = format!(
+                "!_TAG_FILE_SORTED\t{}\t/0=unsorted, 1=sorted/\n",
+                if sorted { 1 } else { 0 }
+            )
+            .into_bytes();
+            if let Err(e) = writer.write_all(&s) {
+                eprintln!("Failed to write pseudo tag: {}", e);
+            }
+        }
 
         // Write tags to file
         for tag in tags {
