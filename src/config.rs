@@ -3,7 +3,7 @@
 //! This module is responsible for parsing command line arguments
 //! and providing configuration options to the rest of the application.
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use std::fs;
 use std::path::Path;
 
@@ -13,6 +13,17 @@ use fields_config::FieldsConfig;
 mod extras_config;
 mod fields_config;
 
+/// Subcommands for the application
+#[derive(Subcommand, Clone)]
+pub enum Commands {
+    /// Generate shell completions
+    Completions {
+        /// The shell to generate completions for
+        #[arg(value_enum)]
+        shell: clap_complete::Shell,
+    },
+}
+
 /// Configuration options for the tag generator.
 ///
 /// Contains all settings that affect the behavior of the application,
@@ -20,6 +31,9 @@ mod fields_config;
 #[derive(Parser, Clone)]
 #[command(about = "Generate vi compatible tags for multiple languages", long_about = None)]
 pub struct Config {
+    #[command(subcommand)]
+    pub command: Option<Commands>,
+
     /// Name to be used for the tagfile, should not contain path separator
     #[arg(short = 'f', default_value = "tags")]
     pub tag_file: String,
@@ -76,14 +90,24 @@ pub struct Config {
     /// Kept for compatibility with `tagbar` plugin.
     #[arg(long = "language-force", default_value = "", verbatim_doc_comment)]
     pub _language_force: String,
-    /// Comma-separated list of Rust tag kinds to generate.
-    /// Available kinds: n(module), s(struct), g(enum), u(union), i(trait),
-    /// f(function), c(impl), m(field), e(enum_variant), C(constant), v(variable),
-    /// t(type_alias), M(macro)
+    ///
+    /// Rust language specific kinds to generate tags for
+    #[arg(long = "kinds-rust", default_value = "", verbatim_doc_comment)]
+    pub kinds_rust: String,
+
+    /// Rust language specific kinds to generate tags for. Deprecated: `kinds-rust` takes
+    /// precedence if it's present
+    #[deprecated = "Use --kinds-rust instead"]
     #[arg(long = "rust-kinds", default_value = "", verbatim_doc_comment)]
     pub rust_kinds: String,
 
     /// Go language specific kinds to generate tags for
+    #[arg(long = "kinds-go", default_value = "")]
+    pub kinds_go: String,
+
+    /// Go language specific kinds to generate tags for. Deprecated: `kinds-go` takes precedence if
+    /// it's present
+    #[deprecated = "Use --kinds-go instead"]
     #[arg(long = "go-kinds", default_value = "")]
     pub go_kinds: String,
 
@@ -200,6 +224,24 @@ impl Config {
                     }
                 },
             }
+        }
+    }
+
+    /// Get the effective Go kinds configuration, preferring the new format
+    pub fn get_go_kinds(&self) -> &str {
+        if !self.kinds_go.is_empty() {
+            &self.kinds_go
+        } else {
+            &self.go_kinds
+        }
+    }
+
+    /// Get the effective Rust kinds configuration, preferring the new format
+    pub fn get_rust_kinds(&self) -> &str {
+        if !self.kinds_rust.is_empty() {
+            &self.kinds_rust
+        } else {
+            &self.rust_kinds
         }
     }
 
