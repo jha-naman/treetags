@@ -220,11 +220,11 @@ impl Parser {
         file_path_relative_to_tag_file: &str,
         config: &crate::config::Config,
     ) -> Option<Vec<tag::Tag>> {
-        // Parse rust-kinds configuration
-        let tag_config = if config.rust_kinds.is_empty() {
+        let effective_kinds = config.get_rust_kinds();
+        let tag_config = if effective_kinds.is_empty() {
             helper::TagKindConfig::new_rust() // Default: all kinds enabled
         } else {
-            helper::TagKindConfig::from_rust_kinds_string(&config.rust_kinds)
+            helper::TagKindConfig::from_rust_kinds_string(effective_kinds)
         };
 
         // Call the new method that accepts user config
@@ -243,11 +243,11 @@ impl Parser {
         file_path_relative_to_tag_file: &str,
         config: &crate::config::Config,
     ) -> Option<Vec<tag::Tag>> {
-        // Parse go-kinds configuration
-        let tag_config = if config.go_kinds.is_empty() {
+        let effective_kinds = config.get_go_kinds();
+        let tag_config = if effective_kinds.is_empty() {
             helper::TagKindConfig::new_go() // Default: all kinds enabled
         } else {
-            helper::TagKindConfig::from_go_kinds_string(&config.go_kinds)
+            helper::TagKindConfig::from_go_kinds_string(effective_kinds)
         };
 
         // Call the new method that accepts user config

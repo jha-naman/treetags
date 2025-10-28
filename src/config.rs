@@ -76,14 +76,24 @@ pub struct Config {
     /// Kept for compatibility with `tagbar` plugin.
     #[arg(long = "language-force", default_value = "", verbatim_doc_comment)]
     pub _language_force: String,
-    /// Comma-separated list of Rust tag kinds to generate.
-    /// Available kinds: n(module), s(struct), g(enum), u(union), i(trait),
-    /// f(function), c(impl), m(field), e(enum_variant), C(constant), v(variable),
-    /// t(type_alias), M(macro)
+    ///
+    /// Rust language specific kinds to generate tags for
+    #[arg(long = "kinds-rust", default_value = "", verbatim_doc_comment)]
+    pub kinds_rust: String,
+
+    /// Rust language specific kinds to generate tags for. Deprecated: `kinds-rust` takes
+    /// precedence if it's present
+    #[deprecated = "Use --kinds-rust instead"]
     #[arg(long = "rust-kinds", default_value = "", verbatim_doc_comment)]
     pub rust_kinds: String,
 
     /// Go language specific kinds to generate tags for
+    #[arg(long = "kinds-go", default_value = "")]
+    pub kinds_go: String,
+
+    /// Go language specific kinds to generate tags for. Deprecated: `kinds-go` takes precedence if
+    /// it's present
+    #[deprecated = "Use --kinds-go instead"]
     #[arg(long = "go-kinds", default_value = "")]
     pub go_kinds: String,
 
@@ -200,6 +210,24 @@ impl Config {
                     }
                 },
             }
+        }
+    }
+
+    /// Get the effective Go kinds configuration, preferring the new format
+    pub fn get_go_kinds(&self) -> &str {
+        if !self.kinds_go.is_empty() {
+            &self.kinds_go
+        } else {
+            &self.go_kinds
+        }
+    }
+
+    /// Get the effective Rust kinds configuration, preferring the new format
+    pub fn get_rust_kinds(&self) -> &str {
+        if !self.kinds_rust.is_empty() {
+            &self.kinds_rust
+        } else {
+            &self.rust_kinds
         }
     }
 
