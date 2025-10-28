@@ -72,6 +72,19 @@ Or, if you are using lua for configuration
 vim.g.gutentags_ctags_executable = 'treetags'
 ```
 
+## Generate shell autocomplete scripts
+
+Users can generate completions like:
+
+```bash
+# refer to your shell documentation for determining the correct path for autcomplete files
+treetags completions bash > ~/.local/share/bash-completion/completions/treetags
+treetags completions zsh > ~/.local/share/zsh/site-functions/_treetags
+treetags completions fish > ~/.config/fish/completions/treetags.fish
+```
+
+
+
 ## Running Integration Tests
 
 Integration tests are built from test cases on demand

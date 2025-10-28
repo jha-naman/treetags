@@ -3,7 +3,7 @@
 //! This module is responsible for parsing command line arguments
 //! and providing configuration options to the rest of the application.
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use std::fs;
 use std::path::Path;
 
@@ -13,6 +13,17 @@ use fields_config::FieldsConfig;
 mod extras_config;
 mod fields_config;
 
+/// Subcommands for the application
+#[derive(Subcommand, Clone)]
+pub enum Commands {
+    /// Generate shell completions
+    Completions {
+        /// The shell to generate completions for
+        #[arg(value_enum)]
+        shell: clap_complete::Shell,
+    },
+}
+
 /// Configuration options for the tag generator.
 ///
 /// Contains all settings that affect the behavior of the application,
@@ -20,6 +31,9 @@ mod fields_config;
 #[derive(Parser, Clone)]
 #[command(about = "Generate vi compatible tags for multiple languages", long_about = None)]
 pub struct Config {
+    #[command(subcommand)]
+    pub command: Option<Commands>,
+
     /// Name to be used for the tagfile, should not contain path separator
     #[arg(short = 'f', default_value = "tags")]
     pub tag_file: String,

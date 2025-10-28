@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+ - Add basic shell autocomplete integration
+ - Add `kinds-rust` and `kinds-go` command line arguments (related (issue)[https://github.com/jha-naman/treetags/issues/22])
+
 ## [0.3.1] 2025-10-20
 
 ### Added

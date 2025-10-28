@@ -19,6 +19,9 @@ use crate::file_finder::FileFinder;
 use crate::tag_processor::TagProcessor;
 use crate::tag_writer::TagWriter;
 
+use clap::CommandFactory;
+use clap_complete::{generate, Shell};
+
 /// The main entry point for the application.
 ///
 /// Parses command line arguments, finds or creates a tag file,
@@ -26,6 +29,16 @@ use crate::tag_writer::TagWriter;
 fn main() {
     // Parse command line arguments
     let config = Config::new();
+
+    // Handle completion subcommand
+    if let Some(command) = &config.command {
+        match command {
+            config::Commands::Completions { shell } => {
+                generate_completions(*shell);
+                return;
+            }
+        }
+    }
 
     // Determine tag file path
     let tag_file_path = match file_finder::determine_tag_file_path(&config.tag_file, config.append)
@@ -88,4 +101,11 @@ fn main() {
     // Write tags to file
     let tag_writer = TagWriter::new(tag_file_path);
     tag_writer.write_tags(&mut tags, true, config.sort);
+}
+
+/// Generate shell completions for the specified shell
+fn generate_completions(shell: Shell) {
+    let mut cmd = Config::command();
+    let bin_name = cmd.get_name().to_string();
+    generate(shell, &mut cmd, bin_name, &mut std::io::stdout());
 }
