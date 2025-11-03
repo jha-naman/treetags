@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+ - `ctags` like handling for `-f <tagfile>` command line args param
+
+### Removed
+ - Recursive search for tag file in current directory and it's parent folders
+
 ## [0.3.2] 2025-10-28
 
 ### Added

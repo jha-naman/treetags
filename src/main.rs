@@ -1,6 +1,5 @@
 #![doc = include_str!("../README.md")]
 
-use std::path::Path;
 use std::process;
 
 mod config;
@@ -51,25 +50,20 @@ fn main() {
     };
 
     // Get files to process
-    // If writing to stdout, use the current directory as the base for file finding
-    let search_base = Path::new(&tag_file_path);
-    // let search_base = if tag_file_path == "-" {
-    //     Path::new(".")
-    // } else {
-    //     Path::new(&tag_file_path)
-    // };
-    let file_finder = match FileFinder::from_patterns(search_base, config.exclude.clone()) {
+    let file_finder = match FileFinder::from_patterns(config.exclude.clone(), config.recurse) {
         Ok(finder) => finder,
         Err(err) => {
             eprintln!("{}", err);
             process::exit(1);
         }
     };
+
     let file_result = if !config.file_names.is_empty() {
-        // Process both files and directories from the command line arguments
+        // Process specified files and directories
         file_finder.get_files_from_paths(&config.file_names)
     } else {
-        file_finder.get_files_from_dir()
+        // Default to current directory when no files specified
+        file_finder.get_files_from_paths(&[".".to_string()])
     };
 
     // Print any warnings about file access issues
