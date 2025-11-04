@@ -3,9 +3,8 @@
 //! This module is responsible for parsing command line arguments
 //! and providing configuration options to the rest of the application.
 
-use clap::{Parser, Subcommand};
-use std::fs;
-use std::path::Path;
+use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
+use std::{fs, path::Path};
 
 use extras_config::ExtrasConfig;
 use fields_config::FieldsConfig;
@@ -14,7 +13,7 @@ mod extras_config;
 mod fields_config;
 
 /// Subcommands for the application
-#[derive(Subcommand, Clone)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum Commands {
     /// Generate shell completions
     Completions {
@@ -28,7 +27,7 @@ pub enum Commands {
 ///
 /// Contains all settings that affect the behavior of the application,
 /// including file selection, threading, and output options.
-#[derive(Parser, Clone)]
+#[derive(Parser, Clone, Debug)]
 #[command(about = "Generate vi compatible tags for multiple languages", long_about = None)]
 pub struct Config {
     #[command(subcommand)]
@@ -37,13 +36,6 @@ pub struct Config {
     /// Name to be used for the tagfile, should not contain path separator
     #[arg(short = 'f', default_value = "tags")]
     pub tag_file: String,
-
-    /// Append tags to existing tag file instead of reginerating the file from scratch.
-    /// Need to pass in list of file names for which new tags are to be generated.
-    /// Will panic if the tag file doesn't already exist in current or one of the parent
-    /// directories.
-    #[arg(long = "append", default_value = "no", verbatim_doc_comment)]
-    pub append_raw: String,
 
     /// List of file names to be processed when `--append` option is passed
     pub file_names: Vec<String>,
@@ -54,22 +46,46 @@ pub struct Config {
     #[arg(long)]
     pub exclude: Vec<String>,
 
-    /// Value passed in this arg is currently being ignored.
-    /// Kept for compatibility with `vim-gutentags` plugin.
-    #[arg(long = "options", default_value = "", verbatim_doc_comment)]
-    pub _options: String,
+    /// Read additional options from file or directory
+    #[arg(long = "options", default_value = "")]
+    pub options: String,
+
+    /// Recurse into directories encountered in the list of supplied files
+    #[arg(
+        short = 'R',
+        long = "recurse",
+        default_value = "false",
+        default_missing_value = "true",
+        num_args = 0..=1,
+        value_parser = clap::builder::BoolishValueParser::new(),
+        action = clap::ArgAction::Set
+    )]
+    pub recurse: bool,
 
     /// Whether to sort the files or not.
     /// Values of 'yes', 'on', 'true', '1' set it to true
     /// Values of 'no', '0', 'off', 'false' set it to false
-    #[arg(long = "sort", default_value = "yes", verbatim_doc_comment)]
-    pub sort_raw: String,
-    /// Field value derived from the `sort_raw` string field
-    #[arg(skip)]
+    #[arg(
+        long = "sort",
+        default_value = "true",
+        default_missing_value = "true",
+        num_args = 0..=1,
+        value_parser = clap::builder::BoolishValueParser::new(),
+        action = clap::ArgAction::Set
+    )]
     pub sort: bool,
 
-    /// Field value derived from the `append_raw` option field
-    #[arg(skip)]
+    /// Append tags to existing tag file instead of reginerating the file from scratch.
+    /// Need to pass in list of file names for which new tags are to be generated.
+    #[arg(
+        short = 'a',
+        long = "append",
+        default_value = "false",
+        default_missing_value = "true",
+        num_args = 0..=1,
+        value_parser = clap::builder::BoolishValueParser::new(),
+        action = clap::ArgAction::Set
+    )]
     pub append: bool,
 
     /// Enable extra tag information (e.g., +q for qualified tags, +f for file scope)
@@ -90,7 +106,7 @@ pub struct Config {
     /// Kept for compatibility with `tagbar` plugin.
     #[arg(long = "language-force", default_value = "", verbatim_doc_comment)]
     pub _language_force: String,
-    ///
+
     /// Rust language specific kinds to generate tags for
     #[arg(long = "kinds-rust", default_value = "", verbatim_doc_comment)]
     pub kinds_rust: String,
@@ -144,37 +160,101 @@ impl Config {
     ///
     /// A new `Config` instance with parsed arguments and defaults.
     pub fn new() -> Config {
-        let mut config = Self::parse();
+        // First parse to get the options file path
+        let initial_args: Vec<String> = std::env::args().collect();
+        let initial_matches = Self::command().get_matches_from(&initial_args);
+        let options_path = initial_matches.get_one::<String>("options").unwrap();
+
+        // Combine file options with command line args
+        let combined_args = Self::combine_args_with_options(&initial_args, options_path);
+
+        // Parse with combined arguments
+        let matches = Self::command().get_matches_from(combined_args);
+        let mut config = Self::from_arg_matches(&matches).unwrap();
+
         config.validate();
         config.parse_file_args();
-
-        // value_str is not a valid boolean string. Assume it's a filename.
-        let mut filename_misinterpreted_by_raw_bool: Option<String> = None;
-
-        if let Some(parsed_sort_val) = config.try_string_to_bool(&config.sort_raw) {
-            config.sort = parsed_sort_val;
-        } else {
-            config.sort = true;
-            filename_misinterpreted_by_raw_bool = Some(config.sort_raw.clone());
-        }
-
-        // Handle append option
-        if let Some(parsed_append_val) = config.try_string_to_bool(&config.append_raw) {
-            config.append = parsed_append_val;
-        } else {
-            config.append = true;
-            filename_misinterpreted_by_raw_bool = Some(config.append_raw.clone());
-        }
-
-        if let Some(filename) = filename_misinterpreted_by_raw_bool {
-            // This filename was consumed by --append or --sort
-            config.file_names.insert(0, filename);
-        }
 
         config.extras_config = ExtrasConfig::from_string(&config.extras);
         config.fields_config = FieldsConfig::from_string(&config.fields);
 
         config
+    }
+
+    /// Combine command line arguments with options from file
+    fn combine_args_with_options(original_args: &[String], options_path: &str) -> Vec<String> {
+        if options_path.is_empty() {
+            return original_args.to_vec();
+        }
+
+        let mut combined_args = vec![original_args[0].clone()]; // Keep program name
+
+        // Add options from file first (lower precedence)
+        if let Ok(file_options) = Self::read_options_from_path(options_path) {
+            combined_args.extend(file_options);
+        } else {
+            eprintln!("Warning: Could not read options from: {}", options_path);
+        }
+
+        // Add original command line args (higher precedence)
+        combined_args.extend(original_args.iter().skip(1).cloned());
+
+        combined_args
+    }
+
+    /// Read options from file or directory
+    fn read_options_from_path(options_path: &str) -> Result<Vec<String>, std::io::Error> {
+        let path = Path::new(options_path);
+        let content = Self::read_options_content(path)?;
+
+        let mut options = Vec::new();
+        for line in content.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+
+            // Simple split by whitespace - clap will handle the parsing
+            options.extend(line.split_whitespace().map(String::from));
+        }
+
+        Ok(options)
+    }
+
+    /// Read content from file or directory
+    fn read_options_content(path: &Path) -> Result<String, std::io::Error> {
+        if path.is_file() {
+            fs::read_to_string(path)
+        } else if path.is_dir() {
+            let mut content = String::new();
+            let mut entries: Vec<_> = fs::read_dir(path)?
+                .filter_map(Result::ok)
+                .filter(|entry| {
+                    entry
+                        .path()
+                        .extension()
+                        .and_then(|ext| ext.to_str())
+                        .map(|ext| ext == "ctags")
+                        .unwrap_or(false)
+                })
+                .collect();
+
+            entries.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+
+            for entry in entries {
+                if let Ok(file_content) = fs::read_to_string(entry.path()) {
+                    content.push_str(&file_content);
+                    content.push('\n');
+                }
+            }
+
+            Ok(content)
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Path is neither a file nor a directory",
+            ))
+        }
     }
 
     fn parse_file_args(&mut self) {
@@ -198,17 +278,6 @@ impl Config {
     }
 
     fn validate(&self) {
-        let tag_file = Path::new(&self.tag_file);
-        let mut path_components = tag_file.components();
-        let _ = path_components.next();
-        if path_components.next().is_some() {
-            eprintln!(
-                "tagfile should only contain the tagfile name, not the path: {}",
-                tag_file.display()
-            );
-            std::process::exit(1);
-        }
-
         self.validate_file_args();
     }
 
@@ -243,61 +312,5 @@ impl Config {
         } else {
             &self.rust_kinds
         }
-    }
-
-    /// Converts a string value to a boolean based on predefined mappings.
-    ///
-    /// # Arguments
-    ///
-    /// * `value` - A string slice that should be converted to a boolean
-    ///
-    /// # Returns
-    ///
-    /// * `Some(true)` for values: "yes", "on", "true", "1" (case-insensitive)
-    /// * `Some(false)` for values: "no", "off", "false", "0" (case-insensitive)
-    /// * `None` for other values
-    /// ```
-    fn try_string_to_bool(&self, value: &str) -> Option<bool> {
-        match value.to_lowercase().as_str() {
-            "yes" | "on" | "true" | "1" => Some(true),
-            "no" | "off" | "false" | "0" => Some(false),
-            _ => None,
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_true_values() {
-        let config = Config::new();
-        assert_eq!(config.try_string_to_bool("yes"), Some(true));
-        assert_eq!(config.try_string_to_bool("YES"), Some(true));
-        assert_eq!(config.try_string_to_bool("on"), Some(true));
-        assert_eq!(config.try_string_to_bool("ON"), Some(true));
-        assert_eq!(config.try_string_to_bool("true"), Some(true));
-        assert_eq!(config.try_string_to_bool("TRUE"), Some(true));
-        assert_eq!(config.try_string_to_bool("1"), Some(true));
-    }
-
-    #[test]
-    fn test_false_values() {
-        let config = Config::new();
-        assert_eq!(config.try_string_to_bool("no"), Some(false));
-        assert_eq!(config.try_string_to_bool("NO"), Some(false));
-        assert_eq!(config.try_string_to_bool("off"), Some(false));
-        assert_eq!(config.try_string_to_bool("OFF"), Some(false));
-        assert_eq!(config.try_string_to_bool("false"), Some(false));
-        assert_eq!(config.try_string_to_bool("FALSE"), Some(false));
-        assert_eq!(config.try_string_to_bool("0"), Some(false));
-    }
-
-    #[test]
-    fn test_invalid_value() {
-        let config = Config::new();
-        assert_eq!(config.try_string_to_bool("invalid"), None);
-        assert_eq!(config.try_string_to_bool(""), None);
     }
 }

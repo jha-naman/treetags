@@ -7,7 +7,8 @@
 use crate::shell_to_regex;
 use crate::tag::{parse_tag_file as parse_tags, Tag};
 use regex::RegexSet;
-use std::fs::File;
+use std::fs;
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -46,14 +47,14 @@ impl FileFinderResult {
 
 /// A structure for finding and filtering files in a directory.
 ///
-/// FileFinder recursively explores directories and filters files
+/// FileFinder explores directories and filters files
 /// based on exclude patterns provided in the configuration.
 pub struct FileFinder {
-    /// The root directory path to search
-    dir_path: PathBuf,
-
     /// A set of regular expressions for file exclusion
     exclude_patterns: RegexSet,
+
+    /// Whether to recurse into directories
+    recurse: bool,
 }
 
 impl FileFinder {
@@ -61,27 +62,13 @@ impl FileFinder {
     ///
     /// # Arguments
     ///
-    /// * `tag_file_path` - Path to the tag file, used to determine the root directory
     /// * `exclude_patterns` - Shell-style patterns for files to exclude
+    /// * `recurse` - Whether to recurse into directories
     ///
     /// # Returns
     ///
     /// A Result containing a new FileFinder instance or an error message
-    pub fn from_patterns(
-        tag_file_path: &Path,
-        exclude_patterns: Vec<String>,
-    ) -> Result<Self, String> {
-        let dir_path = if tag_file_path.to_str() == Some("-") {
-            // If writing to stdout, use current directory as the root
-            std::env::current_dir()
-                .map_err(|e| format!("Failed to access current directory: {}", e))?
-        } else {
-            tag_file_path
-                .parent()
-                .ok_or_else(|| "Failed to access tag file's parent directory".to_string())?
-                .to_path_buf()
-        };
-
+    pub fn from_patterns(exclude_patterns: Vec<String>, recurse: bool) -> Result<Self, String> {
         let exclude_regexes = exclude_patterns
             .iter()
             .map(|pattern| shell_to_regex::shell_to_regex(pattern))
@@ -91,33 +78,9 @@ impl FileFinder {
             .map_err(|e| format!("Failed to compile exclude patterns: {}", e))?;
 
         Ok(Self {
-            dir_path,
             exclude_patterns,
+            recurse,
         })
-    }
-
-    /// Recursively finds all files in the directory that don't match exclude patterns.
-    ///
-    /// # Returns
-    ///
-    /// A FileFinderResult containing found files and any errors encountered
-    pub fn get_files_from_dir(&self) -> FileFinderResult {
-        let dir_path = match if self.dir_path.to_str() == Some("-") {
-            // If writing to stdout, use current directory as the root
-            std::env::current_dir()
-        } else {
-            Ok(self.dir_path.clone())
-        } {
-            Ok(path) => path,
-            Err(e) => {
-                let mut result = FileFinderResult::new();
-                result
-                    .errors
-                    .push(format!("Failed to access current directory: {}", e));
-                return result;
-            }
-        };
-        self.scan_directory(&dir_path)
     }
 
     /// Processes a list of files and directories, expanding any directories
@@ -140,10 +103,18 @@ impl FileFinder {
                 // If it's a file, add it directly
                 result.files.push(path_str.clone());
             } else if path.is_dir() {
-                // If it's a directory, recursively find all files
-                let dir_result = self.scan_directory(path);
-                result.files.extend(dir_result.files);
-                result.errors.extend(dir_result.errors);
+                if self.recurse {
+                    // If recursion is enabled, scan the directory
+                    let dir_result = self.scan_directory(path);
+                    result.files.extend(dir_result.files);
+                    result.errors.extend(dir_result.errors);
+                } else {
+                    // Without recursion, skip directories
+                    result.errors.push(format!(
+                        "Skipping directory '{}' (use -R to recurse into directories)",
+                        path_str
+                    ));
+                }
             } else {
                 // Path doesn't exist or is inaccessible, record error but continue
                 result
@@ -199,90 +170,110 @@ impl FileFinder {
     }
 }
 
-/// Determines the path to the tag file based on configuration.
+/// Validates that a file is a proper tags file by checking its first line.
 ///
 /// # Arguments
 ///
-/// * `tag_file_name` - Name of the tag file
-/// * `append` - If true, search for an existing tag file; otherwise create a new path
+/// * `path` - Path to the tag file to validate
 ///
 /// # Returns
 ///
-/// A Result containing either the tag file path or an error message
-pub fn determine_tag_file_path(tag_file_name: &str, append: bool) -> Result<String, String> {
-    if tag_file_name == "-" {
-        return Ok("-".to_string());
-    }
+/// A Result indicating whether the file is valid or an error message
+fn validate_existing_tag_file(path: &str) -> Result<(), String> {
+    let file =
+        fs::File::open(path).map_err(|e| format!("Cannot read tag file '{}': {}", path, e))?;
 
-    match find_tag_file(tag_file_name) {
-        Ok(tag_file) => Ok(tag_file),
-        Err(_) => {
-            if append {
-                Err(format!("Could not find hte tag file: {}", tag_file_name))
-            } else {
-                Ok(std::env::current_dir()
-                    .map_err(|e| format!("Failed to get current directory: {}", e))?
-                    .join(tag_file_name)
-                    .to_string_lossy()
-                    .into_owned())
+    let mut reader = BufReader::new(file);
+    let mut line = String::new();
+
+    loop {
+        line.clear();
+        match reader.read_line(&mut line) {
+            Ok(0) => {
+                // EOF reached - empty file is valid
+                return Ok(());
+            }
+            Ok(_) => {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    // Validate the first non-empty line
+                    return validate_tag_line(trimmed, path);
+                }
+            }
+            Err(e) => {
+                return Err(format!("Error reading tag file '{}': {}", path, e));
             }
         }
     }
 }
 
-/// Searches for a tag file in the current directory and its parents.
+/// Validates that a line looks like a valid tag entry.
 ///
 /// # Arguments
 ///
-/// * `filename` - Name of the tag file to search for
+/// * `line` - The line to validate
+/// * `path` - Path to the tag file (for error messages)
 ///
 /// # Returns
 ///
-/// Result containing the path to the tag file if found, or an error message if not found
-pub fn find_tag_file(filename: &str) -> Result<String, String> {
-    let mut current_dir =
-        std::env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
-
-    // Check if the file exists in the current directory
-    match File::open(current_dir.join(filename)) {
-        Ok(_) => return Ok(current_dir.join(filename).to_string_lossy().into_owned()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            // File not found, continue searching in parent directories
-        }
-        Err(e) => {
-            return Err(format!(
-                "Failed to open tag file '{}' in directory '{}': {}",
-                filename,
-                current_dir.display(),
-                e
-            ));
-        }
+/// A Result indicating whether the line is valid or an error message
+fn validate_tag_line(line: &str, path: &str) -> Result<(), String> {
+    if line.starts_with("!_TAG_") {
+        return Ok(());
     }
 
-    // Check parent directories
-    while let Some(parent) = current_dir.parent() {
-        current_dir = parent.to_path_buf();
-        match File::open(current_dir.join(filename)) {
-            Ok(_) => return Ok(current_dir.join(filename).to_string_lossy().into_owned()),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                // File not found, continue searching in parent directories
-                continue;
-            }
-            Err(e) => {
-                return Err(format!(
-                    "Failed to open tag file '{}' in directory '{}': {}",
-                    filename,
-                    current_dir.display(),
-                    e
-                ));
-            }
-        }
+    let parts: Vec<&str> = line.split('\t').collect();
+    if parts.len() >= 3 {
+        return Ok(());
     }
 
     Err(format!(
-        "Tag file '{}' not found in current directory or any parent directory",
-        filename
+        "Tag file '{}' doesn't look like a tags file (first line: '{}')",
+        path, line
     ))
+}
+
+/// Determines the path to the tag file based on configuration.
+///
+/// # Arguments
+///
+/// * `tag_file_name` - Name of the tag file (default is "tags")
+/// * `append` - If true, tags are added to tags file
+///
+/// # Returns
+///
+/// A Result containing either the tag file path or an error message
+pub fn determine_tag_file_path(tag_file_name: &str, append: bool) -> Result<String, String> {
+    // Handle stdout output
+    if tag_file_name == "-" {
+        return Ok("-".to_string());
+    }
+
+    if tag_file_name.len() > 1 && tag_file_name.starts_with('-') {
+        return Err(format!(
+            "Refusing to use '{}' as tag file name (begins with '-'). Use absolute path or add path separator if you really want this name. eg './{}'",
+            tag_file_name, tag_file_name
+        ));
+    }
+
+    let tag_file_path = std::env::current_dir()
+        .map_err(|e| format!("Failed to get current directory: {}", e))?
+        .join(tag_file_name)
+        .to_string_lossy()
+        .into_owned();
+
+    if append {
+        if Path::new(&tag_file_path).exists() {
+            if let Err(e) = validate_existing_tag_file(&tag_file_path) {
+                return Err(e);
+            }
+        } else {
+            fs::File::create(&tag_file_path)
+                .map_err(|e| format!("Failed to create tag file '{}': {}", tag_file_path, e))?;
+        }
+    }
+
+    Ok(tag_file_path)
 }
 
 /// Parses an existing tag file and returns its tags.
