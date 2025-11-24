@@ -161,6 +161,15 @@ fn process_node(cursor: &mut TreeCursor, context: &mut CppContext) -> Option<(Sc
         "preproc_def" => process_macro_definition(cursor, context),
         "preproc_function_def" => process_macro_function_definition(cursor, context),
         "type_definition" => process_typedef(cursor, context),
+        "preproc_include" => process_preproc_include(cursor, context),
+        "labeled_statement" => process_labeled_statement(cursor, context),
+        "namespace_alias_definition" => process_namespace_alias_definition(cursor, context),
+        "using_declaration" => process_using_declaration(cursor, context),
+        "template_declaration" => process_template_declaration(cursor, context),
+        // Module support is not released to crates.io
+        // https://github.com/tree-sitter/tree-sitter-cpp/issues/341
+        // "module_declaration" => process_module_declaration(cursor, context),
+        // "module_partition" => process_module_partition(cursor, context),
         _ => None,
     }
 }
@@ -564,7 +573,7 @@ fn extract_function_name_from_declarator(
         match declarator_child.kind() {
             "identifier" | "field_identifier" | "destructor_name" => {
                 fn_name = context.base.node_text(&declarator_child).to_string();
-                Break
+                Continue
             }
             "qualified_identifier" => {
                 iterate_children!(cursor, |qualified_identier_child| {
@@ -590,15 +599,19 @@ fn extract_function_name_from_declarator(
                             } else {
                                 fn_name = operator_text.to_string();
                             }
-                            Break
+                            Continue
                         }
                         _ => Continue,
                     }
                 });
-                Break
+                Continue
             }
             "operator_name" => {
                 fn_name = context.base.node_text(&declarator_child).to_string();
+                Continue
+            }
+            "parameter_list" => {
+                process_parameter_list(cursor, context, &fn_name);
                 Break
             }
             _ => Continue,
@@ -614,8 +627,15 @@ fn process_declaration(
 ) -> Option<(ScopeType, String)> {
     let mut type_info = String::new();
     let mut variable_names = Vec::new();
+    let mut is_extern = false;
     iterate_children!(cursor, |child_node| {
         match child_node.kind() {
+            "storage_class_specifier" => {
+                if context.base.node_text(&child_node) == "extern" {
+                    is_extern = true;
+                }
+                Continue
+            }
             // Type specifiers
             "primitive_type"
             | "type_identifier"
@@ -710,7 +730,13 @@ fn process_declaration(
                 .iter()
                 .any(|(scope_type, _)| matches!(scope_type, ScopeType::Function));
 
-            let kind = if is_local { "l" } else { "v" };
+            let kind = if is_extern {
+                "x"
+            } else if is_local {
+                "l"
+            } else {
+                "v"
+            };
 
             let mut extra_fields = IndexMap::new();
 
@@ -861,9 +887,34 @@ fn process_macro_function_definition(
     cursor: &mut TreeCursor,
     context: &mut CppContext,
 ) -> Option<(ScopeType, String)> {
-    // For function-like macros, we want to extract the name from the "name" field
-    // which contains an identifier node
-    process_named_item(cursor, context, &["identifier"], "d", None)
+    let mut macro_name = String::new();
+    iterate_children!(cursor, |child| {
+        match child.kind() {
+            "identifier" => {
+                macro_name = context.base.node_text(&child).to_string();
+                create_tag(macro_name.clone(), "d", child, context, None);
+                Continue
+            }
+            "preproc_params" => {
+                iterate_children!(cursor, |params_child| {
+                    match params_child.kind() {
+                        "identifier" => {
+                            let param_name = context.base.node_text(&params_child).to_string();
+                            let mut fields = IndexMap::new();
+                            fields.insert("macro".to_string(), macro_name.clone());
+                            create_tag(param_name, "D", params_child, context, Some(fields));
+                            Continue
+                        }
+                        _ => Continue,
+                    }
+                });
+                Break
+            }
+            _ => Continue,
+        }
+    });
+
+    None
 }
 
 fn process_typedef(
@@ -990,4 +1041,227 @@ fn extract_method_name_from_declarator(
     });
 
     method_name
+}
+
+fn process_preproc_include(
+    cursor: &mut TreeCursor,
+    context: &mut CppContext,
+) -> Option<(ScopeType, String)> {
+    let node = cursor.node();
+    iterate_children!(cursor, |child_node| {
+        if child_node.kind() == "string_literal" || child_node.kind() == "system_lib_string" {
+            let path = context.base.node_text(&child_node);
+            let path = path.trim_matches(|c| c == '"' || c == '<' || c == '>');
+            create_tag(path.to_string(), "h", node, context, None);
+        }
+        Continue
+    });
+
+    None
+}
+
+fn process_labeled_statement(
+    cursor: &mut TreeCursor,
+    context: &mut CppContext,
+) -> Option<(ScopeType, String)> {
+    let node = cursor.node();
+    iterate_children!(cursor, |child_node| {
+        if child_node.kind() == "statement_identifier" {
+            let label_name = context.base.node_text(&child_node).to_string();
+            create_tag(label_name, "L", node, context, None);
+            Break
+        } else {
+            Continue
+        }
+    });
+
+    None
+}
+
+fn process_namespace_alias_definition(
+    cursor: &mut TreeCursor,
+    context: &mut CppContext,
+) -> Option<(ScopeType, String)> {
+    let node = cursor.node();
+    let mut alias_name = String::new();
+    iterate_children!(cursor, |child_node| {
+        if child_node.kind() == "namespace_identifier" {
+            alias_name = context.base.node_text(&child_node).to_string();
+            // First one is the alias name
+            Break
+        } else {
+            Continue
+        }
+    });
+    if !alias_name.is_empty() {
+        create_tag(alias_name, "A", node, context, None);
+    }
+
+    None
+}
+
+fn process_using_declaration(
+    cursor: &mut TreeCursor,
+    context: &mut CppContext,
+) -> Option<(ScopeType, String)> {
+    let node = cursor.node();
+
+    iterate_children!(cursor, |child_node| {
+        match child_node.kind() {
+            "qualified_identifier" | "namespace_identifier" | "identifier" => {
+                create_tag(
+                    context.base.node_text(&child_node).to_string(),
+                    "U",
+                    node,
+                    context,
+                    None,
+                );
+                Break
+            }
+            _ => Continue,
+        }
+    });
+
+    None
+}
+
+fn process_template_declaration(
+    cursor: &mut TreeCursor,
+    context: &mut CppContext,
+) -> Option<(ScopeType, String)> {
+    iterate_children!(cursor, |child| {
+        match child.kind() {
+            "template_parameter_list" => {
+                iterate_children!(cursor, |param_child| {
+                    match param_child.kind() {
+                        "parameter_declaration"
+                        | "type_parameter_declaration"
+                        | "optional_type_parameter_declaration" => {
+                            iterate_children!(cursor, |name_child| {
+                                if name_child.kind() == "type_identifier" {
+                                    let name = context.base.node_text(&name_child).to_string();
+                                    create_tag(name, "Z", name_child, context, None);
+                                }
+                                Continue
+                            });
+                        }
+                        "template_template_parameter_declaration" => {
+                            if let Some(name_node) = param_child.child_by_field_name("name") {
+                                let name = context.base.node_text(&name_node).to_string();
+                                create_tag(name, "Z", name_node, context, None);
+                            }
+                        }
+                        _ => {}
+                    }
+                    Continue
+                });
+                Break
+            }
+            _ => Continue,
+        }
+    });
+
+    None
+}
+
+// fn process_module_declaration(
+//     cursor: &mut TreeCursor,
+//     context: &mut CppContext,
+// ) -> Option<(ScopeType, String)> {
+//     process_named_item(cursor, context, &["identifier"], "M", None)
+// }
+
+// fn process_module_partition(
+//     cursor: &mut TreeCursor,
+//     context: &mut CppContext,
+// ) -> Option<(ScopeType, String)> {
+//     process_named_item(cursor, context, &["identifier"], "P", None)
+// }
+
+fn process_parameter_list(cursor: &mut TreeCursor, context: &mut CppContext, fn_name: &String) {
+    iterate_children!(cursor, |param_child| {
+        if param_child.kind() == "parameter_declaration" {
+            let mut name = String::new();
+            let mut type_info = String::new();
+            let mut name_node_for_tag = param_child;
+
+            iterate_children!(cursor, |decl_child| {
+                match decl_child.kind() {
+                    "primitive_type"
+                    | "type_identifier"
+                    | "qualified_identifier"
+                    | "sized_type_specifier" => {
+                        type_info = context.base.node_text(&decl_child).to_string();
+                        Continue
+                    }
+                    "identifier" => {
+                        name = context.base.node_text(&decl_child).to_string();
+                        name_node_for_tag = decl_child;
+                        Continue
+                    }
+                    "declarator" | "pointer_declarator" | "reference_declarator" => {
+                        let mut current_node = decl_child;
+                        loop {
+                            if current_node.kind() == "identifier" {
+                                name = context.base.node_text(&current_node).to_string();
+                                name_node_for_tag = current_node;
+                                break;
+                            }
+
+                            if let Some(child) = current_node.child_by_field_name("declarator") {
+                                current_node = child;
+                                continue;
+                            }
+
+                            // Fallback for unnamed declarators/identifiers
+                            let mut found_next = false;
+                            let mut temp_cursor = current_node.walk();
+                            for child in current_node.children(&mut temp_cursor) {
+                                match child.kind() {
+                                    "identifier"
+                                    | "declarator"
+                                    | "pointer_declarator"
+                                    | "reference_declarator" => {
+                                        current_node = child;
+                                        found_next = true;
+                                        break;
+                                    }
+                                    _ => {}
+                                }
+                            }
+
+                            if !found_next {
+                                break;
+                            }
+                        }
+                        Continue
+                    }
+                    _ => Continue,
+                }
+            });
+
+            if !name.is_empty() {
+                let mut extra_fields = IndexMap::new();
+                match context.scope_stack.last() {
+                    Some((ScopeType::Class, class_name)) => extra_fields.insert(
+                        "function".to_string(),
+                        format!("{}::{}", class_name, fn_name),
+                    ),
+                    _ => extra_fields.insert("function".to_string(), fn_name.clone()),
+                };
+                // extra_fields.insert("function".to_string(), fn_name.clone());
+                if !type_info.is_empty() {
+                    extra_fields.insert("typeref".to_string(), format!("typename:{}", type_info));
+                }
+                create_tag(
+                    name,
+                    "z",
+                    name_node_for_tag,
+                    context,
+                    Some(extra_fields.clone()),
+                );
+            }
+        }
+        Continue
+    });
 }

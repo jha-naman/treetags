@@ -1,6 +1,8 @@
 #include <iostream>
 #include <string>
 
+#define ADD(x, y) ((x) + (y))
+
 int main(int argc, char** argv) {
 		return 0;
 }
@@ -23,6 +25,10 @@ namespace Baz {
         printf("bar\n");
     }
 }
+
+namespace Foo = Baz;
+using namespace Foo::Baz;
+using namespace Baz;
 
 std::string bar = "bar";
 const std::string& barRef = bar;
@@ -197,12 +203,16 @@ public:
 Box<Box<int> > boxOfBox;
 boxOfBox.insert(intBox);
 
-template<class T>
+template<class T> //foobar
 void barkThreeTimes(const T& input)
 {
     input.bark();
+    if (true) {
+        goto label;
+    }
     input.bark();
-    input.bark();
+    label:
+        input.bark();
 }
 
 #include <vector>
