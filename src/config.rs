@@ -37,6 +37,11 @@ pub struct Config {
     #[arg(short = 'f', default_value = "tags")]
     pub tag_file: String,
 
+    /// Append tags to existing tag file instead of reginerating the file from scratch.
+    /// Need to pass in list of file names for which new tags are to be generated.
+    #[arg(long = "append", default_value = "no", verbatim_doc_comment)]
+    pub append_raw: String,
+
     /// List of file names to be processed when `--append` option is passed
     pub file_names: Vec<String>,
     #[arg(long, default_value = "4")]
@@ -46,46 +51,29 @@ pub struct Config {
     #[arg(long)]
     pub exclude: Vec<String>,
 
+    /// Recurse into directories encountered in the list of supplied files
+    #[arg(short = 'R', long = "recurse", default_value = "no")]
+    pub recurse_raw: String,
+
+    /// Field value derived from the `recurse_raw` option field
+    #[arg(skip)]
+    pub recurse: bool,
+
     /// Read additional options from file or directory
     #[arg(long = "options", default_value = "")]
     pub options: String,
 
-    /// Recurse into directories encountered in the list of supplied files
-    #[arg(
-        short = 'R',
-        long = "recurse",
-        default_value = "false",
-        default_missing_value = "true",
-        num_args = 0..=1,
-        value_parser = clap::builder::BoolishValueParser::new(),
-        action = clap::ArgAction::Set
-    )]
-    pub recurse: bool,
-
     /// Whether to sort the files or not.
     /// Values of 'yes', 'on', 'true', '1' set it to true
     /// Values of 'no', '0', 'off', 'false' set it to false
-    #[arg(
-        long = "sort",
-        default_value = "true",
-        default_missing_value = "true",
-        num_args = 0..=1,
-        value_parser = clap::builder::BoolishValueParser::new(),
-        action = clap::ArgAction::Set
-    )]
+    #[arg(long = "sort", default_value = "yes", verbatim_doc_comment)]
+    pub sort_raw: String,
+    /// Field value derived from the `sort_raw` string field
+    #[arg(skip)]
     pub sort: bool,
 
-    /// Append tags to existing tag file instead of reginerating the file from scratch.
-    /// Need to pass in list of file names for which new tags are to be generated.
-    #[arg(
-        short = 'a',
-        long = "append",
-        default_value = "false",
-        default_missing_value = "true",
-        num_args = 0..=1,
-        value_parser = clap::builder::BoolishValueParser::new(),
-        action = clap::ArgAction::Set
-    )]
+    /// Field value derived from the `append_raw` option field
+    #[arg(skip)]
     pub append: bool,
 
     /// Enable extra tag information (e.g., +q for qualified tags, +f for file scope)
@@ -106,7 +94,7 @@ pub struct Config {
     /// Kept for compatibility with `tagbar` plugin.
     #[arg(long = "language-force", default_value = "", verbatim_doc_comment)]
     pub _language_force: String,
-
+    ///
     /// Rust language specific kinds to generate tags for
     #[arg(long = "kinds-rust", default_value = "", verbatim_doc_comment)]
     pub kinds_rust: String,
@@ -174,6 +162,37 @@ impl Config {
 
         config.validate();
         config.parse_file_args();
+
+        // value_str is not a valid boolean string. Assume it's a filename.
+        let mut filename_misinterpreted_by_raw_bool: Option<String> = None;
+
+        if let Some(parsed_sort_val) = config.try_string_to_bool(&config.sort_raw) {
+            config.sort = parsed_sort_val;
+        } else {
+            config.sort = true;
+            filename_misinterpreted_by_raw_bool = Some(config.sort_raw.clone());
+        }
+
+        // Handle append option
+        if let Some(parsed_append_val) = config.try_string_to_bool(&config.append_raw) {
+            config.append = parsed_append_val;
+        } else {
+            config.append = true;
+            filename_misinterpreted_by_raw_bool = Some(config.append_raw.clone());
+        }
+
+        if let Some(parsed_recurse_val) = config.try_string_to_bool(&config.recurse_raw) {
+            config.recurse = parsed_recurse_val;
+        } else {
+            config.recurse = true;
+            filename_misinterpreted_by_raw_bool = Some(config.recurse_raw.clone());
+        }
+
+        if let Some(filename) = filename_misinterpreted_by_raw_bool {
+            // This filename was consumed by --append or --sort or another option converted from
+            // string to bool
+            config.file_names.insert(0, filename);
+        }
 
         config.extras_config = ExtrasConfig::from_string(&config.extras);
         config.fields_config = FieldsConfig::from_string(&config.fields);
@@ -312,5 +331,61 @@ impl Config {
         } else {
             &self.rust_kinds
         }
+    }
+
+    /// Converts a string value to a boolean based on predefined mappings.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - A string slice that should be converted to a boolean
+    ///
+    /// # Returns
+    ///
+    /// * `Some(true)` for values: "yes", "on", "true", "1" (case-insensitive)
+    /// * `Some(false)` for values: "no", "off", "false", "0" (case-insensitive)
+    /// * `None` for other values
+    /// ```
+    fn try_string_to_bool(&self, value: &str) -> Option<bool> {
+        match value.to_lowercase().as_str() {
+            "yes" | "on" | "true" | "1" => Some(true),
+            "no" | "off" | "false" | "0" => Some(false),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_true_values() {
+        let config = Config::new();
+        assert_eq!(config.try_string_to_bool("yes"), Some(true));
+        assert_eq!(config.try_string_to_bool("YES"), Some(true));
+        assert_eq!(config.try_string_to_bool("on"), Some(true));
+        assert_eq!(config.try_string_to_bool("ON"), Some(true));
+        assert_eq!(config.try_string_to_bool("true"), Some(true));
+        assert_eq!(config.try_string_to_bool("TRUE"), Some(true));
+        assert_eq!(config.try_string_to_bool("1"), Some(true));
+    }
+
+    #[test]
+    fn test_false_values() {
+        let config = Config::new();
+        assert_eq!(config.try_string_to_bool("no"), Some(false));
+        assert_eq!(config.try_string_to_bool("NO"), Some(false));
+        assert_eq!(config.try_string_to_bool("off"), Some(false));
+        assert_eq!(config.try_string_to_bool("OFF"), Some(false));
+        assert_eq!(config.try_string_to_bool("false"), Some(false));
+        assert_eq!(config.try_string_to_bool("FALSE"), Some(false));
+        assert_eq!(config.try_string_to_bool("0"), Some(false));
+    }
+
+    #[test]
+    fn test_invalid_value() {
+        let config = Config::new();
+        assert_eq!(config.try_string_to_bool("invalid"), None);
+        assert_eq!(config.try_string_to_bool(""), None);
     }
 }
