@@ -39,7 +39,7 @@ pub struct Config {
 
     /// Append tags to existing tag file instead of reginerating the file from scratch.
     /// Need to pass in list of file names for which new tags are to be generated.
-    #[arg(long = "append", default_value = "no", verbatim_doc_comment)]
+    #[arg(long = "append", default_value = "no", verbatim_doc_comment, default_missing_value="false", num_args=0..=1)]
     pub append_raw: String,
 
     /// List of file names to be processed when `--append` option is passed
@@ -52,7 +52,7 @@ pub struct Config {
     pub exclude: Vec<String>,
 
     /// Recurse into directories encountered in the list of supplied files
-    #[arg(short = 'R', long = "recurse", default_value = "no")]
+    #[arg(short = 'R', long = "recurse", default_value = "no", default_missing_value="false", num_args=0..=1)]
     pub recurse_raw: String,
 
     /// Field value derived from the `recurse_raw` option field
@@ -66,7 +66,7 @@ pub struct Config {
     /// Whether to sort the files or not.
     /// Values of 'yes', 'on', 'true', '1' set it to true
     /// Values of 'no', '0', 'off', 'false' set it to false
-    #[arg(long = "sort", default_value = "yes", verbatim_doc_comment)]
+    #[arg(long = "sort", default_value = "yes", verbatim_doc_comment, default_missing_value="true", num_args=0..=1)]
     pub sort_raw: String,
     /// Field value derived from the `sort_raw` string field
     #[arg(skip)]
