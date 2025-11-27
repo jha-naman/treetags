@@ -15,8 +15,9 @@ issue to see how tags compare to LSP.
 
 By default, it will generate a new tag file in the current directory and look
 for tags in files list passed during command line invokation. By default it
-ignores directories. Pass the `-R` or `--recurse` options if you want
-directories to be recursively looked into for tags.
+recursively traverses directories present in the list. Pass the `-R no`
+or `--recurse no` options do not want directories to be recursively looked
+into for tags.
 If the `--append` option is used it will  update the existing tag file
 with tags generated from the list of files passed via command line.
 
