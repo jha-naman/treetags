@@ -39,7 +39,7 @@ pub struct Config {
 
     /// Append tags to existing tag file instead of reginerating the file from scratch.
     /// Need to pass in list of file names for which new tags are to be generated.
-    #[arg(long = "append", default_value = "no", verbatim_doc_comment, default_missing_value="true", num_args=0..=1)]
+    #[arg(long = "append", default_value = "false", verbatim_doc_comment, default_missing_value="true", num_args=0..=1)]
     pub append_raw: String,
 
     /// List of file names to be processed when `--append` option is passed
@@ -52,7 +52,7 @@ pub struct Config {
     pub exclude: Vec<String>,
 
     /// Recurse into directories encountered in the list of supplied files
-    #[arg(short = 'R', long = "recurse", default_value = "no", default_missing_value="true", num_args=0..=1)]
+    #[arg(short = 'R', long = "recurse", default_value = "true", default_missing_value="true", num_args=0..=1)]
     pub recurse_raw: String,
 
     /// Field value derived from the `recurse_raw` option field
@@ -66,7 +66,7 @@ pub struct Config {
     /// Whether to sort the files or not.
     /// Values of 'yes', 'on', 'true', '1' set it to true
     /// Values of 'no', '0', 'off', 'false' set it to false
-    #[arg(long = "sort", default_value = "yes", verbatim_doc_comment, default_missing_value="true", num_args=0..=1)]
+    #[arg(long = "sort", default_value = "true", verbatim_doc_comment, default_missing_value="true", num_args=0..=1)]
     pub sort_raw: String,
     /// Field value derived from the `sort_raw` string field
     #[arg(skip)]
@@ -196,8 +196,6 @@ impl Config {
 
         config.extras_config = ExtrasConfig::from_string(&config.extras);
         config.fields_config = FieldsConfig::from_string(&config.fields);
-
-        config.handle_special_cases(&initial_args);
 
         config
     }
@@ -352,38 +350,6 @@ impl Config {
             "yes" | "on" | "true" | "1" => Some(true),
             "no" | "off" | "false" | "0" => Some(false),
             _ => None,
-        }
-    }
-
-    /// Handle special cases for command line argument combinations
-    fn handle_special_cases(&mut self, raw_args: &[String]) {
-        // Skip the program name (first argument)
-        let user_args: Vec<&str> = raw_args.iter().skip(1).map(|s| s.as_str()).collect();
-        
-        // Case 1: No arguments at all
-        if user_args.is_empty() {
-            eprintln!("No files specified. Try \"treetags --help\".");
-            std::process::exit(1);
-        }
-        
-        // Case 2: Only "-R" specified
-        if user_args.len() == 1 && (user_args[0] == "-R" || user_args[0] == "--recurse") {
-            self.file_names = vec![".".to_string()];
-            self.recurse = true;
-            return;
-        }
-        
-        // Case 3: Only "*" specified
-        if user_args.len() == 1 && user_args[0] == "*" {
-            self.file_names = vec![".".to_string()];
-            self.recurse = true;
-            return;
-        }
-
-        // Final safety check: if we still have no files, error out
-        if self.file_names.is_empty() {
-            eprintln!("No files specified. Try \"treetags --help\".");
-            std::process::exit(1);
         }
     }
 }
