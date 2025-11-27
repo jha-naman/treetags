@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] 2025-11-27
+
 ### Changed
  - Updated default value of `recurse` cli option to `true`.
 
