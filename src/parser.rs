@@ -6,11 +6,14 @@
 //! The `Parser` struct maintains configuration for each supported language and provides
 //! methods to parse files and generate tags from source code.
 
+use crate::config::user_languages::GrammarConfig;
 use crate::queries;
 use crate::tag;
 use crate::tags_config::get_tags_config;
+use libloading::{Library, Symbol};
+use std::collections::HashMap;
 use std::fs;
-use tree_sitter::Parser as TSParser;
+use tree_sitter::{Language, Parser as TSParser};
 use tree_sitter_tags::TagsConfiguration;
 use tree_sitter_tags::TagsContext;
 
@@ -19,6 +22,12 @@ mod cpp;
 mod go;
 mod helper;
 mod rust;
+
+/// Holds dynamically loaded grammar libraries
+pub struct DynamicGrammar {
+    _library: Library, // Keep library alive
+    config: TagsConfiguration,
+}
 
 /// Parser manages the parsing configurations for all supported languages
 /// and provides methods to generate tags from source files.
@@ -29,10 +38,6 @@ pub struct Parser {
     pub ruby_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
     /// Configuration for Python language
     pub python_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
-    /// Configuration for C language
-    pub c_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
-    /// Configuration for C++ language
-    pub cpp_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
     /// Configuration for Java language
     pub java_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
     /// Configuration for OCaml language
@@ -57,6 +62,8 @@ pub struct Parser {
     pub tags_context: TagsContext,
     /// Parser for generating tags using tree walking
     pub ts_parser: TSParser,
+    /// Dynamically loaded user grammars
+    pub user_grammars: HashMap<String, DynamicGrammar>,
 }
 
 impl Default for Parser {
@@ -84,16 +91,6 @@ impl Parser {
                 tree_sitter_python::LANGUAGE.into(),
                 tree_sitter_python::TAGS_QUERY,
                 "python",
-            ),
-            c_config: get_tags_config(
-                tree_sitter_c::LANGUAGE.into(),
-                tree_sitter_c::TAGS_QUERY,
-                "c",
-            ),
-            cpp_config: get_tags_config(
-                tree_sitter_cpp::LANGUAGE.into(),
-                tree_sitter_cpp::TAGS_QUERY,
-                "c++",
             ),
             java_config: get_tags_config(
                 tree_sitter_java::LANGUAGE.into(),
@@ -147,6 +144,170 @@ impl Parser {
             ),
             tags_context: TagsContext::new(),
             ts_parser: TSParser::new(),
+            user_grammars: HashMap::new(),
+        }
+    }
+
+    /// Load a user-defined grammar
+    fn load_user_grammar(
+        &mut self,
+        grammar_name: &str,
+        grammar_config: &GrammarConfig,
+    ) -> Result<(), String> {
+        // Load the dynamic library
+        let library = unsafe {
+            Library::new(&grammar_config.library_path).map_err(|e| {
+                format!(
+                    "Failed to load grammar library {}: {}",
+                    grammar_config.library_path.display(),
+                    e
+                )
+            })?
+        };
+
+        // Get the language function (typically named "tree_sitter_<language>")
+        let language_fn: Symbol<unsafe extern "C" fn() -> Language> = unsafe {
+            library
+                .get(format!("tree_sitter_{}", grammar_name.replace('-', "_")).as_bytes())
+                .map_err(|e| {
+                    format!(
+                        "Failed to find language function tree_sitter_{} in {}: {}",
+                        grammar_name.replace('-', "_"),
+                        grammar_config.library_path.display(),
+                        e
+                    )
+                })?
+        };
+
+        let language = unsafe { language_fn() };
+
+        // Load the tags query
+        let tags_query = fs::read_to_string(&grammar_config.query_file).map_err(|e| {
+            format!(
+                "Failed to read tags query file {}: {}",
+                grammar_config.query_file.display(),
+                e
+            )
+        })?;
+
+        // Create tags configuration
+        let config = TagsConfiguration::new(language, &tags_query, "").map_err(|e| {
+            format!(
+                "Failed to create tags configuration for {}: {}",
+                grammar_name, e
+            )
+        })?;
+
+        let dynamic_grammar = DynamicGrammar {
+            _library: library,
+            config,
+        };
+
+        self.user_grammars
+            .insert(grammar_name.to_string(), dynamic_grammar);
+
+        Ok(())
+    }
+
+    /// Generate tags by first trying user grammars, then built-in configurations
+    pub fn generate_by_tag_query_with_user_support(
+        &mut self,
+        code: &[u8],
+        file_path_relative_to_tag_file: &str,
+        extension: &str,
+        config: Option<&crate::config::Config>,
+    ) -> Vec<tag::Tag> {
+        // First try user-defined grammars if config is provided
+        let mut source_name = String::new();
+        let tags_config: Option<&TagsConfiguration> = if let Some(config) = config {
+            if let Some((grammar_name, grammar_config)) =
+                config.user_languages.get_grammar_for_extension(extension)
+            {
+                // Load grammar if not already loaded
+                if !self.user_grammars.contains_key(grammar_name) {
+                    if let Err(e) = self.load_user_grammar(grammar_name, grammar_config) {
+                        eprintln!("Warning: {}", e);
+                        // Fall through to built-in languages
+                    }
+                }
+
+                // Try to use user grammar if loaded
+                if let Some(grammar) = self.user_grammars.get(grammar_name) {
+                    source_name = format!("user grammar '{}'", grammar_name);
+                    Some(&grammar.config)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+        .or_else(|| {
+            // Fall back to built-in language configurations
+            let (config, name) = match extension {
+                "js" | "jsx" => (self.js_config.as_ref().ok(), "built-in 'js' grammar"),
+                "rb" => (self.ruby_config.as_ref().ok(), "built-in 'rb' grammar"),
+                "py" | "pyw" => (self.python_config.as_ref().ok(), "built-in 'py' grammar"),
+                "java" => (self.java_config.as_ref().ok(), "built-in 'java' grammar"),
+                "ml" => (self.ocaml_config.as_ref().ok(), "built-in 'ocaml' grammar"),
+                "php" => (self.php_config.as_ref().ok(), "built-in 'php' grammar"),
+                "ts" | "tsx" => (
+                    self.typescript_config.as_ref().ok(),
+                    "built-in 'ts' grammar",
+                ),
+                "ex" => (
+                    self.elixir_config.as_ref().ok(),
+                    "built-in 'elixir' grammar",
+                ),
+                "lua" => (self.lua_config.as_ref().ok(), "built-in 'lua' grammar"),
+                "cs" => (self.csharp_config.as_ref().ok(), "built-in 'cs' grammar"),
+                "sh" | "bash" => (self.bash_config.as_ref().ok(), "built-in 'bash' grammar"),
+                "scala" => (self.scala_config.as_ref().ok(), "built-in 'scala' grammar"),
+                "jl" => (self.julia_config.as_ref().ok(), "built-in 'julia' grammar"),
+                _ => (None, ""),
+            };
+            if let Some(cfg) = config {
+                source_name = name.to_string();
+                Some(cfg)
+            } else {
+                None
+            }
+        });
+
+        // Generate tags inline instead of calling separate method
+        if let Some(tags_config) = tags_config {
+            let result = self.tags_context.generate_tags(tags_config, code, None);
+
+            match result {
+                Ok((raw_tags, _)) => {
+                    let mut tags = Vec::new();
+                    for tag_result in raw_tags {
+                        match tag_result {
+                            Ok(tag) if tag.is_definition => {
+                                match tag::Tag::from_ts_tag(
+                                    tag,
+                                    code,
+                                    file_path_relative_to_tag_file,
+                                ) {
+                                    Ok(new_tag) => tags.push(new_tag),
+                                    Err(e) => eprintln!("Error creating tag: {}", e),
+                                }
+                            }
+                            Ok(_) => {} // Skip non-definition tags
+                            Err(e) => eprintln!("Error in tag generation: {}", e),
+                        }
+                    }
+                    tags
+                }
+                Err(e) => {
+                    eprintln!("Error generating tags with {}: {}", source_name, e);
+                    Vec::new()
+                }
+            }
+        } else {
+            Vec::new()
         }
     }
 
@@ -209,7 +370,12 @@ impl Parser {
             Ok(tags)
         } else {
             // Fallback to tags generated by TAGS quries
-            Ok(self.generate_by_tag_query(&code, file_path_relative_to_tag_file, extension))
+            Ok(self.generate_by_tag_query_with_user_support(
+                &code,
+                file_path_relative_to_tag_file,
+                extension,
+                Some(config),
+            ))
         }
     }
 
@@ -322,60 +488,11 @@ impl Parser {
         file_path_relative_to_tag_file: &str,
         extension: &str,
     ) -> Vec<tag::Tag> {
-        let config = match extension {
-            "js" | "jsx" => self.js_config.as_ref().ok(),
-            "rb" => self.ruby_config.as_ref().ok(),
-            "py" | "pyw" => self.python_config.as_ref().ok(),
-            "c" | "h" | "i" => self.c_config.as_ref().ok(),
-            "cc" | "cpp" | "CPP" | "cxx" | "c++" | "cp" | "C" | "cppm" | "ixx" | "ii" | "H"
-            | "hh" | "hpp" | "HPP" | "hxx" | "h++" | "tcc" => self.cpp_config.as_ref().ok(),
-            "java" => self.java_config.as_ref().ok(),
-            "ml" => self.ocaml_config.as_ref().ok(),
-            "php" => self.php_config.as_ref().ok(),
-            "ts" | "tsx" => self.typescript_config.as_ref().ok(),
-            "ex" => self.elixir_config.as_ref().ok(),
-            "lua" => self.lua_config.as_ref().ok(),
-            "cs" => self.csharp_config.as_ref().ok(),
-            "sh" | "bash" => self.bash_config.as_ref().ok(),
-            "scala" => self.scala_config.as_ref().ok(),
-            "jl" => self.julia_config.as_ref().ok(),
-            _ => None,
-        };
-
-        let mut tags: Vec<tag::Tag> = Vec::new();
-        if config.is_none() {
-            return tags;
-        }
-
-        let tags_config = config.unwrap();
-
-        let result = self.tags_context.generate_tags(tags_config, code, None);
-
-        match result {
-            Err(err) => eprintln!("Error generating tags for file: {}", err),
-            Ok(valid_result) => {
-                let (raw_tags, _) = valid_result;
-                for tag in raw_tags {
-                    match tag {
-                        Err(error) => eprintln!("Error generating tags for file: {}", error),
-                        Ok(tag) => {
-                            if !tag.is_definition {
-                                continue;
-                            }
-
-                            match tag::Tag::from_ts_tag(tag, code, file_path_relative_to_tag_file) {
-                                Ok(new_tag) => tags.push(new_tag),
-                                Err(error_msg) => {
-                                    eprintln!("{}", error_msg);
-                                    continue;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        tags
+        self.generate_by_tag_query_with_user_support(
+            code,
+            file_path_relative_to_tag_file,
+            extension,
+            None,
+        )
     }
 }
