@@ -77,11 +77,11 @@ pub fn generate_tags_with_config(
 /// Generic tree walking function that can be used by any language implementation
 /// that implements the LanguageContext trait
 pub fn walk_generic<C: LanguageContext>(cursor: &mut TreeCursor, context: &mut C) {
-    loop {
-        // Process the current node
-        let scope_info = context.process_node(cursor);
+    let mut scope_pushed_stack: Vec<bool> = Vec::new();
 
-        // Manage Scope Stack
+    // Pre-order tree walk with scope stack management
+    loop {
+        let scope_info = context.process_node(cursor);
         let mut scope_pushed = false;
         if let Some((scope_type, scope_name)) = scope_info {
             if !scope_name.is_empty() {
@@ -89,21 +89,24 @@ pub fn walk_generic<C: LanguageContext>(cursor: &mut TreeCursor, context: &mut C
                 scope_pushed = true;
             }
         }
+        scope_pushed_stack.push(scope_pushed);
 
-        // Recurse into children
         if cursor.goto_first_child() {
-            walk_generic(cursor, context);
-            cursor.goto_parent(); // Return to current node after visiting children
+            continue;
         }
 
-        // Pop Scope if necessary
-        if scope_pushed {
-            context.pop_scope();
-        }
+        loop {
+            if scope_pushed_stack.pop().unwrap_or(false) {
+                context.pop_scope();
+            }
 
-        // Move to the next sibling
-        if !cursor.goto_next_sibling() {
-            break;
+            if cursor.goto_next_sibling() {
+                break;
+            }
+
+            if !cursor.goto_parent() {
+                return;
+            }
         }
     }
 }
