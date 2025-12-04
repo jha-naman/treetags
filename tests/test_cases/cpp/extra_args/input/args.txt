@@ -1,2 +1,2 @@
---sort yes -f '-' --kinds-c++='cdefghlpD'
+--sort yes -f '-' --kinds-c++='cdefghLpDAUZz'
 source.cpp

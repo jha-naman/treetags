@@ -1,9 +1,13 @@
 !_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+ADD	source.cpp	/^#define ADD(x, y) ((x) + (y))$/;"	d
+Baz	source.cpp	/^using namespace Baz;$/;"	U
 Box	source.cpp	/^class Box {$/;"	c
 Dog	source.cpp	/^class Dog {$/;"	c
 Dog	source.cpp	/^    Dog();$/;"	p	class:Dog
 Dog	source.cpp	/^Dog::Dog()$/;"	f	class:Dog
 ECarTypes	source.cpp	/^enum ECarTypes : uint8_t$/;"	g	typeref:typename:uint8_t
+Foo	source.cpp	/^namespace Foo = Baz;$/;"	A
+Foo::Baz	source.cpp	/^using namespace Foo::Baz;$/;"	U
 GetPreferredCarType	source.cpp	/^ECarTypes GetPreferredCarType()$/;"	f	typeref:typename:ECarTypes
 Hatchback	source.cpp	/^    Hatchback, \/\/ 1$/;"	e	enum:ECarTypes
 Hybrid	source.cpp	/^    Hybrid \/\/ 255$/;"	e	enum:ECarTypes
@@ -13,14 +17,27 @@ Point	source.cpp	/^    Point() { };$/;"	f	class:Point
 Point	source.cpp	/^    Point (double a, double b) :$/;"	f	class:Point
 SUV	source.cpp	/^    SUV = 254, \/\/ 254$/;"	e	enum:ECarTypes
 Sedan	source.cpp	/^    Sedan, \/\/ 0$/;"	e	enum:ECarTypes
+T	source.cpp	/^template<class T>$/;"	Z
+T	source.cpp	/^template<class T> \/\/foobar$/;"	Z
+a	source.cpp	/^    Point (double a, double b) :$/;"	z	class:Point	typeref:typename:double	function:Point::Point
+argc	source.cpp	/^int main(int argc, char** argv) {$/;"	z	typeref:typename:int	function:main
+argv	source.cpp	/^int main(int argc, char** argv) {$/;"	z	typeref:typename:char	function:main
+b	source.cpp	/^    Point (double a, double b) :$/;"	z	class:Point	typeref:typename:double	function:Point::Point
 bar	source.cpp	/^    void bar()$/;"	f	namespace:Baz	typeref:typename:void
 bark	source.cpp	/^    void bark() const { std::cout << name << " barks!\\n"; }$/;"	f	class:Dog	typeref:typename:void
 barkThreeTimes	source.cpp	/^void barkThreeTimes(const T& input)$/;"	f	typeref:typename:void
+dogsName	source.cpp	/^void Dog::setName(const std::string& dogsName)$/;"	z	typeref:typename:std::string	function:setName
+dogsOwner	source.cpp	/^void OwnedDog::setOwner(const std::string& dogsOwner)$/;"	z	typeref:typename:std::string	function:setOwner
+dogsWeight	source.cpp	/^void Dog::setWeight(int dogsWeight)$/;"	z	typeref:typename:int	function:setWeight
 fn	source.cpp	/^void fn();$/;"	p	typeref:typename:void
 fn	source.cpp	/^void fn(void);$/;"	p	typeref:typename:void
 foo	source.cpp	/^    void foo()$/;"	f	namespace:Baz	typeref:typename:void
+input	source.cpp	/^void barkThreeTimes(const T& input)$/;"	z	typeref:typename:T	function:barkThreeTimes
 insert	source.cpp	/^    void insert(const T&) { }$/;"	f	class:Box	typeref:typename:void
+iostream	source.cpp	/^#include <iostream>$/;"	h
+label	source.cpp	/^    label:$/;"	L	function:barkThreeTimes
 main	source.cpp	/^int main(int argc, char** argv) {$/;"	f	typeref:typename:int
+msg	source.cpp	/^void print(char const* msg)$/;"	z	typeref:typename:char	function:print
 operator +	source.cpp	/^    Point operator+(const Point& rhs) const;$/;"	p	class:Point	typeref:typename:Point
 operator +	source.cpp	/^Point Point::operator+(const Point& rhs) const$/;"	f	typeref:typename:Point	class:Point
 operator +=	source.cpp	/^    Point& operator+=(const Point& rhs);$/;"	p	class:Point	typeref:typename:Point
@@ -30,11 +47,18 @@ print	source.cpp	/^    virtual void print() const;$/;"	p	class:Dog	typeref:typen
 print	source.cpp	/^void Dog::print() const$/;"	f	typeref:typename:void	class:Dog
 print	source.cpp	/^    void print() const override;$/;"	p	class:OwnedDog	typeref:typename:void
 print	source.cpp	/^void OwnedDog::print() const$/;"	f	typeref:typename:void	class:OwnedDog
+rhs	source.cpp	/^Point Point::operator+(const Point& rhs) const$/;"	z	typeref:typename:Point	function:operator +
+rhs	source.cpp	/^Point& Point::operator+=(const Point& rhs)$/;"	z	typeref:typename:Point	function:operator +=
 setName	source.cpp	/^    void setName(const std::string& dogsName);$/;"	p	class:Dog	typeref:typename:void
 setName	source.cpp	/^void Dog::setName(const std::string& dogsName)$/;"	f	typeref:typename:void	class:Dog
 setOwner	source.cpp	/^    void setOwner(const std::string& dogsOwner);$/;"	p	class:OwnedDog	typeref:typename:void
 setOwner	source.cpp	/^void OwnedDog::setOwner(const std::string& dogsOwner)$/;"	f	typeref:typename:void	class:OwnedDog
 setWeight	source.cpp	/^    void setWeight(int dogsWeight);$/;"	p	class:Dog	typeref:typename:void
 setWeight	source.cpp	/^void Dog::setWeight(int dogsWeight)$/;"	f	typeref:typename:void	class:Dog
+std	source.cpp	/^using namespace std;$/;"	U
+string	source.cpp	/^#include <string>$/;"	h
+vector	source.cpp	/^#include <vector>$/;"	h
+x	source.cpp	/^#define ADD(x, y) ((x) + (y))$/;"	D	macro:ADD
+y	source.cpp	/^#define ADD(x, y) ((x) + (y))$/;"	D	macro:ADD
 ~Dog	source.cpp	/^    virtual ~Dog();$/;"	p	class:Dog
 ~Dog	source.cpp	/^Dog::~Dog()$/;"	f	class:Dog

@@ -468,6 +468,7 @@ impl TagKindConfig {
             (&["N", "name"], "N"),
             (&["U", "using"], "U"),
             (&["Z", "tparam"], "Z"),
+            (&["M", "module"], "M"),
         ];
 
         // Default enabled kinds for C++

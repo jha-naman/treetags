@@ -1,4 +1,5 @@
 !_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+../my_lib/my_lib_header.h	source.c	/^#include "..\/my_lib\/my_lib_header.h"$/;"	h
 ADD	source.c	/^#define ADD(a, b) ((a) + (b))$/;"	d
 DAYS_IN_YEAR	source.c	/^#define DAYS_IN_YEAR 365$/;"	d
 EXAMPLE_H	source.c	/^#define EXAMPLE_H$/;"	d	
@@ -40,7 +41,9 @@ rect	source.c	/^typedef struct {$/;"	t	typeref:struct:__anon16f8bb470208
 rectangle	source.c	/^struct rectangle {$/;"	s	
 rectangle	source.c	/^typedef struct rectangle rect;$/;"	s
 rectangle	source.c	/^struct rectangle r;$/;"	s
+stdlib.h	source.c	/^#include <stdlib.h>$/;"	h
 str_reverse_through_pointer	source.c	/^void str_reverse_through_pointer(char *str_in) {$/;"	f	typeref:typename:void
+string.h	source.c	/^#include <string.h>$/;"	h
 swapTwoNumbers	source.c	/^void swapTwoNumbers(int *a, int *b)$/;"	f	typeref:typename:void
 testFunc	source.c	/^void testFunc() {$/;"	f	typeref:typename:void
 testFunc2	source.c	/^void testFunc2() {$/;"	f	typeref:typename:void
