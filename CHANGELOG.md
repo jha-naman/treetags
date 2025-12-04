@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+ - Thread stackoverflow error when generating tags for large C/C++ files
+
 ## [0.5.1] 2025-12-04
 
 ### Added
