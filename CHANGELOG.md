@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] 2025-12-04
+
+### Added
+ - Add support for various missing C++ tag kinds
+   - h  included header files
+   - D  parameters inside macro definitions
+   - L  goto labels
+   - A  namespace aliases
+   - U  using namespace statements
+   - Z  template parameters
+   - z  function parameters inside function or prototype definitions
+
 ## [0.5.0] 2025-11-27
 
 ### Changed
