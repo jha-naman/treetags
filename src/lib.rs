@@ -27,6 +27,7 @@ pub mod tag;
 pub mod tag_processor;
 pub mod tag_writer;
 pub mod tags_config;
+pub mod user_grammars;
 
 // Re-export commonly used items
 pub use config::Config;

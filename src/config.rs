@@ -11,6 +11,7 @@ use fields_config::FieldsConfig;
 
 mod extras_config;
 mod fields_config;
+mod user_grammars;
 
 /// Subcommands for the application
 #[derive(Subcommand, Clone, Debug)]
@@ -130,6 +131,13 @@ pub struct Config {
     /// Parsed extras configuration
     #[clap(skip)]
     pub extras_config: ExtrasConfig,
+
+    #[clap(skip)]
+    pub user_grammars: Vec<user_grammars::UserGrammar>,
+
+    /// Path to user languages config file. Overrides default config file paths.
+    #[arg(long)]
+    pub user_languages_config: Option<std::path::PathBuf>,
 }
 
 impl Default for Config {
@@ -196,6 +204,7 @@ impl Config {
 
         config.extras_config = ExtrasConfig::from_string(&config.extras);
         config.fields_config = FieldsConfig::from_string(&config.fields);
+        config.user_grammars = user_grammars::load(config.user_languages_config.as_ref());
 
         config
     }

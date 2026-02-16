@@ -12,6 +12,7 @@ mod tag;
 mod tag_processor;
 mod tag_writer;
 mod tags_config;
+mod user_grammars;
 
 use crate::config::Config;
 use crate::file_finder::FileFinder;
