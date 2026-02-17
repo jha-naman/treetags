@@ -2,6 +2,7 @@
 
 use std::process;
 
+mod built_in_grammars;
 mod config;
 mod file_finder;
 mod parser;

@@ -6,10 +6,9 @@
 //! The `Parser` struct maintains configuration for each supported language and provides
 //! methods to parse files and generate tags from source code.
 
+use crate::built_in_grammars;
 use crate::config::Config;
-use crate::queries;
 use crate::tag;
-use crate::tags_config::get_tags_config;
 use crate::user_grammars;
 use libloading::Library;
 use std::collections::HashMap;
@@ -26,42 +25,14 @@ mod rust;
 /// Parser manages the parsing configurations for all supported languages
 /// and provides methods to generate tags from source files.
 pub struct Parser {
-    /// Configuration for JavaScript language
-    pub js_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
-    /// Configuration for Ruby language
-    pub ruby_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
-    /// Configuration for Python language
-    pub python_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
-    /// Configuration for C language
-    pub c_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
-    /// Configuration for C++ language
-    pub cpp_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
-    /// Configuration for Java language
-    pub java_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
-    /// Configuration for OCaml language
-    pub ocaml_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
-    /// Configuration for PHP language
-    pub php_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
-    /// Configuration for TypeScript language
-    pub typescript_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
-    /// Configuration for Elixir language
-    pub elixir_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
-    /// Configuration for Lua language
-    pub lua_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
-    /// Configuration for C# language
-    pub csharp_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
-    /// Configuration for Bash language,
-    pub bash_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
-    /// Configuration for Scala language
-    pub scala_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
-    /// Configuration for Julia language
-    pub julia_config: Result<TagsConfiguration, tree_sitter_tags::Error>,
+    /// Storage for all grammar configurations (built-in and user-provided)
+    pub grammar_configs: Vec<Result<TagsConfiguration, tree_sitter_tags::Error>>,
 
-    /// Vec containing Configurations for user provided grammars
-    pub user_grammars_config: Vec<Result<TagsConfiguration, tree_sitter_tags::Error>>,
+    /// Map of file extension to index in grammar_configs
+    pub extension_config_map: HashMap<String, usize>,
+
     // Keep the user provided grammars alive
     _user_grammars: Vec<Library>,
-    pub user_grammars_config_map: HashMap<String, usize>,
 
     /// Context for generating tags
     pub tags_context: TagsContext,
@@ -79,100 +50,42 @@ impl Default for Parser {
 impl Parser {
     /// Creates a new Parser instance with configurations for all supported languages
     pub fn new(config: &Config) -> Self {
-        let grammars = user_grammars::load(config);
-        let mut user_grammars_config = Vec::new();
-        let mut user_grammars_config_map = HashMap::new();
+        let mut grammar_configs = Vec::new();
+        let mut extension_config_map = HashMap::new();
 
-        for (extensions, config_result) in grammars.tag_configurations {
-            if config_result.is_ok() {
-                let index = user_grammars_config.len();
+        // Helper to add a config and map extensions to it
+        let mut add_config = |config_res: Result<TagsConfiguration, tree_sitter_tags::Error>,
+                              extensions: &[&str]| {
+            let index = grammar_configs.len();
+            grammar_configs.push(config_res);
+            for ext in extensions {
+                extension_config_map.insert(ext.to_string(), index);
+            }
+        };
+
+        // 1. Load Built-in Grammars
+        for (extensions, config_res) in built_in_grammars::load() {
+            add_config(config_res, &extensions);
+        }
+
+        // 2. Load User Grammars
+        let user_grammars = user_grammars::load(config);
+        for (extensions, config_res) in user_grammars.tag_configurations {
+            let index = grammar_configs.len();
+            grammar_configs.push(config_res);
+
+            // Only map extensions if the config loaded successfully, but push result anyway to keep indices valid
+            if grammar_configs.last().unwrap().is_ok() {
                 for extension in extensions {
-                    user_grammars_config_map.insert(extension, index);
+                    extension_config_map.insert(extension, index);
                 }
             }
-            user_grammars_config.push(config_result);
         }
 
         Self {
-            js_config: get_tags_config(
-                tree_sitter_javascript::LANGUAGE.into(),
-                tree_sitter_javascript::TAGS_QUERY,
-                "javascript",
-            ),
-            ruby_config: get_tags_config(
-                tree_sitter_ruby::LANGUAGE.into(),
-                tree_sitter_ruby::TAGS_QUERY,
-                "ruby",
-            ),
-            python_config: get_tags_config(
-                tree_sitter_python::LANGUAGE.into(),
-                tree_sitter_python::TAGS_QUERY,
-                "python",
-            ),
-            c_config: get_tags_config(
-                tree_sitter_c::LANGUAGE.into(),
-                tree_sitter_c::TAGS_QUERY,
-                "c",
-            ),
-            cpp_config: get_tags_config(
-                tree_sitter_cpp::LANGUAGE.into(),
-                tree_sitter_cpp::TAGS_QUERY,
-                "c++",
-            ),
-            java_config: get_tags_config(
-                tree_sitter_java::LANGUAGE.into(),
-                tree_sitter_java::TAGS_QUERY,
-                "java",
-            ),
-            ocaml_config: get_tags_config(
-                tree_sitter_ocaml::LANGUAGE_OCAML.into(),
-                tree_sitter_ocaml::TAGS_QUERY,
-                "ocaml",
-            ),
-            php_config: get_tags_config(
-                tree_sitter_php::LANGUAGE_PHP.into(),
-                tree_sitter_php::TAGS_QUERY,
-                "php",
-            ),
-            typescript_config: get_tags_config(
-                tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
-                tree_sitter_typescript::TAGS_QUERY,
-                "typescript",
-            ),
-            elixir_config: get_tags_config(
-                tree_sitter_elixir::LANGUAGE.into(),
-                tree_sitter_elixir::TAGS_QUERY,
-                "elixir",
-            ),
-            lua_config: get_tags_config(
-                tree_sitter_lua::LANGUAGE.into(),
-                tree_sitter_lua::TAGS_QUERY,
-                "lua",
-            ),
-            csharp_config: get_tags_config(
-                tree_sitter_c_sharp::LANGUAGE.into(),
-                queries::C_SHARP_TAGS_QUERY,
-                "c#",
-            ),
-            bash_config: get_tags_config(
-                tree_sitter_bash::LANGUAGE.into(),
-                queries::BASH_TAGS_QUERY,
-                "bash",
-            ),
-            scala_config: get_tags_config(
-                tree_sitter_scala::LANGUAGE.into(),
-                queries::SCALA_TAGS_QUERY,
-                "scala",
-            ),
-            julia_config: get_tags_config(
-                tree_sitter_julia::LANGUAGE.into(),
-                queries::JULIA_TAGS_QUERY,
-                "julia",
-            ),
-
-            user_grammars_config,
-            _user_grammars: grammars._grammars,
-            user_grammars_config_map,
+            grammar_configs,
+            extension_config_map,
+            _user_grammars: user_grammars._grammars,
 
             tags_context: TagsContext::new(),
             ts_parser: TSParser::new(),
@@ -351,33 +264,11 @@ impl Parser {
         file_path_relative_to_tag_file: &str,
         extension: &str,
     ) -> Vec<tag::Tag> {
-        let config = self
-            .user_grammars_config_map
-            .get(extension)
-            .and_then(|&i| {
-                self.user_grammars_config
-                    .get(i)
-                    .and_then(|result| result.as_ref().ok())
-            })
-            .or_else(|| match extension {
-                "js" | "jsx" => self.js_config.as_ref().ok(),
-                "rb" => self.ruby_config.as_ref().ok(),
-                "py" | "pyw" => self.python_config.as_ref().ok(),
-                "c" | "h" | "i" => self.c_config.as_ref().ok(),
-                "cc" | "cpp" | "CPP" | "cxx" | "c++" | "cp" | "C" | "cppm" | "ixx" | "ii" | "H"
-                | "hh" | "hpp" | "HPP" | "hxx" | "h++" | "tcc" => self.cpp_config.as_ref().ok(),
-                "java" => self.java_config.as_ref().ok(),
-                "ml" => self.ocaml_config.as_ref().ok(),
-                "php" => self.php_config.as_ref().ok(),
-                "ts" | "tsx" => self.typescript_config.as_ref().ok(),
-                "ex" => self.elixir_config.as_ref().ok(),
-                "lua" => self.lua_config.as_ref().ok(),
-                "cs" => self.csharp_config.as_ref().ok(),
-                "sh" | "bash" => self.bash_config.as_ref().ok(),
-                "scala" => self.scala_config.as_ref().ok(),
-                "jl" => self.julia_config.as_ref().ok(),
-                _ => None,
-            });
+        let config = self.extension_config_map.get(extension).and_then(|&i| {
+            self.grammar_configs
+                .get(i)
+                .and_then(|result| result.as_ref().ok())
+        });
 
         let mut tags: Vec<tag::Tag> = Vec::new();
 

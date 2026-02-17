@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 pub struct UserGrammar {
     pub language_name: String,
     pub grammar_lib_path: PathBuf,
-    pub extensions: Vec<String>,
+    pub extensions: Option<Vec<String>>,
     pub query_file_path: Option<PathBuf>,
 }
 

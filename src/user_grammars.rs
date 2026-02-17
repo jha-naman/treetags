@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::queries;
 use crate::tags_config::get_tags_config;
 use libloading::{Library, Symbol};
 use std::fs;
@@ -11,6 +12,21 @@ pub struct UserGrammars {
         Result<TagsConfiguration, tree_sitter_tags::Error>,
     )>,
     pub _grammars: Vec<Library>,
+}
+
+struct LanguageDefaults {
+    query: &'static str,
+    extensions: &'static [&'static str],
+}
+
+fn get_language_defaults(lang_name: &str) -> Option<LanguageDefaults> {
+    match lang_name {
+        "kotlin" => Some(LanguageDefaults {
+            query: queries::KOTLIN_TAGS_QUERY,
+            extensions: &["kt", "kts"],
+        }),
+        _ => None,
+    }
 }
 
 pub fn load(config: &Config) -> UserGrammars {
@@ -63,24 +79,42 @@ pub fn load(config: &Config) -> UserGrammars {
                 }
             };
 
-            let tags_query = if let Some(query_path) = &user_grammar.query_file_path {
+            let user_query = if let Some(query_path) = &user_grammar.query_file_path {
                 match fs::read_to_string(query_path) {
-                    Ok(query) => query,
+                    Ok(query) => Some(query),
                     Err(e) => {
                         eprintln!(
                             "Warning: Failed to read query file {}: {}",
                             query_path.display(),
                             e
                         );
-                        "".to_string()
+                        None
                     }
                 }
+            } else {
+                None
+            };
+
+            let defaults = get_language_defaults(&user_grammar.language_name);
+
+            let tags_query = if let Some(query) = user_query {
+                query
+            } else if let Some(defaults) = &defaults {
+                defaults.query.to_string()
             } else {
                 "".to_string()
             };
 
+            let extensions = if let Some(exts) = &user_grammar.extensions {
+                exts.clone()
+            } else if let Some(defaults) = &defaults {
+                defaults.extensions.iter().map(|s| s.to_string()).collect()
+            } else {
+                vec![]
+            };
+
             let tags_config = get_tags_config(language, &tags_query, &user_grammar.language_name);
-            tag_configurations.push((user_grammar.extensions.clone(), tags_config));
+            tag_configurations.push((extensions, tags_config));
             grammars.push(lib);
         }
     }

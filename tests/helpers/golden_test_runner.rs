@@ -15,7 +15,7 @@ use super::{
 #[derive(Deserialize)]
 struct UserGrammarConfig {
     language_name: String,
-    extensions: Vec<String>,
+    extensions: Option<Vec<String>>,
 }
 
 /// Execute the test case and validate results
@@ -52,17 +52,23 @@ pub fn run_test_case(test_case: &TestCase) -> Result<(), String> {
             queries_config = format!("query_file_path = {:?}\n", dest_path);
         }
 
+        let extensions_config = if let Some(exts) = grammar_config.extensions {
+            format!("extensions = {:?}\n", exts)
+        } else {
+            String::new()
+        };
+
         let toml_content_out = format!(
             r#"
 [[user_grammars]]
 language_name = "{}"
 grammar_lib_path = "{}"
-extensions = {:?}
+{}
 {}
 "#,
             grammar_config.language_name,
             lib_path.display(),
-            grammar_config.extensions,
+            extensions_config,
             queries_config
         );
 
