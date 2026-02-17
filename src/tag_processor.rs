@@ -131,7 +131,7 @@ impl TagProcessor {
         tag_file_path: String,
         config: Config,
     ) {
-        let mut parser = Parser::new();
+        let mut parser = Parser::new(&config);
         let tag_file_dir = if tag_file_path == "-" {
             // If writing to stdout, use current directory as the base
             std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf())

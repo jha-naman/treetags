@@ -15,6 +15,8 @@ fn main() {
     // Create the generated tests directory
     fs::create_dir_all(&generated_tests_dir).unwrap();
 
+    compile_test_grammars(Path::new(&out_dir));
+
     let test_cases = discover_test_cases();
 
     // Generate individual test files
@@ -133,4 +135,72 @@ fn sanitize_test_name(name: &str) -> String {
         .collect::<String>()
         .trim_matches('_')
         .to_string()
+}
+
+fn compile_test_grammars(out_dir: &Path) {
+    let grammars_dir = Path::new("tests/grammars");
+    if !grammars_dir.exists() {
+        return;
+    }
+
+    for entry in fs::read_dir(grammars_dir).unwrap().filter_map(Result::ok) {
+        let grammar_path = entry.path();
+        if !grammar_path.is_dir() {
+            continue;
+        }
+
+        let grammar_name = grammar_path.file_name().unwrap().to_str().unwrap();
+        let lang_name = if let Some(name) = grammar_name.strip_prefix("tree-sitter-") {
+            name
+        } else {
+            continue;
+        };
+
+        let parser_path = grammar_path.join("parser.c");
+        if !parser_path.exists() {
+            continue;
+        }
+
+        let mut paths_to_compile = vec![parser_path];
+        if grammar_path.join("scanner.c").exists() {
+            paths_to_compile.push(grammar_path.join("scanner.c"));
+        }
+
+        let mut build = cc::Build::new();
+        build.include(&grammar_path).warnings(false);
+
+        let compiler = build.get_compiler();
+        let mut command = compiler.to_command();
+
+        command.arg("-shared").arg("-fPIC");
+
+        let (lib_prefix, lib_suffix) = if cfg!(target_os = "macos") {
+            ("lib", ".dylib")
+        } else {
+            ("lib", ".so")
+        };
+
+        let out_file_name = format!("{}tree_sitter_{}{}", lib_prefix, lang_name, lib_suffix);
+        let out_path = out_dir.join(&out_file_name);
+
+        command.arg("-o").arg(&out_path);
+
+        for path in &paths_to_compile {
+            command.arg(path);
+        }
+
+        let status = command
+            .status()
+            .unwrap_or_else(|e| panic!("Failed to execute compiler: {}", e));
+
+        if !status.success() {
+            panic!(
+                "Failed to compile grammar for {}. Exit code: {:?}",
+                lang_name,
+                status.code()
+            );
+        }
+
+        println!("cargo:rerun-if-changed={}", grammar_path.display());
+    }
 }
