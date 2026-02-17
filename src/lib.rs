@@ -17,6 +17,7 @@ let tags = parser.parse_file(&file_path_relative_to_tag_file, &file_path, extens
 ```
  */
 
+pub mod built_in_grammars;
 pub mod config;
 pub mod file_finder;
 pub mod parser;

@@ -47,7 +47,7 @@ with tags generated from the list of files passed via command line.
 - [x] Scala
 
 ### User provided grammars and queries
-Users need to  provide below things for treetags to be able to generate tags for
+Users need to provide below things for treetags to be able to generate tags for
 languages that do not have a builtin grammar supplied.
 
  - Precompiled tree-sitter grammar for the language.
@@ -66,6 +66,13 @@ grammar_lib_path = "/home/naman/.local/share/nvim/lazy/nvim-treesitter/parser/ko
 query_file_path = "/home/naman/.config/treetags/queries/kotlin.scm"
 extensions = ["kt", "kts"]
  ```
+
+#### Languages with built-in fallback tags query and extensions
+Some languages have tags query and extensions built-in into treetags. Users only
+need to provide the tree-sitter grammar in that case for treetags to be able to
+generate tags for that language.
+
+ - [x] Kotlin
 
 ## Installation
 Install Rust and C developmet toolchains to build `treetags`
