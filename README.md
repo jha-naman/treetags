@@ -3,6 +3,7 @@
 Generate vi compatible tags for multiple languages.
 
 Uses the tags queries defined in the various official language parsers to detect tags.
+It can also make use of tree-sitter grammars and queries installed by the user on their system.
 
 The goal is to have code navigation available in vim/nvim for multiple languages
 with minimum effort and have reasonable performance.
@@ -44,6 +45,27 @@ with tags generated from the list of files passed via command line.
 - [x] Python
 - [x] Ruby
 - [x] Scala
+
+### User provided grammars and queries
+Users need to  provide below things for treetags to be able to generate tags for
+languages that do not have a builtin grammar supplied.
+
+ - Precompiled tree-sitter grammar for the language.
+   [tree-sitter-langs](https://github.com/emacs-tree-sitter/tree-sitter-langs/releases) project is one source with many pre-compiled grammars
+ - [Tags query](https://tree-sitter.github.io/tree-sitter/4-code-navigation.html) file for the language
+ - List of file extensions for which the grammar/tag combo is to be used
+ - Add an entry to the `[[user_grammars]]` toml array of the treetags config file
+
+ An example config for Kotlin language located at the defualt location of `~/.config/treetags/config.toml`
+ is shown below:
+
+ ```toml
+[[user_grammars]]
+language_name = "kotlin"
+grammar_lib_path = "/home/naman/.local/share/nvim/lazy/nvim-treesitter/parser/kotlin.so"
+query_file_path = "/home/naman/.config/treetags/queries/kotlin.scm"
+extensions = ["kt", "kts"]
+ ```
 
 ## Installation
 Install Rust and C developmet toolchains to build `treetags`
