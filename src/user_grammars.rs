@@ -25,6 +25,10 @@ fn get_language_defaults(lang_name: &str) -> Option<LanguageDefaults> {
             query: queries::KOTLIN_TAGS_QUERY,
             extensions: &["kt", "kts"],
         }),
+        "gleam" => Some(LanguageDefaults {
+            query: queries::GLEAM_TAGS_QUERY,
+            extensions: &["gleam"],
+        }),
         _ => None,
     }
 }
@@ -54,14 +58,14 @@ pub fn load(config: &Config) -> UserGrammars {
             let language = match language_symbol {
                 Ok(lang_fn) => {
                     let language_fn = lang_fn();
-                    let lang_version = language_fn.version();
+                    let lang_version = language_fn.abi_version();
                     if lang_version > LANGUAGE_VERSION
                         || lang_version < MIN_COMPATIBLE_LANGUAGE_VERSION
                     {
                         eprintln!(
                             "Warning: Grammar '{}' has incompatible version {} (expected {})",
                             user_grammar.language_name,
-                            language_fn.version(),
+                            language_fn.abi_version(),
                             tree_sitter::LANGUAGE_VERSION
                         );
                         continue;

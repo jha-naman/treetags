@@ -73,6 +73,7 @@ need to provide the tree-sitter grammar in that case for treetags to be able to
 generate tags for that language.
 
  - [x] Kotlin
+ - [x] Gleam
 
 ## Installation
 Install Rust and C developmet toolchains to build `treetags`

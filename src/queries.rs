@@ -7,3 +7,5 @@ pub const SCALA_TAGS_QUERY: &str = include_str!("../queries/scala.scm");
 pub const JULIA_TAGS_QUERY: &str = include_str!("../queries/julia.scm");
 
 pub const KOTLIN_TAGS_QUERY: &str = include_str!("../queries/kotlin.scm");
+
+pub const GLEAM_TAGS_QUERY: &str = include_str!("../queries/gleam.scm");
