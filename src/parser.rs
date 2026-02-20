@@ -20,6 +20,7 @@ mod common;
 mod cpp;
 mod go;
 mod helper;
+mod js;
 mod rust;
 
 /// Parser manages the parsing configurations for all supported languages
@@ -115,6 +116,9 @@ impl Parser {
             "cc" | "cpp" | "CPP" | "cxx" | "c++" | "cp" | "C" | "cppm" | "ixx" | "ii" | "H"
             | "hh" | "hpp" | "HPP" | "hxx" | "h++" | "tcc" => self
                 .generate_cpp_tags_with_user_config(code, file_path_relative_to_tag_file, config),
+            "js" | "jsx" | "mjs" | "cjs" => {
+                self.generate_js_tags_with_user_config(code, file_path_relative_to_tag_file, config)
+            }
             _ => None,
         }
     }
@@ -194,6 +198,25 @@ impl Parser {
 
         // Call the new method that accepts user config
         self.generate_go_tags_with_full_config(
+            code,
+            file_path_relative_to_tag_file,
+            &tag_config,
+            config,
+        )
+    }
+
+    /// Generates JavaScript tags with user configuration
+    pub fn generate_js_tags_with_user_config(
+        &mut self,
+        code: &[u8],
+        file_path_relative_to_tag_file: &str,
+        config: &crate::config::Config,
+    ) -> Option<Vec<tag::Tag>> {
+        // Default to all kinds enabled for JS as specific config method isn't in scope of this task
+        // In a real scenario we'd add `get_js_kinds()` to config
+        let tag_config = helper::TagKindConfig::new_js();
+
+        self.generate_js_tags_with_full_config(
             code,
             file_path_relative_to_tag_file,
             &tag_config,

@@ -30,6 +30,7 @@ with tags generated from the list of files passed via command line.
 - [x] Rust
 - [x] C
 - [x] C++
+- [x] JavaScript
 
 ### Basic navigation support without extension fields
 - [x] Bash/Sh
@@ -37,7 +38,6 @@ with tags generated from the list of files passed via command line.
 - [x] Elixir
 - [x] ~Haskell~
 - [x] Java
-- [x] JavaScript
 - [x] Julia
 - [x] Lua
 - [x] Ocaml

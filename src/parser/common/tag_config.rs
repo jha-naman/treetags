@@ -230,6 +230,24 @@ impl TagKindConfig {
         Self { enabled_kinds }
     }
 
+    /// Create a new configuration with all kinds enabled by default for JavaScript
+    pub fn new_js() -> Self {
+        let mut enabled_kinds = HashSet::new();
+        // Add all possible JavaScript tag kinds
+        enabled_kinds.insert("f".to_string()); // functions
+        enabled_kinds.insert("c".to_string()); // classes
+        enabled_kinds.insert("m".to_string()); // methods
+        enabled_kinds.insert("p".to_string()); // properties
+        enabled_kinds.insert("C".to_string()); // constants
+        enabled_kinds.insert("v".to_string()); // global variables
+        enabled_kinds.insert("g".to_string()); // generators
+        enabled_kinds.insert("G".to_string()); // getters
+        enabled_kinds.insert("S".to_string()); // setters
+        enabled_kinds.insert("M".to_string()); // fields
+
+        Self { enabled_kinds }
+    }
+
     /// Create a configuration from a kinds string with support for default kinds and +/- modifiers
     ///
     /// # Arguments

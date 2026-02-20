@@ -8,14 +8,6 @@ pub fn load() -> Vec<(
 )> {
     vec![
         (
-            vec!["js", "jsx"],
-            get_tags_config(
-                tree_sitter_javascript::LANGUAGE.into(),
-                tree_sitter_javascript::TAGS_QUERY,
-                "javascript",
-            ),
-        ),
-        (
             vec!["rb"],
             get_tags_config(
                 tree_sitter_ruby::LANGUAGE.into(),
