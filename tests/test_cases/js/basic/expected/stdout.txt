@@ -1,8 +1,25 @@
 !_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
-Rectangle	source.js	/^class Rectangle {$/;"	
-area	source.js	/^  area() {$/;"	
-fn	source.js	/^const fn = (foo, bar) => {};$/;"	
-fn	source.js	/^String.prototype.fn = function() {};$/;"	
-fn	source.js	/^	fn: () => {},$/;"	
-func	source.js	/^var func = function() {};$/;"	
-inner	source.js	/^	function inner() {};$/;"	
+Fields	source.js	/^class Fields {field1$/;"	c
+PROP	source.js	/^Math.PROP = {$/;"	p
+Rectangle	source.js	/^class Rectangle {$/;"	c
+anonymousFunctionf610258101	source.js	/^function() {$/;"	f
+area	source.js	/^  area() {$/;"	m	class:Rectangle
+bar	source.js	/^const bar = 'baz';$/;"	C
+constructor	source.js	/^  constructor(height, width) {$/;"	m	class:Rectangle
+field1	source.js	/^class Fields {field1$/;"	M	class:Fields
+field2	source.js	/^  field2 = []$/;"	M	class:Fields
+field3	source.js	/^  field3;$/;"	M	class:Fields
+field4	source.js	/^  field4 = function(x, y) {$/;"	M	class:Fields
+fn	source.js	/^const fn = (foo, bar) => {};$/;"	f
+fn	source.js	/^String.prototype.fn = function() {};$/;"	m	class:String
+fn	source.js	/^  fn: () => {},$/;"	m	property:Math.PROP
+foo	source.js	/^let foo = 'bar';$/;"	v
+func	source.js	/^var func = function() {};$/;"	f
+height	source.js	/^	this.height = height;$/;"	p	class:Rectangle	function:constructor
+height	source.js	/^  set height(x) {$/;"	S	class:Rectangle
+height	source.js	/^    this.height = x;$/;"	p	class:Rectangle	function:height
+height	source.js	/^  get height() {$/;"	G	class:Rectangle
+inner	source.js	/^	function inner() {};$/;"	f	function:anonymousFunctionf610258101
+method	source.js	/^  method() {$/;"	m	class:Fields
+property	source.js	/^  property: 1,$/;"	p	property:Math.PROP
+width	source.js	/^	this.width = width;$/;"	p	class:Rectangle	function:constructor
