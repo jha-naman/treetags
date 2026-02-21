@@ -212,9 +212,11 @@ impl Parser {
         file_path_relative_to_tag_file: &str,
         config: &crate::config::Config,
     ) -> Option<Vec<tag::Tag>> {
-        // Default to all kinds enabled for JS as specific config method isn't in scope of this task
-        // In a real scenario we'd add `get_js_kinds()` to config
-        let tag_config = helper::TagKindConfig::new_js();
+        let tag_config = if config.kinds_javascript.is_empty() {
+            helper::TagKindConfig::new_js()
+        } else {
+            helper::TagKindConfig::from_javascript_kinds_string(&config.kinds_javascript)
+        };
 
         self.generate_js_tags_with_full_config(
             code,
