@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0]
+
+### Added
+ - Add support for generating tags using tree-sitter grammars and tag queries installed by the user independently of treetags
+ - Add default tags query file for Gleam language.
+   Users only need to install the gleam tree-sitter grammar to generate tags using treetags.
+ - Add extension fields support for JavaScript.
+
 ## [0.5.2]
 
 ### Fixed
