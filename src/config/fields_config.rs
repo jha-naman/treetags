@@ -101,6 +101,9 @@ impl FieldsConfig {
                     "t" | "typeref" => {
                         config.enabled_fields.insert("typeref".to_string());
                     }
+                    "r" | "roles" => {
+                        config.enabled_fields.insert("roles".to_string());
+                    }
                     _ => eprintln!("Warning: Unknown field: {}", field),
                 }
             } else if let Some(prefix) = part.strip_prefix('-') {
@@ -130,6 +133,9 @@ impl FieldsConfig {
                     "t" | "typeref" => {
                         config.enabled_fields.remove("typeref");
                     }
+                    "r" | "roles" => {
+                        config.enabled_fields.insert("roles".to_string());
+                    }
                     _ => eprintln!("Warning: Unknown field: {}", field),
                 }
             } else {
@@ -158,6 +164,9 @@ impl FieldsConfig {
                     }
                     "t" | "typeref" => {
                         config.enabled_fields.insert("typeref".to_string());
+                    }
+                    "r" | "roles" => {
+                        config.enabled_fields.insert("roles".to_string());
                     }
                     // Add other field mappings as needed
                     _ => eprintln!("Warning: Unknown field: {}", part),

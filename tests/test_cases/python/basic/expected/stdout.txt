@@ -1,6 +1,17 @@
 !_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
-Foo	source.py	/^class Foo:$/;"	
-__init__	source.py	/^	def __init__(self, bar):$/;"	
-bar	source.py	/^	def bar(self):$/;"	
-func	source.py	/^def func(x, y):$/;"	
-variable	source.py	/^variable = [1, 2]$/;"	
+Dee	source.py	/^from . import Blah as Dee$/;"	Y	access:public	roles:def	nameref:unknown:Blah
+Foo	source.py	/^class Foo:$/;"	c	access:public	roles:def
+__Foo1	source.py	/^class __Foo1(Bar, Baz):$/;"	c	access:protected	roles:def
+__Foo1	source.py	/^class __Foo1(Bar, Baz):$/;"	c	access:protected	roles:def	class:__Foo1
+__init__	source.py	/^	def __init__(self, bar):$/;"	m	access:public	roles:def	signature:(self, bar)	class:Foo
+_bar	source.py	/^    def _bar(self,$/;"	m	access:protected	roles:def	signature:(self,
+            baz=None)	class:__Foo1
+bar	source.py	/^	def bar(self):$/;"	m	access:public	roles:def	signature:(self)	class:Foo
+concurrent	source.py	/^concurrent, Foo.assignment = 1, 2$/;"	v	access:public	roles:def
+decorated_func	source.py	/^def decorated_func():$/;"	f	access:public	roles:def	signature:()
+decorated_func	source.py	/^def decorated_func():$/;"	f	access:public	roles:def	signature:()	function:decorated_func
+func	source.py	/^def func(x: int, y: float) -> float:$/;"	f	access:public	roles:def	signature:(x: int, y: float)	typeref:typename:float
+func	source.py	/^async def func(): pass$/;"	f	access:public	roles:def	signature:()
+nested_func	source.py	/^        nested_func = lambda x:x$/;"	m	access:public	roles:def	signature:(x)	class:Foo
+sum	source.py	/^	sum = x + y$/;"	l	access:private	roles:def	function:func
+variable	source.py	/^variable: List[int] = [1, 2]$/;"	v	access:public	roles:def	typeref:typename:List[int]

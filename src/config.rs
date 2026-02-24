@@ -124,9 +124,13 @@ pub struct Config {
     #[arg(long = "kinds-c", default_value = "")]
     pub c_kinds: String,
 
-    /// JavaScritp language specific kinds to generate tags for
+    /// JavaScript language specific kinds to generate tags for
     #[arg(long = "kinds-JavaScript", default_value = "")]
     pub kinds_javascript: String,
+
+    /// Python language specific kinds to generate tags for
+    #[arg(long = "kinds-python", default_value = "")]
+    pub kinds_python: String,
 
     /// Parsed fields configuration  
     #[clap(skip)]

@@ -1,2 +1,2 @@
---sort yes -f '-'
+--sort yes -f '-' --fields=Sar --kinds-python=+l
 source.py
