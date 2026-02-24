@@ -21,6 +21,7 @@ mod cpp;
 mod go;
 mod helper;
 mod js;
+mod python;
 mod rust;
 
 /// Parser manages the parsing configurations for all supported languages
@@ -119,6 +120,11 @@ impl Parser {
             "js" | "jsx" | "mjs" | "cjs" => {
                 self.generate_js_tags_with_user_config(code, file_path_relative_to_tag_file, config)
             }
+            "py" | "pyw" | "pyi" => self.generate_python_tags_with_user_config(
+                code,
+                file_path_relative_to_tag_file,
+                config,
+            ),
             _ => None,
         }
     }
@@ -265,6 +271,27 @@ impl Parser {
 
         // Call the new method that accepts user config
         self.generate_cpp_tags_with_full_config(
+            code,
+            file_path_relative_to_tag_file,
+            &tag_config,
+            config,
+        )
+    }
+
+    /// Generates Python tags with user configuration
+    pub fn generate_python_tags_with_user_config(
+        &mut self,
+        code: &[u8],
+        file_path_relative_to_tag_file: &str,
+        config: &crate::config::Config,
+    ) -> Option<Vec<tag::Tag>> {
+        let tag_config = if config.kinds_python.is_empty() {
+            helper::TagKindConfig::new_python()
+        } else {
+            helper::TagKindConfig::from_python_kinds_string(&config.kinds_python)
+        };
+
+        self.generate_python_tags_with_full_config(
             code,
             file_path_relative_to_tag_file,
             &tag_config,

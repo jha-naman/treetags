@@ -591,4 +591,52 @@ impl TagKindConfig {
 
         Self::from_string(kinds_str, JAVASCRIPT_KIND_MAPPING, &default_kinds)
     }
+
+    /// Create a new configuration with default kinds enabled for JavaScript
+    pub fn new_python() -> Self {
+        let mut enabled_kinds = HashSet::new();
+
+        enabled_kinds.insert("c".to_string()); // classes
+        enabled_kinds.insert("f".to_string()); // functions
+        enabled_kinds.insert("m".to_string()); // class members
+        enabled_kinds.insert("v".to_string()); // variables
+        enabled_kinds.insert("I".to_string()); // name referring a module defined in other file
+        enabled_kinds.insert("i".to_string()); // modules
+        enabled_kinds.insert("Y".to_string()); // name referring a class/variable/function/module defined in other module
+
+        Self { enabled_kinds }
+    }
+
+    /// Create a configuration from a kinds string for JavaScript
+    pub fn from_python_kinds_string(kinds_str: &str) -> Self {
+        const JAVASCRIPT_KIND_MAPPING: &[(&[&str], &str)] = &[
+            (&["c", "classes"], "c"),
+            (&["f", "function"], "f"),
+            (&["m", "class members"], "m"),
+            (&["v", "variables"], "v"),
+            (&["I", "name referring a module defined in other file"], "I"),
+            (&["i", "module"], "i"),
+            (
+                &[
+                    "Y",
+                    "name referring to a class/variable/function/module defined in other module",
+                ],
+                "Y",
+            ),
+            (&["z", "function parameters"], "z"),
+            (&["l", "local variables"], "l"),
+        ];
+
+        // Default enabled kinds for JavaScript
+        let mut default_kinds = HashSet::new();
+        default_kinds.insert("c".to_string()); // classes
+        default_kinds.insert("f".to_string()); // functions
+        default_kinds.insert("m".to_string()); // class members
+        default_kinds.insert("v".to_string()); // variables
+        default_kinds.insert("I".to_string()); // name referring a module defined in other file
+        default_kinds.insert("i".to_string()); // modules
+        default_kinds.insert("Y".to_string()); // name referring a class/variable/function/module defined in other module
+
+        Self::from_string(kinds_str, JAVASCRIPT_KIND_MAPPING, &default_kinds)
+    }
 }
