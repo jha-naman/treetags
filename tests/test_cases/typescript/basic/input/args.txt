@@ -1,0 +1,2 @@
+-f '-' --sort yes --kinds-typescript=fcigemnzpvlCGa
+source.ts

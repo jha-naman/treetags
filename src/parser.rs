@@ -23,6 +23,7 @@ mod helper;
 mod js;
 mod python;
 mod rust;
+mod typescript;
 
 /// Parser manages the parsing configurations for all supported languages
 /// and provides methods to generate tags from source files.
@@ -121,6 +122,11 @@ impl Parser {
                 self.generate_js_tags_with_user_config(code, file_path_relative_to_tag_file, config)
             }
             "py" | "pyw" | "pyi" => self.generate_python_tags_with_user_config(
+                code,
+                file_path_relative_to_tag_file,
+                config,
+            ),
+            "ts" | "tsx" => self.generate_typescript_tags_with_user_config(
                 code,
                 file_path_relative_to_tag_file,
                 config,
@@ -292,6 +298,27 @@ impl Parser {
         };
 
         self.generate_python_tags_with_full_config(
+            code,
+            file_path_relative_to_tag_file,
+            &tag_config,
+            config,
+        )
+    }
+
+    /// Generates TypeScript tags with user configuration
+    pub fn generate_typescript_tags_with_user_config(
+        &mut self,
+        code: &[u8],
+        file_path_relative_to_tag_file: &str,
+        config: &crate::config::Config,
+    ) -> Option<Vec<tag::Tag>> {
+        let tag_config = if config.kinds_typescript.is_empty() {
+            helper::TagKindConfig::new_typescript()
+        } else {
+            helper::TagKindConfig::from_typescript_kinds_string(&config.kinds_typescript)
+        };
+
+        self.generate_typescript_tags_with_full_config(
             code,
             file_path_relative_to_tag_file,
             &tag_config,

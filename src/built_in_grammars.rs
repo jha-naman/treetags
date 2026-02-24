@@ -67,14 +67,6 @@ pub fn load() -> Vec<(
             ),
         ),
         (
-            vec!["ts", "tsx"],
-            get_tags_config(
-                tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
-                tree_sitter_typescript::TAGS_QUERY,
-                "typescript",
-            ),
-        ),
-        (
             vec!["ex"],
             get_tags_config(
                 tree_sitter_elixir::LANGUAGE.into(),
