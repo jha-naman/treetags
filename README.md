@@ -26,11 +26,13 @@ with tags generated from the list of files passed via command line.
 ## Supported Languages
 
 ### Full support with extension fields
-- [x] Go
-- [x] Rust
 - [x] C
 - [x] C++
+- [x] Go
 - [x] JavaScript
+- [x] Python
+- [x] Rust
+- [x] TypeScript
 
 ### Basic navigation support without extension fields
 - [x] Bash/Sh
@@ -42,11 +44,18 @@ with tags generated from the list of files passed via command line.
 - [x] Lua
 - [x] Ocaml
 - [x] PHP
-- [x] Python
 - [x] Ruby
 - [x] Scala
 
-### User provided grammars and queries
+### Languages with built-in fallback tags query and extensions
+Some languages have tags query and extensions built-in into treetags. Users only
+need to provide the tree-sitter grammar in that case for treetags to be able to
+generate tags for that language.
+
+ - [x] Kotlin
+ - [x] Gleam
+
+#### Using externally installed grammars and queries with treetags
 Users need to provide below things for treetags to be able to generate tags for
 languages that do not have a builtin grammar supplied.
 
@@ -67,13 +76,6 @@ query_file_path = "/home/naman/.config/treetags/queries/kotlin.scm"
 extensions = ["kt", "kts"]
  ```
 
-#### Languages with built-in fallback tags query and extensions
-Some languages have tags query and extensions built-in into treetags. Users only
-need to provide the tree-sitter grammar in that case for treetags to be able to
-generate tags for that language.
-
- - [x] Kotlin
- - [x] Gleam
 
 ## Installation
 Install Rust and C developmet toolchains to build `treetags`
