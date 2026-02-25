@@ -609,7 +609,7 @@ impl TagKindConfig {
 
     /// Create a configuration from a kinds string for JavaScript
     pub fn from_python_kinds_string(kinds_str: &str) -> Self {
-        const JAVASCRIPT_KIND_MAPPING: &[(&[&str], &str)] = &[
+        const PYTHON_KIND_MAPPING: &[(&[&str], &str)] = &[
             (&["c", "classes"], "c"),
             (&["f", "function"], "f"),
             (&["m", "class members"], "m"),
@@ -627,7 +627,7 @@ impl TagKindConfig {
             (&["l", "local variables"], "l"),
         ];
 
-        // Default enabled kinds for JavaScript
+        // Default enabled kinds for Python
         let mut default_kinds = HashSet::new();
         default_kinds.insert("c".to_string()); // classes
         default_kinds.insert("f".to_string()); // functions
@@ -637,6 +637,63 @@ impl TagKindConfig {
         default_kinds.insert("i".to_string()); // modules
         default_kinds.insert("Y".to_string()); // name referring a class/variable/function/module defined in other module
 
-        Self::from_string(kinds_str, JAVASCRIPT_KIND_MAPPING, &default_kinds)
+        Self::from_string(kinds_str, PYTHON_KIND_MAPPING, &default_kinds)
+    }
+
+    /// Create a new configuration with all kinds enabled by default for TypeScript
+    pub fn new_typescript() -> Self {
+        let mut enabled_kinds = HashSet::new();
+
+        enabled_kinds.insert("f".to_string()); // functions
+        enabled_kinds.insert("c".to_string()); // classes
+        enabled_kinds.insert("i".to_string()); // interaces
+        enabled_kinds.insert("g".to_string()); // enums
+        enabled_kinds.insert("e".to_string()); // enumerators
+        enabled_kinds.insert("m".to_string()); // methods
+        enabled_kinds.insert("n".to_string()); // namespaces
+        enabled_kinds.insert("p".to_string()); // properties
+        enabled_kinds.insert("v".to_string()); // global variables
+        enabled_kinds.insert("C".to_string()); // constants
+        enabled_kinds.insert("G".to_string()); // generators
+        enabled_kinds.insert("a".to_string()); // aliases
+
+        Self { enabled_kinds }
+    }
+
+    /// Create a configuration from a kinds string for TypeScript
+    pub fn from_typescript_kinds_string(kinds_str: &str) -> Self {
+        const TYPESCRIPT_KIND_MAPPING: &[(&[&str], &str)] = &[
+            (&["f", "function"], "f"),
+            (&["c", "class"], "c"),
+            (&["i", "interface"], "f"),
+            (&["g", "enum"], "g"),
+            (&["e", "enumarator"], "e"),
+            (&["m", "method"], "m"),
+            (&["n", "namespace"], "n"),
+            (&["z", "function parameter"], "z"),
+            (&["p", "property"], "p"),
+            (&["v", "global variables"], "v"),
+            (&["l", "local variable"], "l"),
+            (&["C", "constants"], "p"),
+            (&["G", "generators"], "g"),
+            (&["a", "alias"], "a"),
+        ];
+
+        // Default enabled kinds for TypeScript
+        let mut default_kinds = HashSet::new();
+        default_kinds.insert("f".to_string()); // functions
+        default_kinds.insert("c".to_string()); // classes
+        default_kinds.insert("i".to_string()); // interaces
+        default_kinds.insert("g".to_string()); // enums
+        default_kinds.insert("e".to_string()); // enumerators
+        default_kinds.insert("m".to_string()); // methods
+        default_kinds.insert("n".to_string()); // namespaces
+        default_kinds.insert("p".to_string()); // properties
+        default_kinds.insert("v".to_string()); // global variables
+        default_kinds.insert("C".to_string()); // constants
+        default_kinds.insert("G".to_string()); // generators
+        default_kinds.insert("a".to_string()); // aliases
+
+        Self::from_string(kinds_str, TYPESCRIPT_KIND_MAPPING, &default_kinds)
     }
 }

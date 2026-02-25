@@ -1,0 +1,43 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+APoint	source.ts	/^class APoint implements Point {$/;"	c
+Enum	source.ts	/^enum Enum { Variant1, Variant2 };$/;"	g
+Fields	source.ts	/^class Fields {field1$/;"	c
+Foo	source.ts	/^type Foo = $/;"	a
+Mod	source.ts	/^module Mod {$/;"	n
+ModFoo	source.ts	/^		export class ModFoo<T1, T2> {}$/;"	c	module:Mod
+Rectangle	source.ts	/^class Rectangle {$/;"	c
+TemplateLiteralFoo	source.ts	/^type TemplateLiteralFoo = "foo" | "bar" | "baz";$/;"	a
+Variant1	source.ts	/^enum Enum { Variant1, Variant2 };$/;"	e	enum:Enum
+Variant2	source.ts	/^enum Enum { Variant1, Variant2 };$/;"	e	enum:Enum
+area	source.ts	/^  static area() {$/;"	m	class:Rectangle
+constructor	source.ts	/^  constructor(height, width) {$/;"	m	class:Rectangle
+constructor	source.ts	/^		constructor(x: number, public y: number, public z: number) {$/;"	m	class:APoint
+distance_from_origin	source.ts	/^		distance_from_origin(): number,$/;"	m	interface:Point
+distance_from_origin	source.ts	/^		distance_from_origin(): number {$/;"	m	class:APoint
+field1	source.ts	/^class Fields {field1$/;"	p	class:Fields
+field2	source.ts	/^  field2 = []$/;"	p	class:Fields
+field3	source.ts	/^  field3;$/;"	p	class:Fields
+field4	source.ts	/^  field4 = function(x, y) {$/;"	p	class:Fields
+fn	source.ts	/^const fn = (foo, bar) => {};$/;"	f
+foo	source.ts	/^let foo = 'bar';$/;"	v
+fun	source.ts	/^let fun = (i: string | number): string => { return `\${i}`; };$/;"	f
+func	source.ts	/^var func = function() {};$/;"	f
+height	source.ts	/^  set height(x) {$/;"	m	class:Rectangle
+height	source.ts	/^  get height() {$/;"	m	class:Rectangle
+inner	source.ts	/^	function inner() {};$/;"	f
+main	source.ts	/^function main(): void { console.log("we is main"); };$/;"	f
+method	source.ts	/^  method() {$/;"	m	class:Fields
+modFoo	source.ts	/^let modFoo = new Mod.Foo();$/;"	v
+numbers	source.ts	/^let numbers: Array<number> = [1];$/;"	v
+p1	source.ts	/^var p1: Point = {x: 1, y: 2, z: 3 };$/;"	v
+type	source.ts	/^		| { type: "foo" }$/;"	p
+type	source.ts	/^		| { type: "bar" }$/;"	p
+type	source.ts	/^		| { type: "baz" };$/;"	p
+useless_function	source.ts	/^		useless_function(useless_param: number): void,$/;"	m	interface:Point
+useless_function	source.ts	/^		useless_function(useless_param: number): void {}$/;"	m	class:APoint
+x	source.ts	/^		readonly x: number,$/;"	p	interface:Point
+x	source.ts	/^		x: number,$/;"	p	class:APoint
+y	source.ts	/^		y: number,$/;"	p	interface:Point
+y	source.ts	/^		constructor(x: number, public y: number, public z: number) {$/;"	p	function:constructor
+z	source.ts	/^		z?: number,$/;"	p	interface:Point
+z	source.ts	/^		constructor(x: number, public y: number, public z: number) {$/;"	p	function:constructor

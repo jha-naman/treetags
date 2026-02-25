@@ -131,6 +131,10 @@ pub struct Config {
     /// Python language specific kinds to generate tags for
     #[arg(long = "kinds-python", default_value = "")]
     pub kinds_python: String,
+    ///
+    /// TypeScript language specific kinds to generate tags for
+    #[arg(long = "kinds-typescript", default_value = "")]
+    pub kinds_typescript: String,
 
     /// Parsed fields configuration  
     #[clap(skip)]
