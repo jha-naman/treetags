@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CHANGED
+ - Refactor code for handling `--kinds-[language]` CLI arguments to simplify
+   code and remove duplicate code
+
 ## [0.7.0]
 
 ### Added

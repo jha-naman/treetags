@@ -10,25 +10,22 @@ pub struct TagKindConfig {
 mod tests {
     use super::*;
 
-    const TEST_KIND_MAPPING: &[(&[&str], &str)] = &[
+    const TEST_DEFAULT_KINDS_MAPPING: &[(&[&str], &str)] = &[
         (&["f", "function"], "f"),
         (&["s", "struct"], "s"),
         (&["c", "class"], "c"),
-        (&["m", "member"], "m"),
-        (&["v", "variable"], "v"),
     ];
 
-    fn test_default_kinds() -> HashSet<String> {
-        let mut defaults = HashSet::new();
-        defaults.insert("f".to_string());
-        defaults.insert("s".to_string());
-        defaults.insert("c".to_string());
-        defaults
-    }
+    const TEST_OPTIONAL_KINDS_MAPPING: &[(&[&str], &str)] =
+        &[(&["m", "member"], "m"), (&["v", "variable"], "v")];
 
     #[test]
     fn test_from_string_override_mode_concatenated() {
-        let config = TagKindConfig::from_string("fsm", TEST_KIND_MAPPING, &test_default_kinds());
+        let config = TagKindConfig::from_string(
+            "fsm",
+            TEST_DEFAULT_KINDS_MAPPING,
+            &TEST_OPTIONAL_KINDS_MAPPING,
+        );
 
         assert!(config.is_kind_enabled("f"));
         assert!(config.is_kind_enabled("s"));
@@ -39,8 +36,11 @@ mod tests {
 
     #[test]
     fn test_from_string_override_mode_comma_separated() {
-        let config =
-            TagKindConfig::from_string("f,struct,m", TEST_KIND_MAPPING, &test_default_kinds());
+        let config = TagKindConfig::from_string(
+            "f,struct,m",
+            TEST_DEFAULT_KINDS_MAPPING,
+            &TEST_OPTIONAL_KINDS_MAPPING,
+        );
 
         assert!(config.is_kind_enabled("f"));
         assert!(config.is_kind_enabled("s")); // "struct" maps to "s"
@@ -51,7 +51,11 @@ mod tests {
 
     #[test]
     fn test_from_string_modifier_mode_concatenated() {
-        let config = TagKindConfig::from_string("+m-c", TEST_KIND_MAPPING, &test_default_kinds());
+        let config = TagKindConfig::from_string(
+            "+m-c",
+            TEST_DEFAULT_KINDS_MAPPING,
+            &TEST_OPTIONAL_KINDS_MAPPING,
+        );
 
         assert!(config.is_kind_enabled("f")); // From defaults
         assert!(config.is_kind_enabled("s")); // From defaults
@@ -64,8 +68,8 @@ mod tests {
     fn test_from_string_modifier_mode_comma_separated() {
         let config = TagKindConfig::from_string(
             "+member, -class, +variable",
-            TEST_KIND_MAPPING,
-            &test_default_kinds(),
+            TEST_DEFAULT_KINDS_MAPPING,
+            &TEST_OPTIONAL_KINDS_MAPPING,
         );
 
         assert!(config.is_kind_enabled("f")); // From defaults
@@ -77,7 +81,11 @@ mod tests {
 
     #[test]
     fn test_from_string_modifier_mode_mixed() {
-        let config = TagKindConfig::from_string("+m-s+v", TEST_KIND_MAPPING, &test_default_kinds());
+        let config = TagKindConfig::from_string(
+            "+m-s+v",
+            TEST_DEFAULT_KINDS_MAPPING,
+            &TEST_OPTIONAL_KINDS_MAPPING,
+        );
 
         assert!(config.is_kind_enabled("f")); // From defaults
         assert!(!config.is_kind_enabled("s")); // Removed by -s
@@ -88,24 +96,28 @@ mod tests {
 
     #[test]
     fn test_from_string_empty_input() {
-        let config = TagKindConfig::from_string("", TEST_KIND_MAPPING, &test_default_kinds());
+        let config = TagKindConfig::from_string(
+            "",
+            TEST_DEFAULT_KINDS_MAPPING,
+            &TEST_OPTIONAL_KINDS_MAPPING,
+        );
 
-        // Empty input in override mode should result in no enabled kinds
-        assert!(!config.is_kind_enabled("f"));
-        assert!(!config.is_kind_enabled("s"));
-        assert!(!config.is_kind_enabled("c"));
-        assert!(!config.is_kind_enabled("m"));
-        assert!(!config.is_kind_enabled("v"));
+        // Empty input should now result in default kinds enabled
+        assert!(config.is_kind_enabled("f"));
+        assert!(config.is_kind_enabled("s"));
+        assert!(config.is_kind_enabled("c"));
+        assert!(!config.is_kind_enabled("m")); // Optional, not enabled by default
+        assert!(!config.is_kind_enabled("v")); // Optional, not enabled by default
     }
 
     #[test]
     fn test_from_cpp_kinds_string_default() {
         let config = TagKindConfig::from_cpp_kinds_string("");
 
-        // Should have no kinds enabled for empty input (override mode)
-        assert!(!config.is_kind_enabled("d"));
-        assert!(!config.is_kind_enabled("e"));
-        assert!(!config.is_kind_enabled("f"));
+        // Should have default kinds enabled for empty input
+        assert!(config.is_kind_enabled("d"));
+        assert!(config.is_kind_enabled("e"));
+        assert!(config.is_kind_enabled("f"));
     }
 
     #[test]
@@ -187,55 +199,59 @@ mod tests {
 }
 
 impl TagKindConfig {
-    /// Create a new configuration with all kinds enabled by default for Rust
-    pub fn new_rust() -> Self {
-        let mut enabled_kinds = HashSet::new();
-        // Add all possible tag kinds
-        enabled_kinds.insert("n".to_string()); // module
-        enabled_kinds.insert("s".to_string()); // struct
-        enabled_kinds.insert("g".to_string()); // enum
-        enabled_kinds.insert("u".to_string()); // union
-        enabled_kinds.insert("i".to_string()); // trait/interface
-        enabled_kinds.insert("c".to_string()); // implementation
-        enabled_kinds.insert("f".to_string()); // function
-        enabled_kinds.insert("P".to_string()); // method/procedure
-        enabled_kinds.insert("m".to_string()); // method signature
-        enabled_kinds.insert("e".to_string()); // enum variant
-        enabled_kinds.insert("T".to_string()); // associated type
-        enabled_kinds.insert("C".to_string()); // constant
-        enabled_kinds.insert("v".to_string()); // variable/static
-        enabled_kinds.insert("t".to_string()); // type alias
-        enabled_kinds.insert("M".to_string()); // macro
-
-        Self { enabled_kinds }
+    fn rust_config_data() -> (
+        &'static [(&'static [&'static str], &'static str)],
+        &'static [(&'static [&'static str], &'static str)],
+    ) {
+        const DEFAULTS: &[(&[&str], &str)] = &[
+            (&["n", "module"], "n"),
+            (&["s", "struct"], "s"),
+            (&["g", "enum"], "g"),
+            (&["u", "union"], "u"),
+            (&["i", "trait", "interface"], "i"),
+            (&["c", "impl", "implementation"], "c"),
+            (&["f", "function"], "f"),
+            (&["P", "method", "procedure"], "P"),
+            (&["m", "field"], "m"),
+            (&["e", "enumerator", "variant"], "e"),
+            (&["T", "typedef", "associated_type"], "T"),
+            (&["C", "constant"], "C"),
+            (&["v", "variable", "static"], "v"),
+            (&["t", "type", "alias"], "t"),
+            (&["M", "macro"], "M"),
+        ];
+        const OPTIONALS: &[(&[&str], &str)] = &[];
+        (DEFAULTS, OPTIONALS)
     }
 
-    /// Create a new configuration with all kinds enabled by default for Go
-    pub fn new_go() -> Self {
-        let mut enabled_kinds = HashSet::new();
-        // Add all possible Go tag kinds
-        enabled_kinds.insert("p".to_string()); // package
-        enabled_kinds.insert("f".to_string()); // function
-        enabled_kinds.insert("c".to_string()); // constant
-        enabled_kinds.insert("t".to_string()); // type
-        enabled_kinds.insert("v".to_string()); // variable
-        enabled_kinds.insert("s".to_string()); // struct
-        enabled_kinds.insert("i".to_string()); // interface
-        enabled_kinds.insert("m".to_string()); // struct member
-        enabled_kinds.insert("M".to_string()); // struct anonymous member
-        enabled_kinds.insert("n".to_string()); // interface method specification
-        enabled_kinds.insert("P".to_string()); // imported package
-        enabled_kinds.insert("a".to_string()); // type alias
-
-        Self { enabled_kinds }
+    fn go_config_data() -> (
+        &'static [(&'static [&'static str], &'static str)],
+        &'static [(&'static [&'static str], &'static str)],
+    ) {
+        const DEFAULTS: &[(&[&str], &str)] = &[
+            (&["p", "package"], "p"),
+            (&["f", "function"], "f"),
+            (&["c", "constant"], "c"),
+            (&["t", "type"], "t"),
+            (&["v", "variable"], "v"),
+            (&["s", "struct"], "s"),
+            (&["i", "interface"], "i"),
+            (&["m", "member"], "m"),
+            (&["M", "anonymous"], "M"),
+            (&["n", "method"], "n"),
+            (&["P", "import"], "P"),
+            (&["a", "alias"], "a"),
+        ];
+        const OPTIONALS: &[(&[&str], &str)] = &[];
+        (DEFAULTS, OPTIONALS)
     }
 
     /// Create a configuration from a kinds string with support for default kinds and +/- modifiers
     ///
     /// # Arguments
     /// * `kinds_str` - The kinds string (e.g., "+f,-m", "fsc", "f,s,c")
-    /// * `kind_mapping` - Mapping from aliases to canonical kind codes
-    /// * `default_kinds` - Set of kinds enabled by default for this language
+    /// * `defaults_mapping` - Mapping for kinds enabled by default
+    /// * `optionals_mapping` - Mapping for kinds disabled by default
     ///
     /// # Behavior
     /// - If no +/- prefixes are used: only explicitly listed kinds are enabled (override mode)
@@ -244,14 +260,21 @@ impl TagKindConfig {
     /// - `-kind`: remove kind from enabled set
     pub fn from_string(
         kinds_str: &str,
-        kind_mapping: &[(&[&str], &str)],
-        default_kinds: &HashSet<String>,
+        defaults_mapping: &[(&[&str], &str)],
+        optionals_mapping: &[(&[&str], &str)],
     ) -> Self {
+        // 1. Build the default_kinds set from defaults_mapping
+        let mut default_kinds = HashSet::new();
+        for &(_, canonical) in defaults_mapping {
+            default_kinds.insert(canonical.to_string());
+        }
+
         let mut enabled_kinds = HashSet::new();
 
         // Build the full mapping from aliases to canonical forms
-        let full_kind_map: std::collections::HashMap<&str, &str> = kind_mapping
+        let full_kind_map: std::collections::HashMap<&str, &str> = defaults_mapping
             .iter()
+            .chain(optionals_mapping.iter())
             .flat_map(|(aliases, canonical)| aliases.iter().map(move |alias| (*alias, *canonical)))
             .collect();
 
@@ -264,7 +287,7 @@ impl TagKindConfig {
 
         if has_modifiers {
             // Modifier mode: start with defaults and apply changes
-            enabled_kinds = default_kinds.clone();
+            enabled_kinds = default_kinds;
 
             let entries: Vec<String> = if kinds_str.contains(',') {
                 kinds_str
@@ -316,7 +339,9 @@ impl TagKindConfig {
             }
         } else {
             // Override mode: only include explicitly listed kinds
-            if kinds_str.contains(',') {
+            if kinds_str.trim().is_empty() {
+                enabled_kinds = default_kinds;
+            } else if kinds_str.contains(',') {
                 for kind in kinds_str
                     .split(',')
                     .map(|s| s.trim())
@@ -343,80 +368,16 @@ impl TagKindConfig {
         Self { enabled_kinds }
     }
 
-    /// Create a configuration from a kinds string (e.g. "f,s,c" or "fsc")
-    pub fn from_string_legacy(kinds_str: &str, kind_mapping: &[(&[&str], &str)]) -> Self {
-        let mut enabled_kinds = HashSet::new();
-
-        let full_kind_map: std::collections::HashMap<&str, &str> = kind_mapping
-            .iter()
-            .flat_map(|(aliases, canonical)| aliases.iter().map(move |alias| (*alias, *canonical)))
-            .collect();
-
-        if kinds_str.contains(',') {
-            for kind in kinds_str
-                .split(',')
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-            {
-                if let Some(canonical) = full_kind_map.get(kind) {
-                    enabled_kinds.insert((*canonical).to_string());
-                } else {
-                    eprintln!("Warning: Unknown tag kind: {}", kind);
-                }
-            }
-        } else {
-            for kind_char in kinds_str.chars().filter(|c| !c.is_whitespace()) {
-                let kind_str = &kind_char.to_string();
-                if let Some(canonical) = full_kind_map.get(kind_str.as_str()) {
-                    enabled_kinds.insert((*canonical).to_string());
-                } else {
-                    eprintln!("Warning: Unknown tag kind: {}", kind_char);
-                }
-            }
-        }
-
-        Self { enabled_kinds }
-    }
-
     /// Create a configuration from a kinds string for Rust (e.g., "nsf" or "n,s,f")
     pub fn from_rust_kinds_string(kinds_str: &str) -> Self {
-        const RUST_KIND_MAPPING: &[(&[&str], &str)] = &[
-            (&["n", "module"], "n"),
-            (&["s", "struct"], "s"),
-            (&["g", "enum"], "g"),
-            (&["u", "union"], "u"),
-            (&["i", "trait", "interface"], "i"),
-            (&["c", "impl", "implementation"], "c"),
-            (&["f", "function"], "f"),
-            (&["P", "method", "procedure"], "P"),
-            (&["m", "field"], "m"),
-            (&["e", "enumerator", "variant"], "e"),
-            (&["T", "typedef", "associated_type"], "T"),
-            (&["C", "constant"], "C"),
-            (&["v", "variable", "static"], "v"),
-            (&["t", "type", "alias"], "t"),
-            (&["M", "macro"], "M"),
-        ];
-        Self::from_string_legacy(kinds_str, RUST_KIND_MAPPING)
+        let (defaults, optionals) = Self::rust_config_data();
+        Self::from_string(kinds_str, defaults, optionals)
     }
 
     /// Create a configuration from a kinds string for Go (e.g., "pfc" or "p,f,c")
     pub fn from_go_kinds_string(kinds_str: &str) -> Self {
-        const GO_KIND_MAPPING: &[(&[&str], &str)] = &[
-            (&["p", "package"], "p"),
-            (&["f", "function"], "f"),
-            (&["c", "constant"], "c"),
-            (&["t", "type"], "t"),
-            (&["v", "variable"], "v"),
-            (&["s", "struct"], "s"),
-            (&["i", "interface"], "i"),
-            (&["m", "member"], "m"),
-            (&["M", "anonymous"], "M"),
-            (&["n", "method"], "n"),
-            (&["P", "import"], "P"),
-            (&["a", "alias"], "a"),
-        ];
-        Self::from_string_legacy(kinds_str, GO_KIND_MAPPING)
+        let (defaults, optionals) = Self::go_config_data();
+        Self::from_string(kinds_str, defaults, optionals)
     }
 
     /// Check if a tag kind is enabled
@@ -424,45 +385,30 @@ impl TagKindConfig {
         self.enabled_kinds.contains(kind)
     }
 
-    /// Create a new configuration with all kinds enabled by default for C++
-    pub fn new_cpp() -> Self {
-        let mut enabled_kinds = HashSet::new();
-
-        enabled_kinds.insert("c".to_string()); // class
-        enabled_kinds.insert("d".to_string()); // macro
-        enabled_kinds.insert("e".to_string()); // enumerator
-        enabled_kinds.insert("f".to_string()); // function
-        enabled_kinds.insert("g".to_string()); // enum
-        enabled_kinds.insert("h".to_string()); // header
-        enabled_kinds.insert("m".to_string()); // member
-        enabled_kinds.insert("s".to_string()); // struct
-        enabled_kinds.insert("t".to_string()); // typedef
-        enabled_kinds.insert("u".to_string()); // union
-        enabled_kinds.insert("v".to_string()); // variable
-
-        Self { enabled_kinds }
-    }
-
-    /// Create a configuration from a kinds string for C++ (e.g., "defg", "+f,-m", or "d,e,f,g")
-    pub fn from_cpp_kinds_string(kinds_str: &str) -> Self {
-        const CPP_KIND_MAPPING: &[(&[&str], &str)] = &[
+    fn cpp_config_data() -> (
+        &'static [(&'static [&'static str], &'static str)],
+        &'static [(&'static [&'static str], &'static str)],
+    ) {
+        const DEFAULTS: &[(&[&str], &str)] = &[
             (&["d", "macro"], "d"),
             (&["e", "enumerator"], "e"),
             (&["f", "function"], "f"),
             (&["g", "enum"], "g"),
             (&["h", "header"], "h"),
-            (&["l", "local"], "l"),
             (&["m", "member"], "m"),
-            (&["p", "prototype"], "p"),
             (&["s", "struct"], "s"),
             (&["t", "typedef"], "t"),
             (&["u", "union"], "u"),
             (&["v", "variable"], "v"),
+            (&["c", "class"], "c"),
+        ];
+        const OPTIONALS: &[(&[&str], &str)] = &[
+            (&["l", "local"], "l"),
+            (&["p", "prototype"], "p"),
             (&["x", "externvar"], "x"),
             (&["z", "parameter"], "z"),
             (&["L", "label"], "L"),
             (&["D", "macroparam"], "D"),
-            (&["c", "class"], "c"),
             (&["n", "namespace"], "n"),
             (&["A", "alias"], "A"),
             (&["N", "name"], "N"),
@@ -470,146 +416,79 @@ impl TagKindConfig {
             (&["Z", "tparam"], "Z"),
             (&["M", "module"], "M"),
         ];
-
-        // Default enabled kinds for C++
-        let mut default_kinds = HashSet::new();
-        default_kinds.insert("c".to_string()); // class
-        default_kinds.insert("d".to_string()); // macro
-        default_kinds.insert("e".to_string()); // enumerator
-        default_kinds.insert("f".to_string()); // function
-        default_kinds.insert("g".to_string()); // enum
-        default_kinds.insert("h".to_string()); // header
-        default_kinds.insert("m".to_string()); // member
-        default_kinds.insert("s".to_string()); // struct
-        default_kinds.insert("t".to_string()); // typedef
-        default_kinds.insert("u".to_string()); // union
-        default_kinds.insert("v".to_string()); // variable
-
-        Self::from_string(kinds_str, CPP_KIND_MAPPING, &default_kinds)
+        (DEFAULTS, OPTIONALS)
     }
 
-    /// Create a new configuration with all kinds enabled by default for C
-    pub fn new_c() -> Self {
-        let mut enabled_kinds = HashSet::new();
-
-        enabled_kinds.insert("d".to_string()); // macro
-        enabled_kinds.insert("e".to_string()); // enumerator
-        enabled_kinds.insert("f".to_string()); // function
-        enabled_kinds.insert("g".to_string()); // enum
-        enabled_kinds.insert("h".to_string()); // header
-        enabled_kinds.insert("m".to_string()); // member
-        enabled_kinds.insert("s".to_string()); // struct
-        enabled_kinds.insert("t".to_string()); // typedef
-        enabled_kinds.insert("u".to_string()); // union
-        enabled_kinds.insert("v".to_string()); // variable
-
-        Self { enabled_kinds }
+    /// Create a configuration from a kinds string for C++ (e.g., "defg", "+f,-m", or "d,e,f,g")
+    pub fn from_cpp_kinds_string(kinds_str: &str) -> Self {
+        let (defaults, optionals) = Self::cpp_config_data();
+        Self::from_string(kinds_str, defaults, optionals)
     }
 
-    /// Create a configuration from a kinds string for C (e.g., "defg", "+f,-m", or "d,e,f,g")
-    pub fn from_c_kinds_string(kinds_str: &str) -> Self {
-        const C_KIND_MAPPING: &[(&[&str], &str)] = &[
+    fn c_config_data() -> (
+        &'static [(&'static [&'static str], &'static str)],
+        &'static [(&'static [&'static str], &'static str)],
+    ) {
+        const DEFAULTS: &[(&[&str], &str)] = &[
             (&["d", "macro"], "d"),
             (&["e", "enumerator"], "e"),
             (&["f", "function"], "f"),
             (&["g", "enum"], "g"),
             (&["h", "header"], "h"),
-            (&["l", "local"], "l"),
             (&["m", "member"], "m"),
-            (&["p", "prototype"], "p"),
             (&["s", "struct"], "s"),
             (&["t", "typedef"], "t"),
             (&["u", "union"], "u"),
             (&["v", "variable"], "v"),
+        ];
+        const OPTIONALS: &[(&[&str], &str)] = &[
+            (&["l", "local"], "l"),
+            (&["p", "prototype"], "p"),
             (&["x", "externvar"], "x"),
             (&["z", "parameter"], "z"),
             (&["L", "label"], "L"),
             (&["D", "macroparam"], "D"),
         ];
-
-        // Default enabled kinds for C
-        let mut default_kinds = HashSet::new();
-        default_kinds.insert("d".to_string()); // macro
-        default_kinds.insert("e".to_string()); // enumerator
-        default_kinds.insert("f".to_string()); // function
-        default_kinds.insert("g".to_string()); // enum
-        default_kinds.insert("h".to_string()); // header
-        default_kinds.insert("m".to_string()); // member
-        default_kinds.insert("s".to_string()); // struct
-        default_kinds.insert("t".to_string()); // typedef
-        default_kinds.insert("u".to_string()); // union
-        default_kinds.insert("v".to_string()); // variable
-
-        Self::from_string(kinds_str, C_KIND_MAPPING, &default_kinds)
+        (DEFAULTS, OPTIONALS)
     }
 
-    /// Create a new configuration with all kinds enabled by default for JavaScript
-    pub fn new_js() -> Self {
-        let mut enabled_kinds = HashSet::new();
-        // Add all possible JavaScript tag kinds
-        enabled_kinds.insert("f".to_string()); // functions
-        enabled_kinds.insert("c".to_string()); // classes
-        enabled_kinds.insert("m".to_string()); // methods
-        enabled_kinds.insert("p".to_string()); // properties
-        enabled_kinds.insert("C".to_string()); // constants
-        enabled_kinds.insert("v".to_string()); // global variables
-        enabled_kinds.insert("g".to_string()); // generators
-        enabled_kinds.insert("G".to_string()); // getters
-        enabled_kinds.insert("S".to_string()); // setters
-        enabled_kinds.insert("M".to_string()); // fields
-
-        Self { enabled_kinds }
+    /// Create a configuration from a kinds string for C (e.g., "defg", "+f,-m", or "d,e,f,g")
+    pub fn from_c_kinds_string(kinds_str: &str) -> Self {
+        let (defaults, optionals) = Self::c_config_data();
+        Self::from_string(kinds_str, defaults, optionals)
     }
 
-    /// Create a configuration from a kinds string for JavaScript
-    pub fn from_javascript_kinds_string(kinds_str: &str) -> Self {
-        const JAVASCRIPT_KIND_MAPPING: &[(&[&str], &str)] = &[
+    fn javascript_config_data() -> (
+        &'static [(&'static [&'static str], &'static str)],
+        &'static [(&'static [&'static str], &'static str)],
+    ) {
+        const DEFAULTS: &[(&[&str], &str)] = &[
             (&["f", "function"], "f"),
             (&["c", "classes"], "c"),
             (&["m", "methods"], "m"),
             (&["p", "properties"], "p"),
-            (&["C", "constants"], "p"),
+            (&["C", "constants"], "C"),
             (&["v", "global variables"], "v"),
             (&["g", "generators"], "g"),
             (&["G", "getters"], "G"),
             (&["S", "setters"], "S"),
             (&["M", "fields"], "M"),
         ];
-
-        // Default enabled kinds for JavaScript
-        let mut default_kinds = HashSet::new();
-        default_kinds.insert("f".to_string()); // function
-        default_kinds.insert("c".to_string()); // classes
-        default_kinds.insert("m".to_string()); // methods
-        default_kinds.insert("p".to_string()); // properties
-        default_kinds.insert("C".to_string()); // constants
-        default_kinds.insert("v".to_string()); // global variables
-        default_kinds.insert("g".to_string()); // generators
-        default_kinds.insert("G".to_string()); // getters
-        default_kinds.insert("S".to_string()); // setters
-        default_kinds.insert("M".to_string()); // fields
-
-        Self::from_string(kinds_str, JAVASCRIPT_KIND_MAPPING, &default_kinds)
-    }
-
-    /// Create a new configuration with default kinds enabled for JavaScript
-    pub fn new_python() -> Self {
-        let mut enabled_kinds = HashSet::new();
-
-        enabled_kinds.insert("c".to_string()); // classes
-        enabled_kinds.insert("f".to_string()); // functions
-        enabled_kinds.insert("m".to_string()); // class members
-        enabled_kinds.insert("v".to_string()); // variables
-        enabled_kinds.insert("I".to_string()); // name referring a module defined in other file
-        enabled_kinds.insert("i".to_string()); // modules
-        enabled_kinds.insert("Y".to_string()); // name referring a class/variable/function/module defined in other module
-
-        Self { enabled_kinds }
+        const OPTIONALS: &[(&[&str], &str)] = &[];
+        (DEFAULTS, OPTIONALS)
     }
 
     /// Create a configuration from a kinds string for JavaScript
-    pub fn from_python_kinds_string(kinds_str: &str) -> Self {
-        const PYTHON_KIND_MAPPING: &[(&[&str], &str)] = &[
+    pub fn from_javascript_kinds_string(kinds_str: &str) -> Self {
+        let (defaults, optionals) = Self::javascript_config_data();
+        Self::from_string(kinds_str, defaults, optionals)
+    }
+
+    fn python_config_data() -> (
+        &'static [(&'static [&'static str], &'static str)],
+        &'static [(&'static [&'static str], &'static str)],
+    ) {
+        const DEFAULTS: &[(&[&str], &str)] = &[
             (&["c", "classes"], "c"),
             (&["f", "function"], "f"),
             (&["m", "class members"], "m"),
@@ -623,46 +502,25 @@ impl TagKindConfig {
                 ],
                 "Y",
             ),
+        ];
+        const OPTIONALS: &[(&[&str], &str)] = &[
             (&["z", "function parameters"], "z"),
             (&["l", "local variables"], "l"),
         ];
-
-        // Default enabled kinds for Python
-        let mut default_kinds = HashSet::new();
-        default_kinds.insert("c".to_string()); // classes
-        default_kinds.insert("f".to_string()); // functions
-        default_kinds.insert("m".to_string()); // class members
-        default_kinds.insert("v".to_string()); // variables
-        default_kinds.insert("I".to_string()); // name referring a module defined in other file
-        default_kinds.insert("i".to_string()); // modules
-        default_kinds.insert("Y".to_string()); // name referring a class/variable/function/module defined in other module
-
-        Self::from_string(kinds_str, PYTHON_KIND_MAPPING, &default_kinds)
+        (DEFAULTS, OPTIONALS)
     }
 
-    /// Create a new configuration with all kinds enabled by default for TypeScript
-    pub fn new_typescript() -> Self {
-        let mut enabled_kinds = HashSet::new();
-
-        enabled_kinds.insert("f".to_string()); // functions
-        enabled_kinds.insert("c".to_string()); // classes
-        enabled_kinds.insert("i".to_string()); // interaces
-        enabled_kinds.insert("g".to_string()); // enums
-        enabled_kinds.insert("e".to_string()); // enumerators
-        enabled_kinds.insert("m".to_string()); // methods
-        enabled_kinds.insert("n".to_string()); // namespaces
-        enabled_kinds.insert("p".to_string()); // properties
-        enabled_kinds.insert("v".to_string()); // global variables
-        enabled_kinds.insert("C".to_string()); // constants
-        enabled_kinds.insert("G".to_string()); // generators
-        enabled_kinds.insert("a".to_string()); // aliases
-
-        Self { enabled_kinds }
+    /// Create a configuration from a kinds string for JavaScript
+    pub fn from_python_kinds_string(kinds_str: &str) -> Self {
+        let (defaults, optionals) = Self::python_config_data();
+        Self::from_string(kinds_str, defaults, optionals)
     }
 
-    /// Create a configuration from a kinds string for TypeScript
-    pub fn from_typescript_kinds_string(kinds_str: &str) -> Self {
-        const TYPESCRIPT_KIND_MAPPING: &[(&[&str], &str)] = &[
+    fn typescript_config_data() -> (
+        &'static [(&'static [&'static str], &'static str)],
+        &'static [(&'static [&'static str], &'static str)],
+    ) {
+        const DEFAULTS: &[(&[&str], &str)] = &[
             (&["f", "function"], "f"),
             (&["c", "class"], "c"),
             (&["i", "interface"], "f"),
@@ -670,30 +528,22 @@ impl TagKindConfig {
             (&["e", "enumarator"], "e"),
             (&["m", "method"], "m"),
             (&["n", "namespace"], "n"),
-            (&["z", "function parameter"], "z"),
             (&["p", "property"], "p"),
             (&["v", "global variables"], "v"),
-            (&["l", "local variable"], "l"),
             (&["C", "constants"], "p"),
             (&["G", "generators"], "g"),
             (&["a", "alias"], "a"),
         ];
+        const OPTIONALS: &[(&[&str], &str)] = &[
+            (&["z", "function parameter"], "z"),
+            (&["l", "local variable"], "l"),
+        ];
+        (DEFAULTS, OPTIONALS)
+    }
 
-        // Default enabled kinds for TypeScript
-        let mut default_kinds = HashSet::new();
-        default_kinds.insert("f".to_string()); // functions
-        default_kinds.insert("c".to_string()); // classes
-        default_kinds.insert("i".to_string()); // interaces
-        default_kinds.insert("g".to_string()); // enums
-        default_kinds.insert("e".to_string()); // enumerators
-        default_kinds.insert("m".to_string()); // methods
-        default_kinds.insert("n".to_string()); // namespaces
-        default_kinds.insert("p".to_string()); // properties
-        default_kinds.insert("v".to_string()); // global variables
-        default_kinds.insert("C".to_string()); // constants
-        default_kinds.insert("G".to_string()); // generators
-        default_kinds.insert("a".to_string()); // aliases
-
-        Self::from_string(kinds_str, TYPESCRIPT_KIND_MAPPING, &default_kinds)
+    /// Create a configuration from a kinds string for TypeScript
+    pub fn from_typescript_kinds_string(kinds_str: &str) -> Self {
+        let (defaults, optionals) = Self::typescript_config_data();
+        Self::from_string(kinds_str, defaults, optionals)
     }
 }
