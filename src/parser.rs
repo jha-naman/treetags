@@ -179,11 +179,7 @@ impl Parser {
         config: &crate::config::Config,
     ) -> Option<Vec<tag::Tag>> {
         let effective_kinds = config.get_rust_kinds();
-        let tag_config = if effective_kinds.is_empty() {
-            helper::TagKindConfig::new_rust() // Default: all kinds enabled
-        } else {
-            helper::TagKindConfig::from_rust_kinds_string(effective_kinds)
-        };
+        let tag_config = helper::TagKindConfig::from_rust_kinds_string(effective_kinds);
 
         // Call the new method that accepts user config
         self.generate_rust_tags_with_full_config(
@@ -202,11 +198,7 @@ impl Parser {
         config: &crate::config::Config,
     ) -> Option<Vec<tag::Tag>> {
         let effective_kinds = config.get_go_kinds();
-        let tag_config = if effective_kinds.is_empty() {
-            helper::TagKindConfig::new_go() // Default: all kinds enabled
-        } else {
-            helper::TagKindConfig::from_go_kinds_string(effective_kinds)
-        };
+        let tag_config = helper::TagKindConfig::from_go_kinds_string(effective_kinds);
 
         // Call the new method that accepts user config
         self.generate_go_tags_with_full_config(
@@ -224,11 +216,8 @@ impl Parser {
         file_path_relative_to_tag_file: &str,
         config: &crate::config::Config,
     ) -> Option<Vec<tag::Tag>> {
-        let tag_config = if config.kinds_javascript.is_empty() {
-            helper::TagKindConfig::new_js()
-        } else {
-            helper::TagKindConfig::from_javascript_kinds_string(&config.kinds_javascript)
-        };
+        let tag_config =
+            helper::TagKindConfig::from_javascript_kinds_string(&config.kinds_javascript);
 
         self.generate_js_tags_with_full_config(
             code,
@@ -246,11 +235,7 @@ impl Parser {
         config: &crate::config::Config,
     ) -> Option<Vec<tag::Tag>> {
         // Parse cpp-kinds configuration
-        let tag_config = if config.cpp_kinds.is_empty() {
-            helper::TagKindConfig::new_cpp()
-        } else {
-            helper::TagKindConfig::from_cpp_kinds_string(&config.cpp_kinds)
-        };
+        let tag_config = helper::TagKindConfig::from_cpp_kinds_string(&config.cpp_kinds);
 
         // Call the new method that accepts user config
         self.generate_cpp_tags_with_full_config(
@@ -269,11 +254,7 @@ impl Parser {
         config: &crate::config::Config,
     ) -> Option<Vec<tag::Tag>> {
         // Parse c-kinds configuration
-        let tag_config = if config.c_kinds.is_empty() {
-            helper::TagKindConfig::new_c()
-        } else {
-            helper::TagKindConfig::from_c_kinds_string(&config.c_kinds)
-        };
+        let tag_config = helper::TagKindConfig::from_c_kinds_string(&config.c_kinds);
 
         // Call the new method that accepts user config
         self.generate_cpp_tags_with_full_config(
@@ -291,11 +272,7 @@ impl Parser {
         file_path_relative_to_tag_file: &str,
         config: &crate::config::Config,
     ) -> Option<Vec<tag::Tag>> {
-        let tag_config = if config.kinds_python.is_empty() {
-            helper::TagKindConfig::new_python()
-        } else {
-            helper::TagKindConfig::from_python_kinds_string(&config.kinds_python)
-        };
+        let tag_config = helper::TagKindConfig::from_python_kinds_string(&config.kinds_python);
 
         self.generate_python_tags_with_full_config(
             code,
@@ -312,11 +289,8 @@ impl Parser {
         file_path_relative_to_tag_file: &str,
         config: &crate::config::Config,
     ) -> Option<Vec<tag::Tag>> {
-        let tag_config = if config.kinds_typescript.is_empty() {
-            helper::TagKindConfig::new_typescript()
-        } else {
-            helper::TagKindConfig::from_typescript_kinds_string(&config.kinds_typescript)
-        };
+        let tag_config =
+            helper::TagKindConfig::from_typescript_kinds_string(&config.kinds_typescript);
 
         self.generate_typescript_tags_with_full_config(
             code,
