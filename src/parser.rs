@@ -216,7 +216,8 @@ impl Parser {
         file_path_relative_to_tag_file: &str,
         config: &crate::config::Config,
     ) -> Option<Vec<tag::Tag>> {
-        let tag_config = helper::TagKindConfig::from_javascript_kinds_string(&config.kinds_javascript);
+        let tag_config =
+            helper::TagKindConfig::from_javascript_kinds_string(&config.kinds_javascript);
 
         self.generate_js_tags_with_full_config(
             code,
@@ -288,7 +289,8 @@ impl Parser {
         file_path_relative_to_tag_file: &str,
         config: &crate::config::Config,
     ) -> Option<Vec<tag::Tag>> {
-        let tag_config = helper::TagKindConfig::from_typescript_kinds_string(&config.kinds_typescript);
+        let tag_config =
+            helper::TagKindConfig::from_typescript_kinds_string(&config.kinds_typescript);
 
         self.generate_typescript_tags_with_full_config(
             code,
