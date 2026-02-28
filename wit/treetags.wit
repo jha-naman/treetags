@@ -1,0 +1,45 @@
+package treetags:plugin@0.1.0;
+
+/// The main interface that a plugin must implement.
+interface tag-generator {
+    /// Represents a single tag generated from source code.
+    record tag {
+        /// The name of the tag (e.g., function name, class name).
+        name: string,
+        /// The line number where the tag is defined (1-based).
+        line: u64,
+        /// The specific kind of the tag (e.g., "function", "class", "method").
+        kind: string,
+        /// Extension fields associated with the tag (e.g., "signature:() -> void").
+        extension-fields: list<tuple<string, string>>,
+    }
+
+    /// Configuration passed to the plugin during execution.
+    record config {
+        /// The file path being processed.
+        file-path: string,
+        /// Language-specific kinds enabled via CLI (e.g. from --kinds-rust).
+        /// If empty, the plugin should emit all default kinds.
+        enabled-kinds: list<string>,
+        /// Extra tag information enabled via CLI (e.g. from --extras).
+        extras: list<string>,
+    }
+
+    /// Returns a list of file extensions this plugin supports (e.g., ["rs", "toml"]).
+    /// The host uses this to route specific files to this plugin.
+    supported-extensions: func() -> list<string>;
+
+    /// Parses the provided source code and returns a list of tags.
+    /// 
+    /// # Arguments
+    /// * `source` - The full text content of the file.
+    /// * `cfg` - Configuration options for this run.
+    ///
+    /// # Returns
+    /// * `result<list<tag>, string>` - A list of tags on success, or an error message string on failure.
+    generate: func(source: string, cfg: config) -> result<list<tag>, string>;
+}
+
+world plugin {
+    export tag-generator;
+}
