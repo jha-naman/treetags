@@ -150,6 +150,10 @@ pub struct Config {
     /// Path to user languages config file. Overrides default config file paths.
     #[arg(long)]
     pub user_languages_config: Option<std::path::PathBuf>,
+
+    /// Paths to WASM plugin files
+    #[arg(long = "wasm")]
+    pub wasm_plugins: Vec<std::path::PathBuf>,
 }
 
 impl Default for Config {
