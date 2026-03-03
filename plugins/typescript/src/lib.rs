@@ -1,3 +1,4 @@
+use crate::exports::treetags::plugin::tag_generator::{Config, Guest, Tag};
 use tree_sitter::{Node, Parser, TreeCursor};
 use wit_bindgen::generate;
 

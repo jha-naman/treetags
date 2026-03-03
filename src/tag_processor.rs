@@ -14,6 +14,8 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use wasmtime::component::{bindgen, Component, Linker};
 use wasmtime::{Engine, Store};
+use wasmtime_wasi::p2::add_to_linker_sync;
+use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 
 bindgen!({
     world: "plugin",
@@ -22,6 +24,20 @@ bindgen!({
 
 use exports::treetags::plugin::tag_generator::Config as WasmConfig;
 use exports::treetags::plugin::tag_generator::Tag as WasmTag;
+
+struct ServerWasiView {
+    table: ResourceTable,
+    ctx: WasiCtx,
+}
+
+impl WasiView for ServerWasiView {
+    fn ctx(&mut self) -> WasiCtxView<'_> {
+        WasiCtxView {
+            ctx: &mut self.ctx,
+            table: &mut self.table,
+        }
+    }
+}
 
 /// A structure for processing files and generating tags.
 ///
@@ -39,7 +55,7 @@ pub struct TagProcessor {
 }
 
 struct WasmPlugin {
-    store: Store<()>,
+    store: Store<ServerWasiView>,
     bindings: Plugin,
     extensions: Vec<String>,
 }
@@ -47,8 +63,12 @@ struct WasmPlugin {
 impl WasmPlugin {
     fn new(path: &Path, engine: &Engine) -> Result<Self, Box<dyn std::error::Error>> {
         let component = Component::from_file(engine, path)?;
-        let linker = Linker::new(engine);
-        let mut store = Store::new(engine, ());
+        let mut linker = Linker::new(engine);
+        add_to_linker_sync(&mut linker)?;
+
+        let wasi = WasiCtxBuilder::new().inherit_stdio().inherit_env().build();
+        let table = ResourceTable::new();
+        let mut store = Store::new(engine, ServerWasiView { table, ctx: wasi });
 
         let bindings = Plugin::instantiate(&mut store, &component, &linker)?;
         let extensions = bindings
@@ -216,7 +236,10 @@ impl TagProcessor {
             .wasm_plugins
             .iter()
             .filter_map(|p| match WasmPlugin::new(p, &engine) {
-                Ok(plugin) => Some(plugin),
+                Ok(plugin) => {
+                    println!("we loaded plugin");
+                    Some(plugin)
+                }
                 Err(e) => {
                     eprintln!("Failed to load WASM plugin {:?}: {}", p, e);
                     None
