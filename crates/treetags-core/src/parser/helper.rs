@@ -1,9 +1,8 @@
 use tree_sitter::TreeCursor;
 
 pub use super::common::tag_config::TagKindConfig;
-pub use super::common::tree_walker::{
-    generate_tags_with_config, walk_generic, Context, LanguageContext,
-};
+pub use super::common::tree_walker::{generate_tags_with_config, walk_generic, Context};
+pub use treetags_common::tree_walker::LanguageContext;
 
 /// Finds the first child node matching any of the specified kinds and returns its text content.
 /// IMPORTANT: Temporarily modifies the cursor but restores it.
@@ -25,37 +24,9 @@ pub fn get_node_name(cursor: &mut TreeCursor, context: &Context, kinds: &[&str])
     None
 }
 
-/// Control flow for child iteration
-pub enum IterationControl {
-    Continue,
-    Break,
-}
-
-// Re-export for convenience
+pub use treetags_common::helper::IterationControl;
+pub use treetags_common::iterate_children;
 pub use IterationControl::{Break, Continue};
-
-/// Iterate over the children of the cursor's current node
-macro_rules! iterate_children {
-    ($cursor:expr, |$node:ident| $body:block) => {
-        if $cursor.goto_first_child() {
-            loop {
-                let $node = $cursor.node();
-                let control = $body;
-                match control {
-                    $crate::parser::helper::Break => break,
-                    $crate::parser::helper::Continue => {}
-                }
-                if !$cursor.goto_next_sibling() {
-                    break;
-                }
-            }
-            $cursor.goto_parent();
-        }
-    };
-}
-
-// Make the macro available to other modules
-pub(crate) use iterate_children;
 
 /// Generates the ctags address string
 pub fn address_string_from_line(row: usize, context: &Context) -> String {

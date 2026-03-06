@@ -240,15 +240,15 @@ impl<'a> GoContext<'a> {
 impl<'a> LanguageContext for GoContext<'a> {
     type ScopeType = ScopeType;
 
-    fn push_scope(&mut self, scope_type: Self::ScopeType, name: String) {
+    fn push_scope(&mut self, scope_type: ScopeType, name: String) {
         self.scope_stack.push((scope_type, name));
     }
 
-    fn pop_scope(&mut self) -> Option<(Self::ScopeType, String)> {
+    fn pop_scope(&mut self) -> Option<(ScopeType, String)> {
         self.scope_stack.pop()
     }
 
-    fn process_node(&mut self, cursor: &mut TreeCursor) -> Option<(Self::ScopeType, String)> {
+    fn process_node(&mut self, cursor: &mut TreeCursor) -> Option<(ScopeType, String)> {
         process_go_node(cursor, self)
     }
 }

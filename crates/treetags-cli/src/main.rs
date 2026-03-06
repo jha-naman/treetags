@@ -1,24 +1,11 @@
-#![doc = include_str!("../README.md")]
+#![doc = include_str!("../../../README.md")]
 
 use std::process;
 
-mod built_in_grammars;
-mod config;
-mod file_finder;
-mod parser;
-mod queries;
-mod shell_to_regex;
-mod split_by_newlines;
-mod tag;
-mod tag_processor;
-mod tag_writer;
-mod tags_config;
-mod user_grammars;
-
-use crate::config::Config;
-use crate::file_finder::FileFinder;
-use crate::tag_processor::TagProcessor;
-use crate::tag_writer::TagWriter;
+use treetags_core::config::{self, Config};
+use treetags_core::file_finder::{self, FileFinder};
+use treetags_core::tag_processor::TagProcessor;
+use treetags_core::tag_writer::TagWriter;
 
 use clap::CommandFactory;
 use clap_complete::{generate, Shell};

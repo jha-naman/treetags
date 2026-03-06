@@ -1,0 +1,10 @@
+[package]
+name = "treetags-common"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+indexmap = { workspace = true }
+serde = { workspace = true }
+tree-sitter = { workspace = true }
+tree-sitter-tags = { workspace = true }

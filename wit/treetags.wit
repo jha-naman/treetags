@@ -6,8 +6,8 @@ interface tag-generator {
     record tag {
         /// The name of the tag (e.g., function name, class name).
         name: string,
-        /// The line number where the tag is defined (1-based).
-        line: u64,
+        /// The search pattern to locate the tag in the file
+        address: string,
         /// The specific kind of the tag (e.g., "function", "class", "method").
         kind: string,
         /// Extension fields associated with the tag (e.g., "signature:() -> void").

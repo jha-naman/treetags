@@ -8,36 +8,9 @@
 use crate::config::Config;
 use crate::parser::Parser;
 use crate::tag::Tag;
-use indexmap::IndexMap;
 use std::path::Path;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
-use wasmtime::component::{bindgen, Component, Linker};
-use wasmtime::{Engine, Store};
-use wasmtime_wasi::p2::add_to_linker_sync;
-use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
-
-bindgen!({
-    world: "plugin",
-    path: "wit/treetags.wit",
-});
-
-use exports::treetags::plugin::tag_generator::Config as WasmConfig;
-use exports::treetags::plugin::tag_generator::Tag as WasmTag;
-
-struct ServerWasiView {
-    table: ResourceTable,
-    ctx: WasiCtx,
-}
-
-impl WasiView for ServerWasiView {
-    fn ctx(&mut self) -> WasiCtxView<'_> {
-        WasiCtxView {
-            ctx: &mut self.ctx,
-            table: &mut self.table,
-        }
-    }
-}
 
 /// A structure for processing files and generating tags.
 ///
@@ -52,76 +25,6 @@ pub struct TagProcessor {
 
     /// Configuration for tag generation
     config: Config,
-}
-
-struct WasmPlugin {
-    store: Store<ServerWasiView>,
-    bindings: Plugin,
-    extensions: Vec<String>,
-}
-
-impl WasmPlugin {
-    fn new(path: &Path, engine: &Engine) -> Result<Self, Box<dyn std::error::Error>> {
-        let component = Component::from_file(engine, path)?;
-        let mut linker = Linker::new(engine);
-        add_to_linker_sync(&mut linker)?;
-
-        let wasi = WasiCtxBuilder::new().inherit_stdio().inherit_env().build();
-        let table = ResourceTable::new();
-        let mut store = Store::new(engine, ServerWasiView { table, ctx: wasi });
-
-        let bindings = Plugin::instantiate(&mut store, &component, &linker)?;
-        let extensions = bindings
-            .treetags_plugin_tag_generator()
-            .call_supported_extensions(&mut store)?;
-
-        Ok(Self {
-            store,
-            bindings,
-            extensions,
-        })
-    }
-
-    fn generate_tags(
-        &mut self,
-        source: &str,
-        file_path: &str,
-        config: &Config,
-    ) -> Result<Vec<Tag>, String> {
-        let wasm_config = WasmConfig {
-            file_path: file_path.to_string(),
-            enabled_kinds: vec![], // TODO: Populate based on file extension and config
-            extras: config.extras.split_whitespace().map(String::from).collect(),
-        };
-
-        let result = self
-            .bindings
-            .treetags_plugin_tag_generator()
-            .call_generate(&mut self.store, source, &wasm_config)
-            .map_err(|e| e.to_string())?;
-
-        match result {
-            Ok(wasm_tags) => Ok(wasm_tags.into_iter().map(Self::convert_tag).collect()),
-            Err(e) => Err(e),
-        }
-    }
-
-    fn convert_tag(wasm_tag: WasmTag) -> Tag {
-        let mut extension_fields = IndexMap::new();
-        for (key, value) in wasm_tag.extension_fields {
-            extension_fields.insert(key, value);
-        }
-        // Assuming address is line number based for now as per WIT definition
-        let address = format!("{}", wasm_tag.line);
-
-        Tag {
-            name: wasm_tag.name,
-            file_name: String::new(), // Will be filled by caller or adjusted
-            address,
-            kind: Some(wasm_tag.kind),
-            extension_fields: Some(extension_fields),
-        }
-    }
 }
 
 impl TagProcessor {
@@ -230,23 +133,6 @@ impl TagProcessor {
     ) {
         let mut parser = Parser::new(&config);
 
-        // Initialize WASM engine and plugins
-        let engine = Engine::default();
-        let mut plugins: Vec<WasmPlugin> = config
-            .wasm_plugins
-            .iter()
-            .filter_map(|p| match WasmPlugin::new(p, &engine) {
-                Ok(plugin) => {
-                    println!("we loaded plugin");
-                    Some(plugin)
-                }
-                Err(e) => {
-                    eprintln!("Failed to load WASM plugin {:?}: {}", p, e);
-                    None
-                }
-            })
-            .collect();
-
         let tag_file_dir = if tag_file_path == "-" {
             // If writing to stdout, use current directory as the base
             std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf())
@@ -270,30 +156,6 @@ impl TagProcessor {
 
             // Parse file if it has a recognizable extension
             if let Some(extension) = file_path.extension().and_then(|e| e.to_str()) {
-                // Check if any WASM plugin supports this extension
-                if let Some(plugin) = plugins
-                    .iter_mut()
-                    .find(|p| p.extensions.contains(&extension.to_string()))
-                {
-                    if let Ok(source) = std::fs::read_to_string(&file_path) {
-                        match plugin.generate_tags(&source, &file_path_relative, &config) {
-                            Ok(mut tags) => {
-                                for tag in &mut tags {
-                                    // Ensure file name is set correctly
-                                    if tag.file_name.is_empty() {
-                                        tag.file_name = file_path_relative.clone();
-                                    }
-                                }
-                                if let Ok(mut tags_guard) = tags_lock.lock() {
-                                    tags_guard.append(&mut tags);
-                                }
-                            }
-                            Err(e) => eprintln!("Error in WASM plugin for {}: {}", file_name, e),
-                        }
-                    }
-                    continue;
-                }
-
                 match parser.parse_file_with_config(
                     &file_path_relative,
                     &file_path.to_string_lossy(),
@@ -302,6 +164,13 @@ impl TagProcessor {
                 ) {
                     Ok(mut tags) => {
                         // Add tags to the shared collection
+                        for tag in &mut tags {
+                            // Ensure file name is set correctly
+                            if tag.file_name.is_empty() {
+                                tag.file_name = file_path_relative.clone();
+                            }
+                        }
+
                         if let Ok(mut tags_guard) = tags_lock.lock() {
                             tags_guard.append(&mut tags);
                         }

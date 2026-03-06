@@ -9,12 +9,19 @@
 use crate::built_in_grammars;
 use crate::config::Config;
 use crate::tag;
+use crate::tag::Tag;
 use crate::user_grammars;
+use indexmap::IndexMap;
 use libloading::Library;
 use std::collections::HashMap;
 use std::fs;
+use std::path::Path;
 use tree_sitter::Parser as TSParser;
 use tree_sitter_tags::{TagsConfiguration, TagsContext};
+use wasmtime::component::{bindgen, Component, Linker};
+use wasmtime::{Engine, Store};
+use wasmtime_wasi::p2::add_to_linker_sync;
+use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 
 mod common;
 mod cpp;
@@ -24,6 +31,97 @@ mod js;
 mod python;
 mod rust;
 // mod typescript;
+
+bindgen!({
+    world: "plugin",
+    path: "../../wit/treetags.wit",
+});
+
+use exports::treetags::plugin::tag_generator::Config as WasmConfig;
+use exports::treetags::plugin::tag_generator::Tag as WasmTag;
+
+struct ServerWasiView {
+    table: ResourceTable,
+    ctx: WasiCtx,
+}
+
+impl WasiView for ServerWasiView {
+    fn ctx(&mut self) -> WasiCtxView<'_> {
+        WasiCtxView {
+            ctx: &mut self.ctx,
+            table: &mut self.table,
+        }
+    }
+}
+
+struct WasmPlugin {
+    store: Store<ServerWasiView>,
+    bindings: Plugin,
+    extensions: Vec<String>,
+}
+
+impl WasmPlugin {
+    fn new(path: &Path, engine: &Engine) -> Result<Self, Box<dyn std::error::Error>> {
+        let component = Component::from_file(engine, path)?;
+        let mut linker = Linker::new(engine);
+        add_to_linker_sync(&mut linker)?;
+
+        let wasi = WasiCtxBuilder::new().inherit_stdio().inherit_env().build();
+        let table = ResourceTable::new();
+        let mut store = Store::new(engine, ServerWasiView { table, ctx: wasi });
+
+        let bindings = Plugin::instantiate(&mut store, &component, &linker)?;
+        let extensions = bindings
+            .treetags_plugin_tag_generator()
+            .call_supported_extensions(&mut store)?;
+
+        Ok(Self {
+            store,
+            bindings,
+            extensions,
+        })
+    }
+
+    fn generate_tags(
+        &mut self,
+        source: &str,
+        file_path: &str,
+        config: &Config,
+    ) -> Result<Vec<Tag>, String> {
+        let wasm_config = WasmConfig {
+            file_path: file_path.to_string(),
+            enabled_kinds: vec![], // TODO: Populate based on file extension and config
+            extras: config.extras.split_whitespace().map(String::from).collect(),
+        };
+
+        let result = self
+            .bindings
+            .treetags_plugin_tag_generator()
+            .call_generate(&mut self.store, source, &wasm_config)
+            .map_err(|e| e.to_string())?;
+
+        match result {
+            Ok(wasm_tags) => Ok(wasm_tags.into_iter().map(Self::convert_tag).collect()),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn convert_tag(wasm_tag: WasmTag) -> Tag {
+        let mut extension_fields = IndexMap::new();
+        for (key, value) in wasm_tag.extension_fields {
+            extension_fields.insert(key, value);
+        }
+        let address = format!("{}", wasm_tag.address);
+
+        Tag {
+            name: wasm_tag.name,
+            file_name: String::new(), // Will be filled by caller or adjusted
+            address,
+            kind: Some(wasm_tag.kind),
+            extension_fields: Some(extension_fields),
+        }
+    }
+}
 
 /// Parser manages the parsing configurations for all supported languages
 /// and provides methods to generate tags from source files.
@@ -36,6 +134,8 @@ pub struct Parser {
 
     // Keep the user provided grammars alive
     _user_grammars: Vec<Library>,
+
+    wasm_plugins: Vec<WasmPlugin>,
 
     /// Context for generating tags
     pub tags_context: TagsContext,
@@ -85,10 +185,26 @@ impl Parser {
             }
         }
 
+        let wasm_plugins = {
+            let engine = Engine::default();
+            config
+                .wasm_plugins
+                .iter()
+                .filter_map(|p| match WasmPlugin::new(Path::new(p), &engine) {
+                    Ok(plugin) => Some(plugin),
+                    Err(e) => {
+                        eprintln!("Failed to load WASM plugin {:?}: {}", p, e);
+                        None
+                    }
+                })
+                .collect()
+        };
+
         Self {
             grammar_configs,
             extension_config_map,
             _user_grammars: user_grammars._grammars,
+            wasm_plugins,
 
             tags_context: TagsContext::new(),
             ts_parser: TSParser::new(),
@@ -103,6 +219,18 @@ impl Parser {
         extension: &str,
         config: &crate::config::Config,
     ) -> Option<Vec<tag::Tag>> {
+        if let Some(plugin) = self
+            .wasm_plugins
+            .iter_mut()
+            .find(|p| p.extensions.contains(&extension.to_string()))
+        {
+            if let Ok(source) = std::str::from_utf8(code) {
+                return plugin
+                    .generate_tags(source, file_path_relative_to_tag_file, config)
+                    .ok();
+            }
+        }
+
         match extension {
             "rs" => self.generate_rust_tags_with_user_config(
                 code,
@@ -126,11 +254,15 @@ impl Parser {
                 file_path_relative_to_tag_file,
                 config,
             ),
-            // "ts" | "tsx" => self.generate_typescript_tags_with_user_config(
-            //     code,
-            //     file_path_relative_to_tag_file,
-            //     config,
-            // ),
+            "ts" | "tsx" => {
+                #[cfg(feature = "builtin-typescript")]
+                if let Ok(source) = std::str::from_utf8(code) {
+                    if let Ok(tags) = treetags_typescript::generate_tags(source) {
+                        return Some(tags.into_iter().map(tag::Tag::from).collect());
+                    }
+                }
+                None
+            }
             _ => None,
         }
     }

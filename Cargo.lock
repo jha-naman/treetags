@@ -2252,17 +2252,37 @@ name = "treetags"
 version = "0.7.0"
 dependencies = [
  "assert_cmd",
+ "clap",
+ "clap_complete",
+ "predicates 2.1.5",
+ "serde",
+ "shlex",
+ "similar",
+ "treetags-core",
+]
+
+[[package]]
+name = "treetags-common"
+version = "0.1.0"
+dependencies = [
+ "indexmap",
+ "serde",
+ "tree-sitter",
+ "tree-sitter-tags",
+]
+
+[[package]]
+name = "treetags-core"
+version = "0.7.0"
+dependencies = [
  "cc",
  "clap",
  "clap_complete",
  "dirs",
  "indexmap",
  "libloading",
- "predicates 2.1.5",
  "regex",
  "serde",
- "shlex",
- "similar",
  "toml",
  "tree-sitter",
  "tree-sitter-bash",
@@ -2284,6 +2304,8 @@ dependencies = [
  "tree-sitter-scala",
  "tree-sitter-tags",
  "tree-sitter-typescript",
+ "treetags-common",
+ "treetags-typescript",
  "walkdir",
  "wasmtime",
  "wasmtime-wasi",
@@ -2294,8 +2316,10 @@ dependencies = [
 name = "treetags-typescript"
 version = "0.1.0"
 dependencies = [
+ "indexmap",
  "tree-sitter",
  "tree-sitter-typescript",
+ "treetags-common",
  "wit-bindgen 0.36.0",
 ]
 
