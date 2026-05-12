@@ -1,0 +1,1 @@
+--plugin-dir {TREETAGS_TEST_PLUGINS_DIR} --list-kinds java

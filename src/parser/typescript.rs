@@ -1,9 +1,50 @@
 use super::helper::{self, iterate_children, Break, Continue, LanguageContext, TagKindConfig};
-use super::Parser;
 use indexmap::IndexMap;
 use tree_sitter::{Node, TreeCursor};
 
 use crate::tag;
+
+pub(crate) const LANG_NAME: &'static str = "typescript";
+pub(crate) const LANG_EXTENSIONS: &'static [&'static str] = &["ts", "tsx"];
+
+pub(crate) const KIND_DEFAULTS: &[(&[&str], &str)] = &[
+    (&["f", "function"], "f"),
+    (&["c", "class"], "c"),
+    (&["i", "interface"], "f"),
+    (&["g", "enum"], "g"),
+    (&["e", "enumarator"], "e"),
+    (&["m", "method"], "m"),
+    (&["n", "namespace"], "n"),
+    (&["p", "property"], "p"),
+    (&["v", "global variables"], "v"),
+    (&["C", "constants"], "p"),
+    (&["G", "generators"], "g"),
+    (&["a", "alias"], "a"),
+];
+pub(crate) const KIND_OPTIONALS: &[(&[&str], &str)] = &[
+    (&["z", "function parameter"], "z"),
+    (&["l", "local variable"], "l"),
+];
+
+pub(crate) fn generate(
+    ts_parser: &mut tree_sitter::Parser,
+    code: &[u8],
+    path: &str,
+    tag_config: &TagKindConfig,
+    config: &crate::config::Config,
+) -> Option<Vec<tag::Tag>> {
+    helper::generate_tags_with_config(
+        ts_parser,
+        tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
+        code,
+        path,
+        |source_code, lines, cursor, tags| {
+            let mut context =
+                TypeScriptContext::new(source_code, lines, path, tags, tag_config, config);
+            helper::walk_generic(cursor, &mut context);
+        },
+    )
+}
 
 #[derive(Debug)]
 enum ScopeType {
@@ -55,34 +96,6 @@ impl<'a> LanguageContext for TypeScriptContext<'a> {
 
     fn process_node(&mut self, cursor: &mut TreeCursor) -> Option<(Self::ScopeType, String)> {
         process_node(cursor, self)
-    }
-}
-
-impl Parser {
-    pub fn generate_typescript_tags_with_full_config(
-        &mut self,
-        code: &[u8],
-        file_path_relative_to_tag_file: &str,
-        tag_config: &helper::TagKindConfig,
-        user_config: &crate::config::Config,
-    ) -> Option<Vec<tag::Tag>> {
-        helper::generate_tags_with_config(
-            &mut self.ts_parser,
-            tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
-            code,
-            file_path_relative_to_tag_file,
-            |source_code, lines, cursor, tags| {
-                let mut context = TypeScriptContext::new(
-                    source_code,
-                    lines,
-                    file_path_relative_to_tag_file,
-                    tags,
-                    tag_config,
-                    user_config,
-                );
-                helper::walk_generic(cursor, &mut context);
-            },
-        )
     }
 }
 

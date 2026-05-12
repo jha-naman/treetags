@@ -33,6 +33,17 @@ fn get_language_defaults(lang_name: &str) -> Option<LanguageDefaults> {
     }
 }
 
+/// Returns the file extensions for a user grammar, using explicit config first
+/// then falling back to built-in defaults for the language name.
+pub fn resolve_extensions(lang_name: &str, explicit: Option<&Vec<String>>) -> Vec<String> {
+    if let Some(exts) = explicit {
+        return exts.clone();
+    }
+    get_language_defaults(lang_name)
+        .map(|d| d.extensions.iter().map(|s| s.to_string()).collect())
+        .unwrap_or_default()
+}
+
 pub fn load(config: &Config) -> UserGrammars {
     let mut tag_configurations = Vec::new();
     let mut grammars = Vec::new();

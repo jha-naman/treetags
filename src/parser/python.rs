@@ -1,9 +1,51 @@
 use super::helper::{self, iterate_children, Break, Continue, LanguageContext, TagKindConfig};
-use super::Parser;
 use indexmap::IndexMap;
 use tree_sitter::{Node, TreeCursor};
 
 use crate::tag;
+
+pub(crate) const LANG_NAME: &'static str = "python";
+pub(crate) const LANG_EXTENSIONS: &'static [&'static str] = &["py", "pyw", "pyi"];
+
+pub(crate) const KIND_DEFAULTS: &[(&[&str], &str)] = &[
+    (&["c", "classes"], "c"),
+    (&["f", "function"], "f"),
+    (&["m", "class members"], "m"),
+    (&["v", "variables"], "v"),
+    (&["I", "name referring a module defined in other file"], "I"),
+    (&["i", "module"], "i"),
+    (
+        &[
+            "Y",
+            "name referring to a class/variable/function/module defined in other module",
+        ],
+        "Y",
+    ),
+];
+pub(crate) const KIND_OPTIONALS: &[(&[&str], &str)] = &[
+    (&["z", "function parameters"], "z"),
+    (&["l", "local variables"], "l"),
+];
+
+pub(crate) fn generate(
+    ts_parser: &mut tree_sitter::Parser,
+    code: &[u8],
+    path: &str,
+    tag_config: &TagKindConfig,
+    config: &crate::config::Config,
+) -> Option<Vec<tag::Tag>> {
+    helper::generate_tags_with_config(
+        ts_parser,
+        tree_sitter_python::LANGUAGE.into(),
+        code,
+        path,
+        |source_code, lines, cursor, tags| {
+            let mut context =
+                PythonContext::new(source_code, lines, path, tags, tag_config, config);
+            helper::walk_generic(cursor, &mut context);
+        },
+    )
+}
 
 #[derive(Debug)]
 enum ScopeType {
@@ -52,34 +94,6 @@ impl<'a> LanguageContext for PythonContext<'a> {
 
     fn process_node(&mut self, cursor: &mut TreeCursor) -> Option<(Self::ScopeType, String)> {
         process_node(cursor, self)
-    }
-}
-
-impl Parser {
-    pub fn generate_python_tags_with_full_config(
-        &mut self,
-        code: &[u8],
-        file_path_relative_to_tag_file: &str,
-        tag_config: &helper::TagKindConfig,
-        user_config: &crate::config::Config,
-    ) -> Option<Vec<tag::Tag>> {
-        helper::generate_tags_with_config(
-            &mut self.ts_parser,
-            tree_sitter_python::LANGUAGE.into(),
-            code,
-            file_path_relative_to_tag_file,
-            |source_code, lines, cursor, tags| {
-                let mut context = PythonContext::new(
-                    source_code,
-                    lines,
-                    file_path_relative_to_tag_file,
-                    tags,
-                    tag_config,
-                    user_config,
-                );
-                helper::walk_generic(cursor, &mut context);
-            },
-        )
     }
 }
 

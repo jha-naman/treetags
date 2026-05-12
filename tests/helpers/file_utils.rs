@@ -36,9 +36,13 @@ pub fn normalize_output(output: &str) -> String {
         .to_string()
 }
 
-/// Parse command line arguments from file content
+/// Parse command line arguments from file content.
+/// Substitutes `{TREETAGS_TEST_PLUGINS_DIR}` with the compiled test plugins directory
+/// (set by build.rs when the wasm32-wasip2 target is available).
 pub fn parse_args(content: &str) -> Result<Vec<String>, String> {
-    content
+    let plugins_dir = option_env!("TREETAGS_TEST_PLUGINS_DIR").unwrap_or("");
+    let expanded = content.replace("{TREETAGS_TEST_PLUGINS_DIR}", plugins_dir);
+    expanded
         .lines()
         .filter(|line| !line.trim().is_empty() && !line.starts_with('#'))
         .map(|line| {

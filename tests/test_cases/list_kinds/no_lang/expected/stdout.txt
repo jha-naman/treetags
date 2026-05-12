@@ -1,0 +1,106 @@
+c
+    d  macro
+    e  enumerator
+    f  function
+    g  enum
+    h  header
+    m  member
+    s  struct
+    t  typedef
+    u  union
+    v  variable
+    l  local [off]
+    p  prototype [off]
+    x  externvar [off]
+    z  parameter [off]
+    L  label [off]
+    D  macroparam [off]
+c++
+    d  macro
+    e  enumerator
+    f  function
+    g  enum
+    h  header
+    m  member
+    s  struct
+    t  typedef
+    u  union
+    v  variable
+    c  class
+    l  local [off]
+    p  prototype [off]
+    x  externvar [off]
+    z  parameter [off]
+    L  label [off]
+    D  macroparam [off]
+    n  namespace [off]
+    A  alias [off]
+    N  name [off]
+    U  using [off]
+    Z  tparam [off]
+    M  module [off]
+go
+    p  package
+    f  function
+    c  constant
+    t  type
+    v  variable
+    s  struct
+    i  interface
+    m  member
+    M  anonymous
+    n  method
+    P  import
+    a  alias
+javascript
+    f  function
+    c  classes
+    m  methods
+    p  properties
+    C  constants
+    v  global variables
+    g  generators
+    G  getters
+    S  setters
+    M  fields
+python
+    c  classes
+    f  function
+    m  class members
+    v  variables
+    I  name referring a module defined in other file
+    i  module
+    Y  name referring to a class/variable/function/module defined in other module
+    z  function parameters [off]
+    l  local variables [off]
+rust
+    n  module
+    s  struct
+    g  enum
+    u  union
+    i  trait
+    c  impl
+    f  function
+    P  method
+    m  field
+    e  enumerator
+    T  typedef
+    C  constant
+    v  variable
+    t  type
+    M  macro
+typescript
+    f  function
+    c  class
+    i  interface
+    g  enum
+    e  enumarator
+    m  method
+    n  namespace
+    p  property
+    v  global variables
+    C  constants
+    G  generators
+    a  alias
+    z  function parameter [off]
+    l  local variable [off]

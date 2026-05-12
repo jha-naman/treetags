@@ -68,15 +68,5 @@ fn absolutize_path(base_dir: &Path, path: &mut PathBuf) {
 }
 
 fn get_config_path() -> PathBuf {
-    match xdg::BaseDirectories::with_prefix("treetags") {
-        Ok(xdg_dirs) => xdg_dirs.get_config_file("config.toml"),
-        Err(_) => {
-            // Fallback to ~/.config/treetags/config.toml
-            let mut path = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-            path.push(".config");
-            path.push("treetags");
-            path.push("config.toml");
-            path
-        }
-    }
+    super::paths::get_config_path()
 }

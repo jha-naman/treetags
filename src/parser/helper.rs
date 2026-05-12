@@ -1,6 +1,6 @@
 use tree_sitter::TreeCursor;
 
-pub use super::common::tag_config::TagKindConfig;
+pub use super::common::tag_config::{kinds_from_mappings, KindInfo, TagKindConfig};
 pub use super::common::tree_walker::{
     generate_tags_with_config, walk_generic, Context, LanguageContext,
 };

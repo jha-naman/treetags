@@ -3,7 +3,8 @@
 //! This module is responsible for parsing command line arguments
 //! and providing configuration options to the rest of the application.
 
-use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
+use clap::{FromArgMatches, Parser, Subcommand};
+use std::collections::HashMap;
 use std::{fs, path::Path};
 
 use extras_config::ExtrasConfig;
@@ -11,6 +12,8 @@ use fields_config::FieldsConfig;
 
 mod extras_config;
 mod fields_config;
+pub mod paths;
+mod plugin_config;
 mod user_grammars;
 
 /// Subcommands for the application
@@ -22,6 +25,8 @@ pub enum Commands {
         #[arg(value_enum)]
         shell: clap_complete::Shell,
     },
+    /// List detected plugins with their language names and file extensions, then exit
+    ListPlugins,
 }
 
 /// Configuration options for the tag generator.
@@ -95,48 +100,8 @@ pub struct Config {
     /// Kept for compatibility with `tagbar` plugin.
     #[arg(long = "language-force", default_value = "", verbatim_doc_comment)]
     pub _language_force: String,
-    ///
-    /// Rust language specific kinds to generate tags for
-    #[arg(long = "kinds-rust", default_value = "", verbatim_doc_comment)]
-    pub kinds_rust: String,
 
-    /// Rust language specific kinds to generate tags for. Deprecated: `kinds-rust` takes
-    /// precedence if it's present
-    #[deprecated = "Use --kinds-rust instead"]
-    #[arg(long = "rust-kinds", default_value = "", verbatim_doc_comment)]
-    pub rust_kinds: String,
-
-    /// Go language specific kinds to generate tags for
-    #[arg(long = "kinds-go", default_value = "")]
-    pub kinds_go: String,
-
-    /// Go language specific kinds to generate tags for. Deprecated: `kinds-go` takes precedence if
-    /// it's present
-    #[deprecated = "Use --kinds-go instead"]
-    #[arg(long = "go-kinds", default_value = "")]
-    pub go_kinds: String,
-
-    /// C++ language specific kinds to generate tags for
-    #[arg(long = "kinds-c++", default_value = "")]
-    pub cpp_kinds: String,
-
-    /// C language specific kinds to generate tags for
-    #[arg(long = "kinds-c", default_value = "")]
-    pub c_kinds: String,
-
-    /// JavaScript language specific kinds to generate tags for
-    #[arg(long = "kinds-JavaScript", default_value = "")]
-    pub kinds_javascript: String,
-
-    /// Python language specific kinds to generate tags for
-    #[arg(long = "kinds-python", default_value = "")]
-    pub kinds_python: String,
-    ///
-    /// TypeScript language specific kinds to generate tags for
-    #[arg(long = "kinds-typescript", default_value = "")]
-    pub kinds_typescript: String,
-
-    /// Parsed fields configuration  
+    /// Parsed fields configuration
     #[clap(skip)]
     pub fields_config: FieldsConfig,
 
@@ -150,6 +115,31 @@ pub struct Config {
     /// Path to user languages config file. Overrides default config file paths.
     #[arg(long)]
     pub user_languages_config: Option<std::path::PathBuf>,
+
+    /// Directories to search for WASM plugins (each must contain plugin.toml + plugin.wasm).
+    #[arg(long = "plugin-dir", value_name = "PATH")]
+    pub plugin_dirs: Vec<std::path::PathBuf>,
+
+    /// Directory to search recursively for WASM plugins. Defaults to ~/.config/treetags/plugins.
+    #[arg(long = "plugins-dir", value_name = "PATH")]
+    pub plugins_dir_arg: Option<std::path::PathBuf>,
+
+    /// Resolved plugins directory (set during construction, always valid after Config::new()).
+    #[clap(skip)]
+    pub plugins_dir: std::path::PathBuf,
+
+    /// Kinds filter map keyed by language name, populated from `--kinds-{lang}` args.
+    #[clap(skip)]
+    pub kinds_map: HashMap<String, String>,
+
+    /// Language names discovered from plugin manifests (set during construction).
+    #[clap(skip)]
+    pub plugin_langs: std::collections::HashSet<String>,
+
+    /// List available tag kinds for LANG and exit.
+    /// Omit LANG to list all known language names.
+    #[arg(long = "list-kinds", value_name = "LANG", num_args = 0..=1, default_missing_value = "")]
+    pub list_kinds: Option<String>,
 }
 
 impl Default for Config {
@@ -168,16 +158,28 @@ impl Config {
     ///
     /// A new `Config` instance with parsed arguments and defaults.
     pub fn new() -> Config {
-        // First parse to get the options file path
         let initial_args: Vec<String> = std::env::args().collect();
-        let initial_matches = Self::command().get_matches_from(&initial_args);
-        let options_path = initial_matches.get_one::<String>("options").unwrap();
+
+        // Extract --options path without clap so unknown --kinds-{lang} args don't abort early.
+        let options_path = Self::extract_options_path(&initial_args);
 
         // Combine file options with command line args
-        let combined_args = Self::combine_args_with_options(&initial_args, options_path);
+        let combined_args = Self::combine_args_with_options(&initial_args, &options_path);
+
+        // Extract kinds filter map before stripping kinds args from the arg list.
+        let kinds_map = plugin_config::extract_kinds_map(&combined_args);
+
+        // Strip --kinds-{lang} / --rust-kinds / --go-kinds so clap doesn't see unknown flags.
+        let combined_args = plugin_config::strip_kinds_args(combined_args);
+
+        // Scan plugin language names for help augmentation
+        let plugin_langs = plugin_config::plugin_language_names(&combined_args);
+
+        // Build command with --kinds-{lang} help entries for all known languages
+        let cmd = plugin_config::command_with_all_lang_kinds(&plugin_langs);
 
         // Parse with combined arguments
-        let matches = Self::command().get_matches_from(combined_args);
+        let matches = cmd.get_matches_from(combined_args);
         let mut config = Self::from_arg_matches(&matches).unwrap();
 
         config.validate();
@@ -217,8 +219,22 @@ impl Config {
         config.extras_config = ExtrasConfig::from_string(&config.extras);
         config.fields_config = FieldsConfig::from_string(&config.fields);
         config.user_grammars = user_grammars::load(config.user_languages_config.as_ref());
+        config.plugins_dir = config
+            .plugins_dir_arg
+            .clone()
+            .unwrap_or_else(paths::get_default_plugins_dir);
+        config.kinds_map = kinds_map;
+        config.plugin_langs = plugin_langs;
 
         config
+    }
+
+    /// Extracts the `--options` value from raw args without clap.
+    fn extract_options_path(args: &[String]) -> String {
+        extract_flag_values(args, "options")
+            .into_iter()
+            .last()
+            .unwrap_or_default()
     }
 
     /// Combine command line arguments with options from file
@@ -336,22 +352,16 @@ impl Config {
         }
     }
 
-    /// Get the effective Go kinds configuration, preferring the new format
-    pub fn get_go_kinds(&self) -> &str {
-        if !self.kinds_go.is_empty() {
-            &self.kinds_go
-        } else {
-            &self.go_kinds
-        }
+    /// Builds the clap Command augmented with all `--kinds-{lang}` args for completion generation.
+    /// Scans plugin manifests (no WASM loaded) using the already-resolved plugin dirs.
+    pub fn augmented_command_for_completions(&self) -> clap::Command {
+        let cmd = plugin_config::command_with_all_lang_kinds(&self.plugin_langs);
+        plugin_config::augment_list_kinds_for_completion(cmd, &self.plugin_langs)
     }
 
-    /// Get the effective Rust kinds configuration, preferring the new format
-    pub fn get_rust_kinds(&self) -> &str {
-        if !self.kinds_rust.is_empty() {
-            &self.kinds_rust
-        } else {
-            &self.rust_kinds
-        }
+    /// Returns the kinds filter string for the given language name (builtin or plugin).
+    pub fn get_kinds(&self, lang: &str) -> &str {
+        self.kinds_map.get(lang).map(|s| s.as_str()).unwrap_or("")
     }
 
     /// Converts a string value to a boolean based on predefined mappings.
@@ -373,6 +383,27 @@ impl Config {
             _ => None,
         }
     }
+}
+
+/// Collects all values for a named long flag from raw args without clap.
+/// Handles both `--flag value` and `--flag=value` forms; returns values in order.
+pub(super) fn extract_flag_values(args: &[String], long: &str) -> Vec<String> {
+    let long_flag = format!("--{long}");
+    let long_eq = format!("--{long}=");
+    let mut values = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        if args[i] == long_flag && i + 1 < args.len() {
+            values.push(args[i + 1].clone());
+            i += 2;
+        } else if let Some(v) = args[i].strip_prefix(&long_eq) {
+            values.push(v.to_string());
+            i += 1;
+        } else {
+            i += 1;
+        }
+    }
+    values
 }
 
 #[cfg(test)]

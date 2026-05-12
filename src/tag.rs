@@ -71,7 +71,11 @@ impl Tag {
 
         // Truncate line_content to 96 characters maximum
         let address = if escaped_line.len() > 96 {
-            escaped_line.truncate(96);
+            let at = (0..=96)
+                .rev()
+                .find(|&i| escaped_line.is_char_boundary(i))
+                .unwrap_or(0);
+            escaped_line.truncate(at);
             format!("/^{}/;\"\t", escaped_line) // No '$' if truncated
         } else {
             format!("/^{}$/;\"\t", escaped_line)

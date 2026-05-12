@@ -10,8 +10,8 @@ bar	source.py	/^	def bar(self):$/;"	m	access:public	roles:def	signature:(self)	c
 concurrent	source.py	/^concurrent, Foo.assignment = 1, 2$/;"	v	access:public	roles:def
 decorated_func	source.py	/^def decorated_func():$/;"	f	access:public	roles:def	signature:()
 decorated_func	source.py	/^def decorated_func():$/;"	f	access:public	roles:def	signature:()	function:decorated_func
-func	source.py	/^def func(x: int, y: float) -> float:$/;"	f	access:public	roles:def	signature:(x: int, y: float)	typeref:typename:float
 func	source.py	/^async def func(): pass$/;"	f	access:public	roles:def	signature:()
+func	source.py	/^def func(x: int, y: float) -> float:$/;"	f	access:public	roles:def	signature:(x: int, y: float)	typeref:typename:float
 nested_func	source.py	/^        nested_func = lambda x:x$/;"	m	access:public	roles:def	signature:(x)	class:Foo
 sum	source.py	/^	sum = x + y$/;"	l	access:private	roles:def	function:func
 variable	source.py	/^variable: List[int] = [1, 2]$/;"	v	access:public	roles:def	typeref:typename:List[int]

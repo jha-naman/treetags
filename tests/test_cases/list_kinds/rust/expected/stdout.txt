@@ -1,0 +1,16 @@
+#LETTER  NAME                     ENABLED
+n        module                   yes
+s        struct                   yes
+g        enum                     yes
+u        union                    yes
+i        trait                    yes
+c        impl                     yes
+f        function                 yes
+P        method                   yes
+m        field                    yes
+e        enumerator               yes
+T        typedef                  yes
+C        constant                 yes
+v        variable                 yes
+t        type                     yes
+M        macro                    yes

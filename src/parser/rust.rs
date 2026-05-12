@@ -1,9 +1,49 @@
 use super::helper::{self, LanguageContext, TagKindConfig};
-use super::Parser;
 use indexmap::IndexMap;
 use tree_sitter::{Node, TreeCursor};
 
 use crate::tag;
+
+pub(crate) const LANG_NAME: &'static str = "rust";
+pub(crate) const LANG_EXTENSIONS: &'static [&'static str] = &["rs"];
+
+pub(crate) const KIND_DEFAULTS: &[(&[&str], &str)] = &[
+    (&["n", "module"], "n"),
+    (&["s", "struct"], "s"),
+    (&["g", "enum"], "g"),
+    (&["u", "union"], "u"),
+    (&["i", "trait", "interface"], "i"),
+    (&["c", "impl", "implementation"], "c"),
+    (&["f", "function"], "f"),
+    (&["P", "method", "procedure"], "P"),
+    (&["m", "field"], "m"),
+    (&["e", "enumerator", "variant"], "e"),
+    (&["T", "typedef", "associated_type"], "T"),
+    (&["C", "constant"], "C"),
+    (&["v", "variable", "static"], "v"),
+    (&["t", "type", "alias"], "t"),
+    (&["M", "macro"], "M"),
+];
+pub(crate) const KIND_OPTIONALS: &[(&[&str], &str)] = &[];
+
+pub(crate) fn generate(
+    ts_parser: &mut tree_sitter::Parser,
+    code: &[u8],
+    path: &str,
+    tag_config: &TagKindConfig,
+    config: &crate::config::Config,
+) -> Option<Vec<tag::Tag>> {
+    helper::generate_tags_with_config(
+        ts_parser,
+        tree_sitter_rust::LANGUAGE.into(),
+        code,
+        path,
+        |source_code, lines, cursor, tags| {
+            let mut context = RustContext::new(source_code, lines, path, tags, tag_config, config);
+            helper::walk_generic(cursor, &mut context);
+        },
+    )
+}
 
 // Represents the type of scope for context tracking
 #[derive(Debug)]
@@ -101,34 +141,6 @@ impl<'a> LanguageContext for RustContext<'a> {
 
     fn process_node(&mut self, cursor: &mut TreeCursor) -> Option<(Self::ScopeType, String)> {
         process_node(cursor, self)
-    }
-}
-
-impl Parser {
-    pub fn generate_rust_tags_with_full_config(
-        &mut self,
-        code: &[u8], // Changed to slice for flexibility
-        file_path_relative_to_tag_file: &str,
-        tag_config: &helper::TagKindConfig,
-        user_config: &crate::config::Config,
-    ) -> Option<Vec<tag::Tag>> {
-        helper::generate_tags_with_config(
-            &mut self.ts_parser,
-            tree_sitter_rust::LANGUAGE.into(),
-            code,
-            file_path_relative_to_tag_file,
-            |source_code, lines, cursor, tags| {
-                let mut context = RustContext::new(
-                    source_code,
-                    lines,
-                    file_path_relative_to_tag_file,
-                    tags,
-                    tag_config,
-                    user_config,
-                );
-                helper::walk_generic(cursor, &mut context);
-            },
-        )
     }
 }
 

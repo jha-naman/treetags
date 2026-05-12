@@ -18,9 +18,12 @@ let tags = parser.parse_file(&file_path_relative_to_tag_file, &file_path, extens
  */
 
 pub mod built_in_grammars;
+pub mod builtin_langs;
 pub mod config;
 pub mod file_finder;
+pub mod language_parser;
 pub mod parser;
+pub mod plugin;
 pub mod queries;
 pub mod shell_to_regex;
 pub mod split_by_newlines;
@@ -32,5 +35,6 @@ pub mod user_grammars;
 
 // Re-export commonly used items
 pub use config::Config;
+pub use language_parser::LanguageParserRegistry;
 pub use parser::Parser;
 pub use tag::{parse_tag_file, Tag};

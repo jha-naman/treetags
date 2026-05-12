@@ -7,9 +7,9 @@ EXAMPLE_NAME	source.c	/^#define EXAMPLE_NAME "Dennis Ritchie"$/;"	d
 FRI	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	e	enum:days	
 GREEN	source.c	/^enum traffic_light_state {GREEN, YELLOW, RED};$/;"	e	enum:traffic_light_state	
 MON	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	e	enum:days	
-Node	source.c	/^typedef struct Node$/;"	t	typeref:struct:Node
-Node	source.c	/^typedef struct Node$/;"	s	
 Node	source.c	/^    struct Node *next;$/;"	s	struct:Node
+Node	source.c	/^typedef struct Node$/;"	s	
+Node	source.c	/^typedef struct Node$/;"	t	typeref:struct:Node
 RED	source.c	/^enum traffic_light_state {GREEN, YELLOW, RED};$/;"	e	enum:traffic_light_state	
 SAT	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	e	enum:days	
 SUN	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	e	enum:days	
@@ -38,9 +38,9 @@ r	source.c	/^rect r;$/;"	v	typeref:typename:rect
 r	source.c	/^struct rectangle r;$/;"	v	typeref:struct:rectangle
 rect	source.c	/^typedef struct rectangle rect;$/;"	t	typeref:struct:rectangle	
 rect	source.c	/^typedef struct {$/;"	t	typeref:struct:__anon16f8bb470208	
+rectangle	source.c	/^struct rectangle r;$/;"	s
 rectangle	source.c	/^struct rectangle {$/;"	s	
 rectangle	source.c	/^typedef struct rectangle rect;$/;"	s
-rectangle	source.c	/^struct rectangle r;$/;"	s
 stdlib.h	source.c	/^#include <stdlib.h>$/;"	h
 str_reverse_through_pointer	source.c	/^void str_reverse_through_pointer(char *str_in) {$/;"	f	typeref:typename:void
 string.h	source.c	/^#include <string.h>$/;"	h
@@ -49,7 +49,7 @@ testFunc	source.c	/^void testFunc() {$/;"	f	typeref:typename:void
 testFunc2	source.c	/^void testFunc2() {$/;"	f	typeref:typename:void
 traffic_light_state	source.c	/^enum traffic_light_state {GREEN, YELLOW, RED};$/;"	g	
 val	source.c	/^    int val;$/;"	m	struct:Node	typeref:typename:int	
-width	source.c	/^  int width;$/;"	m	struct:rectangle	typeref:typename:int	
 width	source.c	/^  int width;$/;"	m	struct:__anon16f8bb470308	typeref:typename:int
+width	source.c	/^  int width;$/;"	m	struct:rectangle	typeref:typename:int	
 x	source.c	/^  int x;$/;"	m	struct:__anon16f8bb470108	typeref:typename:int
 y	source.c	/^  int y;$/;"	m	struct:__anon16f8bb470108	typeref:typename:int

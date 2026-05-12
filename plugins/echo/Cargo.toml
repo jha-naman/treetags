@@ -1,0 +1,13 @@
+[package]
+name = "treetags-plugin-echo"
+version = "0.2.0"
+edition = "2021"
+description = "Echo test plugin for treetags integration tests"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+treetags-plugin-common = { path = "../common" }
+wit-bindgen = "0.58"

@@ -11,8 +11,8 @@ assert	source.go	/^	assert "github.com\/stretchr\/testify\/assert"$/;"	P	package
 b	source.go	/^	a, b int$/;"	v	package:treetags	typeref:typename:int
 bar	source.go	/^	bar = "bar"$/;"	c	package:treetags
 c	source.go	/^	c map[string]string$/;"	v	package:treetags	typeref:typename:map[string]string
-foo	source.go	/^func foo(bar, baz string, arr []string) (error, map[string]string) {}$/;"	f	package:treetags	typeref:typename:(error, map[string]string)
 foo	source.go	/^const foo = "foo"$/;"	c	package:treetags
+foo	source.go	/^func foo(bar, baz string, arr []string) (error, map[string]string) {}$/;"	f	package:treetags	typeref:typename:(error, map[string]string)
 i	source.go	/^	i interface{}$/;"	v	package:treetags	typeref:typename:interface{}
 main	source.go	/^func main() {}$/;"	f	package:treetags
 treetags	source.go	/^package treetags$/;"	p

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### CHANGED
  - Refactor code for handling `--kinds-[language]` CLI arguments to simplify
    code and remove duplicate code
+ - Add support for WASM plugins
 
 ## [0.7.0]
 
