@@ -1,29 +1,23 @@
 # TreeTags
 
-Generate vi compatible tags for multiple languages.
+Add code navigation for multiple languages in Vi/Vim/Neovim.
 
-Uses the tags queries defined in the various official language parsers to detect tags.
-It can also make use of tree-sitter grammars and queries installed by the user on their system.
+Leverages tree-sitter to fulfill the goal of supporting multiple programming
+languages with minimal effort without sacrificing maintainability or performance.
 
-The goal is to have code navigation available in vim/nvim for multiple languages
-with minimum effort and have reasonable performance.
-[Extension Fields](https://docs.ctags.io/en/latest/man/ctags.1.html#extension-fields)
-support is missing by design for most languages to make it easier to support multiple languages and
-keep the program trivially easy to maintain.
+To get a brief overview of what treetags does and how it compares to Universal
+ctags see [here](#what-does-treetags-do).
 
-Refer to [this](https://github.com/jha-naman/treetags/issues/1)
-issue to see how tags compare to LSP.
+### More information
 
-By default, it will generate a new tag file in the current directory and look
-for tags in files list passed during command line invokation. By default it
-recursively traverses directories present in the list. Pass the `-R no`
-or `--recurse no` options do not want directories to be recursively looked
-into for tags.
-If the `--append` option is used it will  update the existing tag file
-with tags generated from the list of files passed via command line.
+- [Installation](#installation)
+- [Natively Supported Languages](#natively-supported-languages)
+- [Languages supported by WASM plugins](#wasm-plugins)
+- [Recommended usage](#recommended-usage)
 
+## Natively Supported Languages
 
-## Supported Languages
+Support for these languages is available out of the box in treetags
 
 ### Full support with extension fields
 - [x] C
@@ -33,6 +27,9 @@ with tags generated from the list of files passed via command line.
 - [x] Python
 - [x] Rust
 - [x] TypeScript
+
+Refer to Universal ctags [documentation](https://docs.ctags.io/en/latest/man/ctags.1.html#extension-fields)
+for more about extension fields.
 
 ### Basic navigation support without extension fields
 - [x] Bash/Sh
@@ -47,16 +44,23 @@ with tags generated from the list of files passed via command line.
 - [x] Ruby
 - [x] Scala
 
-### Languages with built-in fallback tags query and extensions
-Some languages have tags query and extensions built-in into treetags. Users only
-need to provide the tree-sitter grammar in that case for treetags to be able to
-generate tags for that language.
+## WASM plugins
 
- - [x] Kotlin
- - [x] Gleam
+> [!NOTE]
+> WASM plugins are still a work in progress feature. They provide all of the
+> same functionality as natively supported languages but the discovery and
+> installation flows for users are being worked out. See [here](WASM_PLUGINS.md)
+> for more details on how to install the plugins and for more details of
+> the implementation.
 
-#### Using externally installed grammars and queries with treetags
-Users need to provide below things for treetags to be able to generate tags for
+Treetags has support for these languages via user installable WASM plugins
+
+### Full support with extension fields
+- [x] Java
+
+## Extending treetags language support via tree-sitter tag queries and grammars
+
+Users need to provide two things for treetags to be able to generate tags for
 languages that do not have a builtin grammar supplied.
 
  - Precompiled tree-sitter grammar for the language.
@@ -76,9 +80,36 @@ query_file_path = "/home/naman/.config/treetags/queries/kotlin.scm"
 extensions = ["kt", "kts"]
  ```
 
+### Languages with preprovided tags query and extensions
+
+Some languages have tags query and extensions built-in into treetags. Users only
+need to provide the tree-sitter grammar in that case for treetags to be able to
+generate tags for that language. Leave the `query_file_path` empty for these
+languages  to use the tags queries provided with treetags.
+
+ - [x] Kotlin
+ - [x] Gleam
 
 ## Installation
-Install Rust and C developmet toolchains to build `treetags`
+There are three prerequisites to build `treetags`
+
+1. Install Rust and C developmet toolchains on your system
+
+2. Add wasm32-wasip2 target for rustc
+
+```
+rustup target add wasm32-wasip2
+```
+
+3. Make sure that rustc uses the clang shipped with [wasi-sdk](https://github.com/WebAssembly/wasi-sdk/releases)
+by setting the `binCC` environment varaible.
+
+```
+export WASI_SDK_PATH=/home/username/play/wasi-sdk-30.0-arm64-linux
+export binCC="${WASI_SDK_PATH}/bin/clang --sysroot=${WASI_SDK_PATH}/share/wasi-sysroot"
+```
+
+Building treetags once development setup is complete:
 
 ```
 cargo build --release
@@ -128,7 +159,7 @@ cargo build  # Generates test files
 cargo test   # Runs all tests including generated ones
 ```
 
-## Usage
+## Command line options
 
 Use the `--help` option to see supported command line arguments.
 
@@ -145,3 +176,32 @@ Options:
   ... # Options omitted for brevity
 ```
 
+## What does treetags do
+
+Treetags creates a tags file that vim can use for allowing the user to easily
+navigate their source code files.
+
+We can quote vim help files to get an idea of what a tag and a tags file are:
+
+> What is a tag?  It is a location where an identifier is defined.  An example
+> is a function definition in a C or C++ program.  A list of tags is kept in a
+> tags file.  This can be used by Vim to directly jump from any place to the
+> tag, the place where an identifier is defined.
+
+To get a full overview of tags related functionality backed into vim/neovim one
+can use `:help tagsrch` in vim or refer to the [online docs](https://vimhelp.org/tagsrch.txt.html)
+
+This is similar to what [Universal ctags](https://ctags.io/) and other verions
+of ctags do. The ctags versions are much more mature and battle tested than
+treetags. Universal ctags in particular also has support for many more languages
+and is actively maintained.
+
+Treetags differs from these in two ways technically. First is that it uses
+tree-sitter for parsing code. Second is that treetags is multithreaded and can
+parse multiple files simultaneously. Another important difference is that
+treetags is primarily maintained by a single person.
+
+#### How treetags compares to  LSP
+
+Refer to [this](https://github.com/jha-naman/treetags/issues/1)
+issue to see how tags compare to LSP.

@@ -1,0 +1,2 @@
+--sort yes -f '-' --kinds-java='acil' --plugin-dir {TREETAGS_TEST_PLUGINS_DIR}
+source.java

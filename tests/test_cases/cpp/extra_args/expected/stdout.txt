@@ -2,9 +2,9 @@
 ADD	source.cpp	/^#define ADD(x, y) ((x) + (y))$/;"	d
 Baz	source.cpp	/^using namespace Baz;$/;"	U
 Box	source.cpp	/^class Box {$/;"	c
-Dog	source.cpp	/^class Dog {$/;"	c
 Dog	source.cpp	/^    Dog();$/;"	p	class:Dog
 Dog	source.cpp	/^Dog::Dog()$/;"	f	class:Dog
+Dog	source.cpp	/^class Dog {$/;"	c
 ECarTypes	source.cpp	/^enum ECarTypes : uint8_t$/;"	g	typeref:typename:uint8_t
 Foo	source.cpp	/^namespace Foo = Baz;$/;"	A
 Foo::Baz	source.cpp	/^using namespace Foo::Baz;$/;"	U
@@ -12,13 +12,13 @@ GetPreferredCarType	source.cpp	/^ECarTypes GetPreferredCarType()$/;"	f	typeref:t
 Hatchback	source.cpp	/^    Hatchback, \/\/ 1$/;"	e	enum:ECarTypes
 Hybrid	source.cpp	/^    Hybrid \/\/ 255$/;"	e	enum:ECarTypes
 OwnedDog	source.cpp	/^class OwnedDog : public Dog {$/;"	c
-Point	source.cpp	/^class Point {$/;"	c
-Point	source.cpp	/^    Point() { };$/;"	f	class:Point
 Point	source.cpp	/^    Point (double a, double b) :$/;"	f	class:Point
+Point	source.cpp	/^    Point() { };$/;"	f	class:Point
+Point	source.cpp	/^class Point {$/;"	c
 SUV	source.cpp	/^    SUV = 254, \/\/ 254$/;"	e	enum:ECarTypes
 Sedan	source.cpp	/^    Sedan, \/\/ 0$/;"	e	enum:ECarTypes
-T	source.cpp	/^template<class T>$/;"	Z
 T	source.cpp	/^template<class T> \/\/foobar$/;"	Z
+T	source.cpp	/^template<class T>$/;"	Z
 a	source.cpp	/^    Point (double a, double b) :$/;"	z	class:Point	typeref:typename:double	function:Point::Point
 argc	source.cpp	/^int main(int argc, char** argv) {$/;"	z	typeref:typename:int	function:main
 argv	source.cpp	/^int main(int argc, char** argv) {$/;"	z	typeref:typename:char	function:main
@@ -42,11 +42,11 @@ operator +	source.cpp	/^    Point operator+(const Point& rhs) const;$/;"	p	class
 operator +	source.cpp	/^Point Point::operator+(const Point& rhs) const$/;"	f	typeref:typename:Point	class:Point
 operator +=	source.cpp	/^    Point& operator+=(const Point& rhs);$/;"	p	class:Point	typeref:typename:Point
 operator +=	source.cpp	/^Point& Point::operator+=(const Point& rhs)$/;"	f	typeref:typename:Point	class:Point
-print	source.cpp	/^void print(char const* msg)$/;"	f	typeref:typename:void
 print	source.cpp	/^    virtual void print() const;$/;"	p	class:Dog	typeref:typename:void
-print	source.cpp	/^void Dog::print() const$/;"	f	typeref:typename:void	class:Dog
 print	source.cpp	/^    void print() const override;$/;"	p	class:OwnedDog	typeref:typename:void
+print	source.cpp	/^void Dog::print() const$/;"	f	typeref:typename:void	class:Dog
 print	source.cpp	/^void OwnedDog::print() const$/;"	f	typeref:typename:void	class:OwnedDog
+print	source.cpp	/^void print(char const* msg)$/;"	f	typeref:typename:void
 rhs	source.cpp	/^Point Point::operator+(const Point& rhs) const$/;"	z	typeref:typename:Point	function:operator +
 rhs	source.cpp	/^Point& Point::operator+=(const Point& rhs)$/;"	z	typeref:typename:Point	function:operator +=
 setName	source.cpp	/^    void setName(const std::string& dogsName);$/;"	p	class:Dog	typeref:typename:void

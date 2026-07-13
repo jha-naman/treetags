@@ -1,0 +1,12 @@
+[package]
+name = "treetags-plugin-common"
+version = "0.2.0"
+edition = "2021"
+description = "Plugin SDK for treetags WASM plugins"
+license = "MIT"
+
+[features]
+tree-walker = ["dep:tree-sitter"]
+
+[dependencies]
+tree-sitter = { version = "0.26.5", optional = true }

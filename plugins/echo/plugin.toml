@@ -1,0 +1,4 @@
+name = "echo"
+version = "0.2.0"
+abi_version = 2
+extensions = ["echo"]

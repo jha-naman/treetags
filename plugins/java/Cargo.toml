@@ -1,0 +1,15 @@
+[package]
+name = "treetags-plugin-java"
+version = "0.1.0"
+edition = "2021"
+description = "Java plugin for treetags"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+treetags-plugin-common = { path = "../common", features = ["tree-walker"] }
+tree-sitter = "0.26.5"
+tree-sitter-java = "0.23.5"
+wit-bindgen = "0.58"

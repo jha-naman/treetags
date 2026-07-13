@@ -1,9 +1,85 @@
 use super::helper::{self, iterate_children, Break, Continue, LanguageContext, TagKindConfig};
-use super::Parser;
 use indexmap::IndexMap;
 use tree_sitter::{Node, TreeCursor};
 
 use crate::tag;
+
+pub(crate) const LANG_NAME: &'static str = "c++";
+pub(crate) const LANG_EXTENSIONS: &'static [&'static str] = &[
+    "cc", "cpp", "CPP", "cxx", "c++", "cp", "C", "cppm", "ixx", "ii", "H", "hh", "hpp", "HPP",
+    "hxx", "h++", "tcc",
+];
+/// C language shares the C++ parser implementation but is a distinct language.
+pub(crate) const C_LANG_NAME: &'static str = "c";
+pub(crate) const C_LANG_EXTENSIONS: &'static [&'static str] = &["c", "h", "i"];
+
+pub(crate) const KIND_DEFAULTS: &[(&[&str], &str)] = &[
+    (&["d", "macro"], "d"),
+    (&["e", "enumerator"], "e"),
+    (&["f", "function"], "f"),
+    (&["g", "enum"], "g"),
+    (&["h", "header"], "h"),
+    (&["m", "member"], "m"),
+    (&["s", "struct"], "s"),
+    (&["t", "typedef"], "t"),
+    (&["u", "union"], "u"),
+    (&["v", "variable"], "v"),
+    (&["c", "class"], "c"),
+];
+pub(crate) const KIND_OPTIONALS: &[(&[&str], &str)] = &[
+    (&["l", "local"], "l"),
+    (&["p", "prototype"], "p"),
+    (&["x", "externvar"], "x"),
+    (&["z", "parameter"], "z"),
+    (&["L", "label"], "L"),
+    (&["D", "macroparam"], "D"),
+    (&["n", "namespace"], "n"),
+    (&["A", "alias"], "A"),
+    (&["N", "name"], "N"),
+    (&["U", "using"], "U"),
+    (&["Z", "tparam"], "Z"),
+    (&["M", "module"], "M"),
+];
+
+pub(crate) const C_KIND_DEFAULTS: &[(&[&str], &str)] = &[
+    (&["d", "macro"], "d"),
+    (&["e", "enumerator"], "e"),
+    (&["f", "function"], "f"),
+    (&["g", "enum"], "g"),
+    (&["h", "header"], "h"),
+    (&["m", "member"], "m"),
+    (&["s", "struct"], "s"),
+    (&["t", "typedef"], "t"),
+    (&["u", "union"], "u"),
+    (&["v", "variable"], "v"),
+];
+pub(crate) const C_KIND_OPTIONALS: &[(&[&str], &str)] = &[
+    (&["l", "local"], "l"),
+    (&["p", "prototype"], "p"),
+    (&["x", "externvar"], "x"),
+    (&["z", "parameter"], "z"),
+    (&["L", "label"], "L"),
+    (&["D", "macroparam"], "D"),
+];
+
+pub(crate) fn generate(
+    ts_parser: &mut tree_sitter::Parser,
+    code: &[u8],
+    path: &str,
+    tag_config: &TagKindConfig,
+    config: &crate::config::Config,
+) -> Option<Vec<tag::Tag>> {
+    helper::generate_tags_with_config(
+        ts_parser,
+        tree_sitter_cpp::LANGUAGE.into(),
+        code,
+        path,
+        |source_code, lines, cursor, tags| {
+            let mut context = CppContext::new(source_code, lines, path, tags, tag_config, config);
+            helper::walk_generic(cursor, &mut context);
+        },
+    )
+}
 
 // Represents the type of scope for context tracking
 #[derive(Debug)]
@@ -114,34 +190,6 @@ impl<'a> LanguageContext for CppContext<'a> {
 
     fn process_node(&mut self, cursor: &mut TreeCursor) -> Option<(Self::ScopeType, String)> {
         process_node(cursor, self)
-    }
-}
-
-impl Parser {
-    pub fn generate_cpp_tags_with_full_config(
-        &mut self,
-        code: &[u8],
-        file_path_relative_to_tag_file: &str,
-        tag_config: &helper::TagKindConfig,
-        user_config: &crate::config::Config,
-    ) -> Option<Vec<tag::Tag>> {
-        helper::generate_tags_with_config(
-            &mut self.ts_parser,
-            tree_sitter_cpp::LANGUAGE.into(),
-            code,
-            file_path_relative_to_tag_file,
-            |source_code, lines, cursor, tags| {
-                let mut context = CppContext::new(
-                    source_code,
-                    lines,
-                    file_path_relative_to_tag_file,
-                    tags,
-                    tag_config,
-                    user_config,
-                );
-                helper::walk_generic(cursor, &mut context);
-            },
-        )
     }
 }
 

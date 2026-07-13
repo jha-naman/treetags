@@ -1,9 +1,46 @@
 use super::helper::{self, Context, LanguageContext, TagKindConfig};
-use super::Parser;
 use indexmap::IndexMap;
 use tree_sitter::TreeCursor;
 
 use crate::tag;
+
+pub(crate) const LANG_NAME: &'static str = "go";
+pub(crate) const LANG_EXTENSIONS: &'static [&'static str] = &["go"];
+
+pub(crate) const KIND_DEFAULTS: &[(&[&str], &str)] = &[
+    (&["p", "package"], "p"),
+    (&["f", "function"], "f"),
+    (&["c", "constant"], "c"),
+    (&["t", "type"], "t"),
+    (&["v", "variable"], "v"),
+    (&["s", "struct"], "s"),
+    (&["i", "interface"], "i"),
+    (&["m", "member"], "m"),
+    (&["M", "anonymous"], "M"),
+    (&["n", "method"], "n"),
+    (&["P", "import"], "P"),
+    (&["a", "alias"], "a"),
+];
+pub(crate) const KIND_OPTIONALS: &[(&[&str], &str)] = &[];
+
+pub(crate) fn generate(
+    ts_parser: &mut tree_sitter::Parser,
+    code: &[u8],
+    path: &str,
+    tag_config: &TagKindConfig,
+    config: &crate::config::Config,
+) -> Option<Vec<tag::Tag>> {
+    helper::generate_tags_with_config(
+        ts_parser,
+        tree_sitter_go::LANGUAGE.into(),
+        code,
+        path,
+        |source_code, lines, cursor, tags| {
+            let mut context = GoContext::new(source_code, lines, path, tags, tag_config, config);
+            helper::walk_generic(cursor, &mut context);
+        },
+    )
+}
 
 /// Get the preferred field ordering for Go
 fn get_field_order_for_go() -> Vec<&'static str> {
@@ -250,34 +287,6 @@ impl<'a> LanguageContext for GoContext<'a> {
 
     fn process_node(&mut self, cursor: &mut TreeCursor) -> Option<(Self::ScopeType, String)> {
         process_go_node(cursor, self)
-    }
-}
-
-impl Parser {
-    pub fn generate_go_tags_with_full_config(
-        &mut self,
-        code: &[u8],
-        file_path_relative_to_tag_file: &str,
-        tag_config: &TagKindConfig,
-        user_config: &crate::config::Config,
-    ) -> Option<Vec<tag::Tag>> {
-        helper::generate_tags_with_config(
-            &mut self.ts_parser,
-            tree_sitter_go::LANGUAGE.into(),
-            code,
-            file_path_relative_to_tag_file,
-            |source_code, lines, cursor, tags| {
-                let mut context = GoContext::new(
-                    source_code,
-                    lines,
-                    file_path_relative_to_tag_file,
-                    tags,
-                    tag_config,
-                    user_config,
-                );
-                helper::walk_generic(cursor, &mut context);
-            },
-        )
     }
 }
 

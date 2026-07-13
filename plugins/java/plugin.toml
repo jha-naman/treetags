@@ -1,0 +1,50 @@
+name = "java"
+version = "0.2.0"
+abi_version = 2
+extensions = ["java"]
+language = "java"
+
+[[kinds]]
+letter = "a"
+name = "annotation"
+default = true
+
+[[kinds]]
+letter = "c"
+name = "class"
+default = true
+
+[[kinds]]
+letter = "e"
+name = "enumConstant"
+default = true
+
+[[kinds]]
+letter = "f"
+name = "field"
+default = true
+
+[[kinds]]
+letter = "g"
+name = "enum"
+default = true
+
+[[kinds]]
+letter = "i"
+name = "interface"
+default = true
+
+[[kinds]]
+letter = "m"
+name = "method"
+default = true
+
+[[kinds]]
+letter = "p"
+name = "package"
+default = true
+
+[[kinds]]
+letter = "l"
+name = "local"
+default = false

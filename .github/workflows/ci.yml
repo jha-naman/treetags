@@ -1,8 +1,10 @@
 name: CI
 
 on: [push, pull_request]
+
 env:
   CARGO_TERM_COLOR: always
+  WASI_SDK_VERSION: "30"
 
 jobs:
   test:
@@ -17,9 +19,32 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
       with:
         components: rustfmt
+        targets: wasm32-wasip2
 
     - name: Cache dependencies
       uses: Swatinem/rust-cache@v2
+
+    - name: Cache wasi-sdk
+      id: cache-wasi-sdk
+      uses: actions/cache@v4
+      with:
+        path: ~/wasi-sdk
+        key: wasi-sdk-${{ env.WASI_SDK_VERSION }}-x86_64-linux
+
+    - name: Install wasi-sdk
+      if: steps.cache-wasi-sdk.outputs.cache-hit != 'true'
+      run: |
+        TARBALL="wasi-sdk-${WASI_SDK_VERSION}.0-x86_64-linux.tar.gz"
+        curl -fsSL "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_SDK_VERSION}/${TARBALL}" \
+          -o /tmp/wasi-sdk.tar.gz
+        mkdir -p ~/wasi-sdk
+        tar xzf /tmp/wasi-sdk.tar.gz -C ~/wasi-sdk --strip-components=1
+
+    - name: Configure wasi-sdk
+      run: |
+        WASI_SDK_DIR="$HOME/wasi-sdk"
+        echo "WASI_SDK_PATH=$WASI_SDK_DIR" >> $GITHUB_ENV
+        echo "binCC=$WASI_SDK_DIR/bin/clang --sysroot=$WASI_SDK_DIR/share/wasi-sysroot" >> $GITHUB_ENV
 
     - name: Check formatting
       run: cargo fmt --check

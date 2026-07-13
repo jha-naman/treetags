@@ -1,0 +1,27 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+A_LIST	source.java	/^				private static final List<String> A_LIST = Arrays.asList("ONE", "TWO", "THREE");$/;"	f	class:Class.FooClass	file:
+Abstract	source.java	/^public abstract class Abstract {$/;"	c
+Bar	source.java	/^public class Bar extends Foo {$/;"	c
+Class	source.java	/^		public Class() {}$/;"	m	class:Class
+Class	source.java	/^public class Class {$/;"	c
+Enum	source.java	/^enum Enum { ONE, TWO, THREE }$/;"	g
+Foo	source.java	/^@interface Foo {$/;"	a
+Foo	source.java	/^public class Foo implements FooInterface {$/;"	c
+FooClass	source.java	/^		private static class FooClass {$/;"	c	class:Class
+FooInterface	source.java	/^interface FooInterface {$/;"	i
+ONE	source.java	/^enum Enum { ONE, TWO, THREE }$/;"	e	enum:Enum	file:
+Record	source.java	/^public record Record(int foo, String bar) {}$/;"	c
+THREE	source.java	/^enum Enum { ONE, TWO, THREE }$/;"	e	enum:Enum	file:
+TWO	source.java	/^enum Enum { ONE, TWO, THREE }$/;"	e	enum:Enum	file:
+bar	source.java	/^		String bar() default bar;$/;"	f	annotation:Foo
+bar	source.java	/^		String bar() default bar;$/;"	m	annotation:Foo
+bar	source.java	/^		public default void bar() {}$/;"	m	interface:FooInterface
+bar	source.java	/^		public void bar() { System.out.println("bar"); }$/;"	m	class:Bar
+foo	source.java	/^		String foo();$/;"	m	annotation:Foo
+foo	source.java	/^		public String foo() { return "foo"; }$/;"	m	class:Foo
+foo	source.java	/^		public String foo();$/;"	m	interface:FooInterface
+getAbstractString	source.java	/^		public abstract List<String> getAbstractString();$/;"	m	class:Abstract
+getIntVar	source.java	/^		public int getIntVar() {$/;"	m	class:Class
+intVar	source.java	/^		private int intVar;$/;"	f	class:Class	file:
+main	source.java	/^		public static void main(String[] args) {$/;"	m	class:Class
+stringVar	source.java	/^		static String stringVar;$/;"	f	class:Class

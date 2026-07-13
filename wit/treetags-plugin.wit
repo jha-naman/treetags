@@ -1,0 +1,30 @@
+package treetags:plugin@1.0.0;
+
+/// The tag-generation interface exported by every treetags plugin.
+interface plugin {
+    /// Input passed from treetags to the plugin for each file.
+    record request {
+        file-path: string,
+        kinds:     string,
+        extras:    string,
+        fields:    string,
+    }
+
+    /// A single tag returned by the plugin.
+    record tag {
+        name:             string,
+        /// 1-based line number.
+        line:             u32,
+        /// Single-letter or word kind (e.g. "f" for function, "c" for class).
+        kind:             string,
+        end-line:         option<u32>,
+        /// Sorted key-value pairs of ctags extension fields.
+        extension-fields: list<tuple<string, string>>,
+    }
+
+    generate: func(req: request, source: list<u8>) -> result<list<tag>, string>;
+}
+
+world plugin-world {
+    export plugin;
+}

@@ -1,0 +1,10 @@
+#LETTER  NAME                     ENABLED
+a        annotation               yes
+c        class                    yes
+e        enumConstant             yes
+f        field                    yes
+g        enum                     yes
+i        interface                yes
+m        method                   yes
+p        package                  yes
+l        local                    no
