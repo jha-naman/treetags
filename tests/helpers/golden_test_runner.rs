@@ -100,12 +100,23 @@ grammar_lib_path = "{}"
     Ok(())
 }
 
-/// Execute the treetags command with given arguments
+/// Execute the treetags command with given arguments.
+/// Prepends `--plugins-dir <empty>` when the test args don't already specify
+/// `--plugins-dir`, so that the user's global ~/.config/treetags/plugins
+/// directory is never consulted during tests.
+/// Tests that need specific plugins use `--plugin-dir` (explicit), which is
+/// additive and unaffected by `--plugins-dir`.
 fn execute_command(working_dir: &Path, args: &[String]) -> Result<std::process::Output, String> {
-    Command::cargo_bin("treetags")
-        .map_err(|e| format!("Failed to create command: {}", e))?
-        .current_dir(working_dir)
-        .args(args)
+    let has_plugins_dir = args.iter().any(|a| a == "--plugins-dir")
+        || args.iter().any(|a| a.starts_with("--plugins-dir="));
+
+    let mut cmd =
+        Command::cargo_bin("treetags").map_err(|e| format!("Failed to create command: {}", e))?;
+    cmd.current_dir(working_dir);
+    if !has_plugins_dir {
+        cmd.args(["--plugins-dir", env!("TREETAGS_TEST_EMPTY_PLUGINS_DIR")]);
+    }
+    cmd.args(args)
         .output()
         .map_err(|e| format!("Failed to execute command: {}", e))
 }

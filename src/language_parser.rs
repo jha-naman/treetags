@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Arc;
 
 use crate::builtin_langs::{BuiltinLangDesc, BUILTIN_LANG_DESCRIPTORS};
@@ -19,12 +20,15 @@ use crate::tag::Tag;
 /// parsing state lives in the per-thread `Parser` passed to `generate_tags`.
 pub trait LanguageParser: Send + Sync {
     /// Generate tags by delegating to the per-thread `Parser` engine.
+    /// `absolute_path` is the source file's absolute path, used by WASM plugins
+    /// for cache file naming; ignored by builtin and query parsers.
     fn generate_tags(
         &self,
         parser: &mut Parser,
         code: &[u8],
         path: &str,
         config: &Config,
+        absolute_path: &Path,
     ) -> Vec<Tag>;
 
     /// Kind metadata for `--list-kinds`. Never requires a `Parser`.
@@ -69,6 +73,7 @@ impl LanguageParser for BuiltinLanguageParser {
         code: &[u8],
         path: &str,
         config: &Config,
+        _absolute_path: &Path,
     ) -> Vec<Tag> {
         (self.generate_fn)(&mut parser.ts_parser, code, path, &self.kind_config, config)
             .unwrap_or_default()
@@ -100,9 +105,10 @@ impl LanguageParser for WasmLanguageParser {
         code: &[u8],
         path: &str,
         config: &Config,
+        absolute_path: &Path,
     ) -> Vec<Tag> {
         parser
-            .try_plugin(&self.extension, code, path, config)
+            .try_plugin(&self.extension, code, path, config, absolute_path)
             .unwrap_or_default()
     }
 
@@ -130,6 +136,7 @@ impl LanguageParser for QueryLanguageParser {
         code: &[u8],
         path: &str,
         _config: &Config,
+        _absolute_path: &Path,
     ) -> Vec<Tag> {
         parser.generate_by_tag_query(code, path, &self.extension)
     }
@@ -168,6 +175,7 @@ impl LanguageParserRegistry {
         let plugin_registry = Arc::new(PluginRegistry::scan(
             &config.plugin_dirs,
             Some(&config.plugins_dir),
+            &config.plugin_cache,
         ));
 
         let mut map: HashMap<String, Box<dyn LanguageParser>> = HashMap::new();

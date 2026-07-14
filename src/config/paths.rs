@@ -20,3 +20,15 @@ pub fn get_config_path() -> PathBuf {
 pub fn get_default_plugins_dir() -> PathBuf {
     get_treetags_dir().join("plugins")
 }
+
+pub fn get_cache_dir() -> PathBuf {
+    match xdg::BaseDirectories::with_prefix("treetags") {
+        Ok(xdg_dirs) => xdg_dirs.get_cache_home(),
+        Err(_) => {
+            let mut path = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+            path.push(".cache");
+            path.push("treetags");
+            path
+        }
+    }
+}

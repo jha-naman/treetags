@@ -12,7 +12,7 @@ use std::process::Command;
 
 /// ABI version written into the distributed plugin.toml.
 /// Keep in sync with PLUGIN_ABI_VERSION in src/plugin/mod.rs.
-const PLUGIN_ABI_VERSION: u32 = 2;
+const PLUGIN_ABI_VERSION: u32 = 3;
 
 #[derive(Parser)]
 #[command(

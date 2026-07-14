@@ -130,12 +130,14 @@ impl Parser {
         code: &[u8],
         path: &str,
         config: &Config,
+        absolute_path: &std::path::Path,
     ) -> Option<Vec<tag::Tag>> {
         self.shared_registry.as_ref()?.try_generate(
             &mut self.local_instances,
             extension,
             code,
             path,
+            absolute_path,
             config,
         )
     }
@@ -211,9 +213,13 @@ impl Parser {
             .map_err(|e| format!("Failed to read file '{}': {}", file_path, e))?;
 
         // Priority 1: WASM plugin
-        if let Some(tags) =
-            self.try_plugin(extension, &code, file_path_relative_to_tag_file, config)
-        {
+        if let Some(tags) = self.try_plugin(
+            extension,
+            &code,
+            file_path_relative_to_tag_file,
+            config,
+            std::path::Path::new(file_path),
+        ) {
             return Ok(tags);
         }
 

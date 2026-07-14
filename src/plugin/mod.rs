@@ -10,4 +10,4 @@ pub use registry::PluginRegistry;
 /// ABI version this build of treetags accepts from WASM plugins.
 /// Bump this whenever the WIT interface (wit/treetags-plugin.wit) changes
 /// in a backwards-incompatible way, and update the constant in plugins/common.
-pub const PLUGIN_ABI_VERSION: u32 = 2;
+pub const PLUGIN_ABI_VERSION: u32 = 3;
