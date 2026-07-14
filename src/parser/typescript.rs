@@ -10,7 +10,7 @@ pub(crate) const LANG_EXTENSIONS: &'static [&'static str] = &["ts", "tsx"];
 pub(crate) const KIND_DEFAULTS: &[(&[&str], &str)] = &[
     (&["f", "function"], "f"),
     (&["c", "class"], "c"),
-    (&["i", "interface"], "f"),
+    (&["i", "interface"], "i"),
     (&["g", "enum"], "g"),
     (&["e", "enumarator"], "e"),
     (&["m", "method"], "m"),

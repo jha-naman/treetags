@@ -5,6 +5,7 @@ Fields	source.ts	/^class Fields {field1$/;"	c
 Foo	source.ts	/^type Foo = $/;"	a
 Mod	source.ts	/^module Mod {$/;"	n
 ModFoo	source.ts	/^		export class ModFoo<T1, T2> {}$/;"	c	module:Mod
+Point	source.ts	/^interface Point {$/;"	i
 Rectangle	source.ts	/^class Rectangle {$/;"	c
 TemplateLiteralFoo	source.ts	/^type TemplateLiteralFoo = "foo" | "bar" | "baz";$/;"	a
 Variant1	source.ts	/^enum Enum { Variant1, Variant2 };$/;"	e	enum:Enum
