@@ -39,10 +39,16 @@ record in the wit file for details. Treetags passes in the the file path of the
 source code file relative to project root, the value of `--kinds-{lang}` cli
 argument passed by the user (`lang` is picked up from the TOML file supplied as
 part of the plugin), value of `extras` cli argument and value of `fields` cli
-argument passed by the user. The plugin is expected to return an array of the
-`tag` record described in the wit file as well as a string containing description
-of any errors. The WASM plugin gets access to the systems `stderr` stream and
-nothing else on the system.
+argument passed by the user and optionally a `cache-file` to presist data for
+subsequent runs of treetags on the same source code file. The plugin is
+expected to return an array of the `tag` record described in the wit file as
+well as a string containing description of any errors. The WASM plugin gets
+access to the systems `stderr` stream and nothing else on the system by default.
+When the user passes the `--plugin-cache` CLI argument the plugin also gets
+access to a per project cache directory for persisting data inbetween runs.
+This can enable the plugin to implement functionality like incremental parsing.
+The `cache-file` passed to generate is unique per project for each source code
+file.
 
 ### `plugin.toml` file
 
