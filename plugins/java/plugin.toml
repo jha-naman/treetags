@@ -1,6 +1,6 @@
 name = "java"
 version = "0.2.0"
-abi_version = 2
+abi_version = 3
 extensions = ["java"]
 language = "java"
 

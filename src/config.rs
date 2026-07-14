@@ -120,6 +120,13 @@ pub struct Config {
     #[arg(long = "plugin-dir", value_name = "PATH")]
     pub plugin_dirs: Vec<std::path::PathBuf>,
 
+    /// Grants a plugin read/write access to a per-source-file cache file under
+    /// ~/.cache/treetags/<project-hash>/<plugin-name>/. Specify the `name` field
+    /// from the plugin's plugin.toml.
+    /// Can be repeated to allow cache file access for multiple files
+    #[arg(long = "plugin-cache", value_name = "NAME")]
+    pub plugin_cache: Vec<String>,
+
     /// Directory to search recursively for WASM plugins. Defaults to ~/.config/treetags/plugins.
     #[arg(long = "plugins-dir", value_name = "PATH")]
     pub plugins_dir_arg: Option<std::path::PathBuf>,

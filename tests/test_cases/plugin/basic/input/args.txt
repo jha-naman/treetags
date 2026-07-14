@@ -1,1 +1,1 @@
---plugin-dir {TREETAGS_TEST_PLUGINS_DIR} -f - source.echo
+--plugin-dir {TREETAGS_TEST_PLUGINS_DIR} -f - --plugin-cache echo source.echo

@@ -6,7 +6,7 @@ use crate::split_by_newlines::split_by_newlines;
 use crate::tag::Tag;
 use indexmap::IndexMap;
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use wasmtime::Engine;
@@ -21,6 +21,7 @@ struct PluginEntry {
 struct ExtPlugin {
     wasm_path: PathBuf,
     language: Option<String>,
+    name: String,
 }
 
 /// Language name and file extensions for a detected plugin.
@@ -38,12 +39,22 @@ pub struct PluginRegistry {
     ext_plugins: HashMap<String, ExtPlugin>,
     compiled: HashMap<PathBuf, OnceLock<Option<SharedPlugin>>>,
     engine: Engine,
+    /// Plugins opted in for cache file access.
+    cache_enabled_plugins: HashSet<String>,
+    /// Per-project cache root: ~/.cache/treetags/<hash-of-cwd>/.
+    /// None when no plugins have cache access enabled.
+    project_cache_root: Option<PathBuf>,
 }
 
 impl PluginRegistry {
     /// Scans `dirs` for `plugin.toml` manifests. WASM binaries are JIT-compiled lazily
     /// on first use, at most once per unique `.wasm` file.
-    pub fn scan(dirs: &[PathBuf], recursive_dir: Option<&PathBuf>) -> Self {
+    /// `cache_plugins` is the list of plugin names granted cache file access.
+    pub fn scan(
+        dirs: &[PathBuf],
+        recursive_dir: Option<&PathBuf>,
+        cache_plugins: &[String],
+    ) -> Self {
         let entries = scan_to_entries(dirs, recursive_dir);
 
         let mut ext_plugins: HashMap<String, ExtPlugin> = HashMap::new();
@@ -58,15 +69,27 @@ impl PluginRegistry {
                 ExtPlugin {
                     wasm_path: entry.wasm_path.clone(),
                     language: entry.language.clone(),
+                    name: entry.name.clone(),
                 },
             );
         }
+
+        let cache_enabled_plugins: HashSet<String> = cache_plugins.iter().cloned().collect();
+        let project_cache_root = if cache_enabled_plugins.is_empty() {
+            None
+        } else {
+            let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+            let project_hash = format!("{:016x}", fnv1a_64(cwd.as_os_str().as_encoded_bytes()));
+            Some(crate::config::paths::get_cache_dir().join(project_hash))
+        };
 
         Self {
             entries,
             ext_plugins,
             compiled,
             engine: Engine::default(),
+            cache_enabled_plugins,
+            project_cache_root,
         }
     }
 
@@ -111,9 +134,18 @@ impl PluginRegistry {
         extension: &str,
         source: &[u8],
         file_path: &str,
+        absolute_path: &Path,
         config: &Config,
     ) -> Option<Vec<Tag>> {
         let ep = self.ext_plugins.get(extension)?;
+
+        let plugin_cache_dir: Option<PathBuf> = if self.cache_enabled_plugins.contains(&ep.name) {
+            self.project_cache_root
+                .as_ref()
+                .map(|root| root.join(&ep.name))
+        } else {
+            None
+        };
 
         // Lazily JIT-compile the plugin the first time a file with this extension is seen.
         // On failure the OnceLock stores None permanently — no retry, error printed once.
@@ -133,11 +165,12 @@ impl PluginRegistry {
             .as_ref()?;
 
         // Lazy-create a per-thread WasmInstance from the now-compiled shared plugin.
+        // The cache dir is preopened as "." in the plugin's WASI sandbox.
         let instance = match local_instances.entry(extension.to_string()) {
             Entry::Occupied(e) => e.into_mut(),
             Entry::Vacant(e) => {
                 let inst = shared
-                    .create_instance()
+                    .create_instance(plugin_cache_dir.as_deref())
                     .map_err(|e| eprintln!("treetags: plugin init error for .{extension}: {e}"))
                     .ok()?;
                 e.insert(inst)
@@ -150,11 +183,16 @@ impl PluginRegistry {
             .unwrap_or("")
             .to_string();
 
+        let cache_file = plugin_cache_dir
+            .as_ref()
+            .map(|_| cache_filename(absolute_path));
+
         let req = Request {
             file_path: file_path.to_string(),
             kinds,
             extras: config.extras.clone(),
             fields: config.fields.clone(),
+            cache_file,
         };
 
         match instance.generate(&req, source) {
@@ -172,6 +210,26 @@ impl PluginRegistry {
             }
         }
     }
+}
+
+/// FNV-1a 64-bit hash — deterministic across runs, no new dependencies.
+fn fnv1a_64(bytes: &[u8]) -> u64 {
+    const BASIS: u64 = 14695981039346656037;
+    const PRIME: u64 = 1099511628211;
+    let mut h = BASIS;
+    for &b in bytes {
+        h ^= b as u64;
+        h = h.wrapping_mul(PRIME);
+    }
+    h
+}
+
+/// Returns the cache filename for a source file: a 16-hex-digit FNV-1a hash + ".cache".
+fn cache_filename(abs_path: &Path) -> String {
+    format!(
+        "{:016x}.cache",
+        fnv1a_64(abs_path.as_os_str().as_encoded_bytes())
+    )
 }
 
 /// Per-extension plugin metadata, returned without loading any WASM.
@@ -197,7 +255,7 @@ pub fn scan_ext_infos(dirs: &[PathBuf], plugins_dir: Option<&PathBuf>) -> Vec<Pl
 /// Prints a formatted table of all detected plugins to stdout.
 pub fn print_plugin_list(dirs: &[PathBuf], plugins_dir: &PathBuf) {
     println!("Plugin directory: {}", plugins_dir.display());
-    let registry = PluginRegistry::scan(dirs, Some(plugins_dir));
+    let registry = PluginRegistry::scan(dirs, Some(plugins_dir), &[]);
     let plugins = registry.list_plugins();
     if plugins.is_empty() {
         println!("No plugins detected.");
@@ -407,7 +465,7 @@ mod tests {
             r#"
 name = "plugin-a"
 version = "0.1.0"
-abi_version = 2
+abi_version = 3
 wasm_file = "plugin.wasm"
 extensions = ["a"]
 "#,
@@ -420,7 +478,7 @@ extensions = ["a"]
             r#"
 name = "plugin-b"
 version = "0.1.0"
-abi_version = 2
+abi_version = 3
 wasm_file = "plugin.wasm"
 extensions = ["b"]
 "#,
@@ -428,7 +486,7 @@ extensions = ["b"]
         .unwrap();
         fs::write(plugin_b.join("plugin.wasm"), "").unwrap();
 
-        let registry = PluginRegistry::scan(&[], Some(&dir.path().to_path_buf()));
+        let registry = PluginRegistry::scan(&[], Some(&dir.path().to_path_buf()), &[]);
         assert!(registry.entries.contains_key("a"));
         assert!(registry.entries.contains_key("b"));
         assert_eq!(registry.entries.len(), 2);
@@ -445,7 +503,7 @@ extensions = ["b"]
             r#"
 name = "java-plugin"
 version = "0.1.0"
-abi_version = 2
+abi_version = 3
 wasm_file = "plugin.wasm"
 language = "java"
 extensions = ["java", "class"]
@@ -454,7 +512,7 @@ extensions = ["java", "class"]
         .unwrap();
         fs::write(plugin_java.join("plugin.wasm"), "").unwrap();
 
-        let registry = PluginRegistry::scan(&[], Some(&dir.path().to_path_buf()));
+        let registry = PluginRegistry::scan(&[], Some(&dir.path().to_path_buf()), &[]);
         let plugins = registry.list_plugins();
         assert_eq!(plugins.len(), 1);
         assert_eq!(plugins[0].language, "java");
@@ -471,7 +529,7 @@ extensions = ["java", "class"]
             r#"
 name = "my-plugin"
 version = "0.1.0"
-abi_version = 2
+abi_version = 3
 wasm_file = "plugin.wasm"
 extensions = ["xyz"]
 "#,
@@ -479,7 +537,7 @@ extensions = ["xyz"]
         .unwrap();
         fs::write(dir.path().join("plugin.wasm"), "").unwrap();
 
-        let registry = PluginRegistry::scan(&[dir.path().to_path_buf()], None);
+        let registry = PluginRegistry::scan(&[dir.path().to_path_buf()], None, &[]);
         let plugins = registry.list_plugins();
         assert_eq!(plugins.len(), 1);
         assert_eq!(plugins[0].language, "my-plugin");

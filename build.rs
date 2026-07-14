@@ -18,6 +18,15 @@ fn main() {
     compile_test_grammars(Path::new(&out_dir));
     build_wasm_plugins(Path::new(&out_dir));
 
+    // Empty plugins dir for tests to use to isolate themselves from the host
+    // system default plugins dir
+    let empty_plugins_dir = Path::new(&out_dir).join("empty-plugins-dir");
+    fs::create_dir_all(&empty_plugins_dir).unwrap();
+    println!(
+        "cargo:rustc-env=TREETAGS_TEST_EMPTY_PLUGINS_DIR={}",
+        empty_plugins_dir.display()
+    );
+
     let test_cases = discover_test_cases();
 
     // Generate individual test files

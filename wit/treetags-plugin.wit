@@ -4,10 +4,15 @@ package treetags:plugin@1.0.0;
 interface plugin {
     /// Input passed from treetags to the plugin for each file.
     record request {
-        file-path: string,
-        kinds:     string,
-        extras:    string,
-        fields:    string,
+        file-path:  string,
+        kinds:      string,
+        extras:     string,
+        fields:     string,
+        /// Filename of the cache file for this source file. For use when
+        /// plugins want to persist some information in between runs for say
+        /// incremental compilation or other reasons
+        /// None when the plugin has not been granted cache access by the user.
+        cache-file: option<string>,
     }
 
     /// A single tag returned by the plugin.

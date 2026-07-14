@@ -32,8 +32,9 @@ impl SharedPlugin {
 
     /// Creates a new per-thread execution context (own linear memory, own call stack).
     /// The compiled component code is shared — no re-JIT per thread.
-    pub fn create_instance(&self) -> anyhow::Result<WasmInstance> {
-        let store = new_store(&self.engine);
+    /// Pass `cache_dir` to preopen a directory for the plugin's cache files.
+    pub fn create_instance(&self, cache_dir: Option<&Path>) -> anyhow::Result<WasmInstance> {
+        let store = new_store(&self.engine, cache_dir);
         WasmInstance::from_component(store, &self.component, &self.linker)
     }
 }

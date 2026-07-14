@@ -116,7 +116,8 @@ impl TagProcessor {
                 }
             };
 
-            let mut tags = lp.generate_tags(&mut parser, &code, &file_path_relative, &config);
+            let mut tags =
+                lp.generate_tags(&mut parser, &code, &file_path_relative, &config, &file_path);
 
             if let Ok(mut guard) = tags_lock.lock() {
                 guard.append(&mut tags);
