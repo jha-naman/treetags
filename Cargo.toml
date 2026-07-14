@@ -13,6 +13,8 @@ readme = "README.md"
 categories = ["development-tools", "command-line-utilities"]
 default-run = "treetags"
 
+exclude = ["tests/", ".github/", "plugins/"]
+
 [dependencies]
 anyhow = "1"
 wasmtime = { version = "45", features = ["cranelift", "component-model"] }
