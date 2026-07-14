@@ -7,10 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+ - Add support for WASM plugins
+
+
 ### CHANGED
  - Refactor code for handling `--kinds-[language]` CLI arguments to simplify
    code and remove duplicate code
- - Add support for WASM plugins
+
+### FIXED
+ - Typescript interface type tags generation
 
 ## [0.7.0]
 
