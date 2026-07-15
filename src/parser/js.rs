@@ -317,6 +317,10 @@ fn process_method_definition(
                 name = context.base.node_text(&child).to_string();
                 Continue
             }
+            "string" => {
+                name = helper::extract_string_tag_name(cursor, &context.base);
+                Continue
+            }
             "get" => {
                 kind_tag = "G";
                 Continue
@@ -350,6 +354,10 @@ fn process_field_definition(
                 name = context.base.node_text(&child).to_string();
                 Continue
             }
+            "string" => {
+                name = helper::extract_string_tag_name(cursor, &context.base);
+                Continue
+            }
             _ => {
                 if cursor.field_name() == Some("value") {
                     match child.kind() {
@@ -379,7 +387,11 @@ fn process_pair(cursor: &mut TreeCursor, context: &mut JsContext) -> Option<(Sco
 
     iterate_children!(cursor, |child| {
         if cursor.field_name() == Some("key") {
-            key_name = context.base.node_text(&child).to_string();
+            if child.kind() == "string" {
+                key_name = helper::extract_string_tag_name(cursor, &context.base);
+            } else {
+                key_name = context.base.node_text(&child).to_string();
+            }
         } else if cursor.field_name() == Some("value") {
             match child.kind() {
                 "function_expression" | "arrow_function" => is_func = true,

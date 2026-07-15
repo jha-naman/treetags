@@ -2,10 +2,13 @@
 Fields	source.js	/^class Fields {field1$/;"	c
 PROP	source.js	/^Math.PROP = {$/;"	p
 Rectangle	source.js	/^class Rectangle {$/;"	c
+\\boo	source.js	/^  '\\\\boo': 3,$/;"	p	property:Math.PROP
+\x20boohoo	source.js	/^  " boohoo": 4,$/;"	p	property:Math.PROP
 anonymousFunctionf610258101	source.js	/^function() {$/;"	f
 area	source.js	/^  area() {$/;"	m	class:Rectangle
 bar	source.js	/^const bar = 'baz';$/;"	C
 constructor	source.js	/^  constructor(height, width) {$/;"	m	class:Rectangle
+field	source.js	/^  "field": 2,$/;"	p	property:Math.PROP
 field1	source.js	/^class Fields {field1$/;"	M	class:Fields
 field2	source.js	/^  field2 = []$/;"	M	class:Fields
 field3	source.js	/^  field3;$/;"	M	class:Fields
@@ -22,4 +25,5 @@ height	source.js	/^  set height(x) {$/;"	S	class:Rectangle
 inner	source.js	/^	function inner() {};$/;"	f	function:anonymousFunctionf610258101
 method	source.js	/^  method() {$/;"	m	class:Fields
 property	source.js	/^  property: 1,$/;"	p	property:Math.PROP
+stringfn	source.js	/^  "stringfn": () => {},$/;"	m	property:Math.PROP
 width	source.js	/^	this.width = width;$/;"	p	class:Rectangle	function:constructor
