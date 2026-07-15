@@ -379,7 +379,18 @@ fn process_pair(cursor: &mut TreeCursor, context: &mut JsContext) -> Option<(Sco
 
     iterate_children!(cursor, |child| {
         if cursor.field_name() == Some("key") {
-            key_name = context.base.node_text(&child).to_string();
+            if child.kind() == "string" {
+                iterate_children!(cursor, |string_child| {
+                    if string_child.kind() == "string_fragment" {
+                        key_name = context.base.node_text(&string_child).to_string();
+                        Break
+                    } else {
+                        Continue
+                    }
+                });
+            } else {
+                key_name = context.base.node_text(&child).to_string();
+            }
         } else if cursor.field_name() == Some("value") {
             match child.kind() {
                 "function_expression" | "arrow_function" => is_func = true,

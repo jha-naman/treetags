@@ -9,6 +9,8 @@ function() {
 Math.PROP = {
   fn: () => {},
   property: 1,
+  "field": 2,
+  "": "empty",
  };
 
 class Rectangle {

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### FIXED
+ - Handle string properties in javascript objects
+
 ## [0.8.0]
 
 ### Added
