@@ -335,14 +335,16 @@ fn process_module(
     let mut name = String::new();
 
     iterate_children!(cursor, |child| {
-        if child.kind() == "identifier" || child.kind() == "string" {
-            name = context.base.node_text(&child).to_string();
-            if name.starts_with('"') || name.starts_with('\'') {
-                name = name[1..name.len() - 1].to_string();
+        match child.kind() {
+            "identifier" => {
+                name = context.base.node_text(&child).to_string();
+                Break
             }
-            Break
-        } else {
-            Continue
+            "string" => {
+                name = helper::extract_string_tag_name(cursor, &context.base);
+                Break
+            }
+            _ => Continue,
         }
     });
 
@@ -364,11 +366,12 @@ fn process_method_definition(
 
     iterate_children!(cursor, |child| {
         match child.kind() {
-            "property_identifier" | "number" | "string" => {
+            "property_identifier" | "number" => {
                 name = context.base.node_text(&child).to_string();
-                if name.starts_with('"') || name.starts_with('\'') {
-                    name = name[1..name.len() - 1].to_string();
-                }
+                Continue
+            }
+            "string" => {
+                name = helper::extract_string_tag_name(cursor, &context.base);
                 Continue
             }
             "accessibility_modifier" => {
@@ -407,14 +410,16 @@ fn process_method_signature(
     let access = "public";
 
     iterate_children!(cursor, |child| {
-        if child.kind() == "property_identifier" || child.kind() == "string" {
-            name = context.base.node_text(&child).to_string();
-            if name.starts_with('"') || name.starts_with('\'') {
-                name = name[1..name.len() - 1].to_string();
+        match child.kind() {
+            "property_identifier" => {
+                name = context.base.node_text(&child).to_string();
+                Break
             }
-            Break
-        } else {
-            Continue
+            "string" => {
+                name = helper::extract_string_tag_name(cursor, &context.base);
+                Break
+            }
+            _ => Continue,
         }
     });
 
@@ -568,11 +573,12 @@ fn process_public_field_definition(
 
     iterate_children!(cursor, |child| {
         match child.kind() {
-            "property_identifier" | "string" => {
+            "property_identifier" => {
                 name = context.base.node_text(&child).to_string();
-                if name.starts_with('"') || name.starts_with('\'') {
-                    name = name[1..name.len() - 1].to_string();
-                }
+                Continue
+            }
+            "string" => {
+                name = helper::extract_string_tag_name(cursor, &context.base);
                 Continue
             }
             "accessibility_modifier" => {
@@ -606,14 +612,16 @@ fn process_property_signature(
     let mut name = String::new();
 
     iterate_children!(cursor, |child| {
-        if child.kind() == "property_identifier" || child.kind() == "string" {
-            name = context.base.node_text(&child).to_string();
-            if name.starts_with('"') || name.starts_with('\'') {
-                name = name[1..name.len() - 1].to_string();
+        match child.kind() {
+            "property_identifier" => {
+                name = context.base.node_text(&child).to_string();
+                Break
             }
-            Break
-        } else {
-            Continue
+            "string" => {
+                name = helper::extract_string_tag_name(cursor, &context.base);
+                Break
+            }
+            _ => Continue,
         }
     });
 

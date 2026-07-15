@@ -11,6 +11,9 @@ Math.PROP = {
   property: 1,
   "field": 2,
   "": "empty",
+  "stringfn": () => {},
+  '\\boo': 3,
+  " boohoo": 4,
  };
 
 class Rectangle {
