@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+ - Generate tags for Rust structs/enums/unions in macro invocations
+
 ### FIXED
  - Handle string properties in javascript objects
  - Handle edge cases when JS/TS tag names are strings (eg { "string": 1 })
