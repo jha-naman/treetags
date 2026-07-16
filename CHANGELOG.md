@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0]
+
 ### Added
  - Generate tags for Rust structs/enums/unions in macro invocations
 
 ### FIXED
  - Handle string properties in javascript objects
  - Handle edge cases when JS/TS tag names are strings (eg { "string": 1 })
+ - Fix bug causing multiple tests to write to and share a single grammar config file
 
 ## [0.8.0]
 
