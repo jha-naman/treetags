@@ -65,8 +65,14 @@ mod example {
     pub const PI: f64 = 3.14159265359;
 
     macro_rules! create_point {
-        ($x:expr, $y:expr) => {
-            Point::new($x, $y)
+        ($x:expr $y:expr) => {
+            Point { x: $x, y: $y }
+        }
+    }
+
+    foo! {
+        struct Bar {
+            x: f64,
         }
     }
 

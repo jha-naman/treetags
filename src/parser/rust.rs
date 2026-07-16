@@ -204,6 +204,10 @@ fn process_node(cursor: &mut TreeCursor, context: &mut RustContext) -> Option<(S
             process_macro(cursor, context);
             None // Macros don't typically form scopes in the way structs/traits
         }
+        "macro_invocation" => {
+            process_macro_invocation(cursor, context);
+            None
+        }
         _ => None, // Ignore other node kinds for scope tracking / direct tagging
     }
 }
@@ -658,6 +662,37 @@ fn process_macro(cursor: &mut TreeCursor, context: &mut RustContext) {
         let clean_name = name.strip_suffix('!').unwrap_or(&name).to_string();
         create_tag(clean_name, "M", node, context, None); // 'M' for macro definition
     }
+}
+
+// Processes 'macro_invocation' -> foo! { ... }, scanning token_tree children for item kinds
+fn process_macro_invocation(cursor: &mut TreeCursor, context: &mut RustContext) {
+    helper::iterate_children!(cursor, |child| {
+        if child.kind() == "token_tree" {
+            scan_token_tree_for_items(cursor, context);
+        }
+        helper::Continue
+    });
+}
+
+// Scans a token_tree for struct/enum/union declarations (struct <identifier> ...)
+fn scan_token_tree_for_items(cursor: &mut TreeCursor, context: &mut RustContext) {
+    let mut prev_tag_kind = "";
+    helper::iterate_children!(cursor, |child| {
+        let kind = child.kind();
+        if kind == "identifier" && !prev_tag_kind.is_empty() {
+            let name = context.base.node_text(&child).to_string();
+            create_tag(name, prev_tag_kind, child, context, None);
+        } else if kind == "token_tree" {
+            scan_token_tree_for_items(cursor, context);
+        }
+        prev_tag_kind = match kind {
+            "struct" => "s",
+            "enum" => "g",
+            "union" => "u",
+            _ => "",
+        };
+        helper::Continue
+    });
 }
 
 // --- Helper Functions ---
