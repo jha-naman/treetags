@@ -45,8 +45,8 @@ pub fn run_test_case(test_case: &TestCase) -> Result<(), String> {
         let mut queries_config = String::new();
         let queries_path = test_case.input_dir.join("queries.scm");
         if queries_path.exists() {
-            let dest_path = PathBuf::from(env!("OUT_DIR"))
-                .join(format!("{}_queries.scm", grammar_config.language_name));
+            let dest_path =
+                PathBuf::from(env!("OUT_DIR")).join(format!("{}_queries.scm", test_case._name));
             fs::copy(&queries_path, &dest_path)
                 .map_err(|e| format!("Failed to copy queries.scm: {}", e))?;
             queries_config = format!("query_file_path = {:?}\n", dest_path);
@@ -72,8 +72,8 @@ grammar_lib_path = "{}"
             queries_config
         );
 
-        let config_file_path = PathBuf::from(env!("OUT_DIR"))
-            .join(format!("{}_user_config.toml", grammar_config.language_name));
+        let config_file_path =
+            PathBuf::from(env!("OUT_DIR")).join(format!("{}_user_config.toml", test_case._name));
         fs::write(&config_file_path, toml_content_out)
             .map_err(|e| format!("Failed to write temporary config file: {}", e))?;
 
@@ -106,15 +106,28 @@ grammar_lib_path = "{}"
 /// directory is never consulted during tests.
 /// Tests that need specific plugins use `--plugin-dir` (explicit), which is
 /// additive and unaffected by `--plugins-dir`.
+/// Similarly, prepends `--user-languages-config <empty>` when the test args
+/// don't already specify it, so the user's ~/.config/treetags/config.toml is
+/// never consulted during tests.
 fn execute_command(working_dir: &Path, args: &[String]) -> Result<std::process::Output, String> {
     let has_plugins_dir = args.iter().any(|a| a == "--plugins-dir")
         || args.iter().any(|a| a.starts_with("--plugins-dir="));
+    let has_user_config = args.iter().any(|a| a == "--user-languages-config")
+        || args
+            .iter()
+            .any(|a| a.starts_with("--user-languages-config="));
 
     let mut cmd =
         Command::cargo_bin("treetags").map_err(|e| format!("Failed to create command: {}", e))?;
     cmd.current_dir(working_dir);
     if !has_plugins_dir {
         cmd.args(["--plugins-dir", env!("TREETAGS_TEST_EMPTY_PLUGINS_DIR")]);
+    }
+    if !has_user_config {
+        cmd.args([
+            "--user-languages-config",
+            env!("TREETAGS_TEST_EMPTY_USER_CONFIG"),
+        ]);
     }
     cmd.args(args)
         .output()
