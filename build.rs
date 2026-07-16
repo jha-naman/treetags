@@ -27,6 +27,15 @@ fn main() {
         empty_plugins_dir.display()
     );
 
+    // Empty user-languages config for tests to use to isolate themselves from
+    // the host system's ~/.config/treetags/config.toml
+    let empty_user_config = Path::new(&out_dir).join("empty-user-config.toml");
+    fs::write(&empty_user_config, "user_grammars = []\n").unwrap();
+    println!(
+        "cargo:rustc-env=TREETAGS_TEST_EMPTY_USER_CONFIG={}",
+        empty_user_config.display()
+    );
+
     let test_cases = discover_test_cases();
 
     // Generate individual test files
