@@ -49,7 +49,7 @@ testFunc	source.c	/^void testFunc() {$/;"	f	typeref:typename:void
 testFunc2	source.c	/^void testFunc2() {$/;"	f	typeref:typename:void
 traffic_light_state	source.c	/^enum traffic_light_state {GREEN, YELLOW, RED};$/;"	g	
 val	source.c	/^    int val;$/;"	m	struct:Node	typeref:typename:int	
-width	source.c	/^  int width;$/;"	m	struct:__anon16f8bb470308	typeref:typename:int
 width	source.c	/^  int width;$/;"	m	struct:rectangle	typeref:typename:int	
+width	source.c	/^  int width;$/;"	m	struct:__anon16f8bb470308	typeref:typename:int
 x	source.c	/^  int x;$/;"	m	struct:__anon16f8bb470108	typeref:typename:int
 y	source.c	/^  int y;$/;"	m	struct:__anon16f8bb470108	typeref:typename:int
