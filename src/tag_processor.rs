@@ -109,6 +109,10 @@ impl TagProcessor {
             let mut tags =
                 lp.generate_tags(&mut parser, &code, &file_path_relative, &config, &file_path);
 
+            if config.sort {
+                tags.sort_unstable_by(|a, b| a.sort_cmp(b));
+            }
+
             local_tags.append(&mut tags);
         }
 
