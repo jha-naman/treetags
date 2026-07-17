@@ -2166,6 +2166,7 @@ dependencies = [
  "indexmap",
  "libloading",
  "predicates 2.1.5",
+ "rayon",
  "regex",
  "serde",
  "shlex",

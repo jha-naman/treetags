@@ -3,7 +3,7 @@ use crate::language_parser::LanguageParserRegistry;
 use crate::tag::Tag;
 use std::fs;
 use std::path::Path;
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{mpsc, Arc};
 use std::thread;
 
 pub struct TagProcessor {
@@ -22,7 +22,6 @@ impl TagProcessor {
     }
 
     pub fn process_files(&self, file_names: Vec<String>) -> Vec<Tag> {
-        let tags_lock = Arc::new(Mutex::new(Vec::new()));
         let mut threads = Vec::with_capacity(self.workers);
         let mut senders = Vec::with_capacity(self.workers);
 
@@ -32,13 +31,12 @@ impl TagProcessor {
 
         for _ in 0..self.workers {
             let (sender, receiver) = mpsc::channel::<String>();
-            let tags_lock = Arc::clone(&tags_lock);
             let tag_file_path = self.tag_file_path.clone();
             let config = self.config.clone();
             let registry = Arc::clone(&lang_registry);
 
-            let thread = thread::spawn(move || {
-                Self::worker(receiver, tags_lock, tag_file_path, config, registry);
+            let thread = thread::spawn(move || -> Vec<Tag> {
+                Self::worker(receiver, tag_file_path, config, registry)
             });
 
             threads.push(thread);
@@ -55,33 +53,23 @@ impl TagProcessor {
 
         drop(senders);
 
+        let mut all_tags = Vec::new();
         for thread in threads {
-            if let Err(e) = thread.join() {
-                eprintln!("Worker thread panicked: {:?}", e);
+            match thread.join() {
+                Ok(tags) => all_tags.extend(tags),
+                Err(e) => eprintln!("Worker thread panicked: {:?}", e),
             }
         }
 
-        let result = {
-            let lock_result = tags_lock.lock();
-            match lock_result {
-                Ok(guard) => guard.clone(),
-                Err(poisoned) => {
-                    eprintln!("Lock was poisoned: mutex poisoned error");
-                    poisoned.into_inner().clone()
-                }
-            }
-        };
-
-        result
+        all_tags
     }
 
     fn worker(
         file_names_rx: mpsc::Receiver<String>,
-        tags_lock: Arc<Mutex<Vec<Tag>>>,
         tag_file_path: String,
         config: Config,
         registry: Arc<LanguageParserRegistry>,
-    ) {
+    ) -> Vec<Tag> {
         // One Parser per thread — holds mutable parse state (ts_parser, tags_context, etc.)
         let mut parser = registry.create_parser();
 
@@ -91,6 +79,8 @@ impl TagProcessor {
             let p = Path::new(&tag_file_path);
             p.parent().unwrap_or(Path::new("")).to_path_buf()
         };
+
+        let mut local_tags = Vec::new();
 
         while let Ok(file_name) = file_names_rx.recv() {
             let file_path = std::env::current_dir().unwrap().join(&file_name);
@@ -119,9 +109,13 @@ impl TagProcessor {
             let mut tags =
                 lp.generate_tags(&mut parser, &code, &file_path_relative, &config, &file_path);
 
-            if let Ok(mut guard) = tags_lock.lock() {
-                guard.append(&mut tags);
+            if config.sort {
+                tags.sort_unstable_by(|a, b| a.sort_cmp(b));
             }
+
+            local_tags.append(&mut tags);
         }
+
+        local_tags
     }
 }

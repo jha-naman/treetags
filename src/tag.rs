@@ -90,6 +90,23 @@ impl Tag {
         })
     }
 
+    pub fn sort_cmp(&self, other: &Tag) -> std::cmp::Ordering {
+        self.name
+            .cmp(&other.name)
+            .then_with(|| self.file_name.cmp(&other.file_name))
+            .then_with(|| self.address.cmp(&other.address))
+            .then_with(|| self.kind.cmp(&other.kind))
+            .then_with(|| match (&self.extension_fields, &other.extension_fields) {
+                (None, None) => std::cmp::Ordering::Equal,
+                (None, Some(_)) => std::cmp::Ordering::Less,
+                (Some(_), None) => std::cmp::Ordering::Greater,
+                (Some(af), Some(bf)) => af
+                    .iter()
+                    .map(|(k, v)| (k.as_str(), v.as_str()))
+                    .cmp(bf.iter().map(|(k, v)| (k.as_str(), v.as_str()))),
+            })
+    }
+
     /// Converts the tag into a byte representation suitable for writing to a tags file
     ///
     /// # Returns

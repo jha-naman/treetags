@@ -23,6 +23,7 @@ use crate::config::Config;
 use crate::file_finder::FileFinder;
 use crate::tag_processor::TagProcessor;
 use crate::tag_writer::TagWriter;
+use rayon::slice::ParallelSliceMut;
 
 use clap_complete::generate;
 
@@ -74,13 +75,7 @@ fn main() {
     }
 
     if config.sort {
-        tags.sort_unstable_by(|a, b| {
-            a.name
-                .cmp(&b.name)
-                .then_with(|| a.file_name.cmp(&b.file_name))
-                .then_with(|| a.address.cmp(&b.address))
-                .then_with(|| a.kind.cmp(&b.kind))
-        });
+        tags.par_sort_unstable_by(|a, b| a.sort_cmp(b));
     }
 
     let tag_writer = TagWriter::new(tag_file_path);
