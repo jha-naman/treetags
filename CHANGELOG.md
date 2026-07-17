@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
  - Use rayon's parallel sort for sorting the tags
+ - Stop writing to a single Vec<Tag> from across workers
+ - Sort each files tags individually
 
 ## [0.9.0]
 
