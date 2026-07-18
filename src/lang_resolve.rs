@@ -133,9 +133,36 @@ fn basename(s: &str) -> &str {
     s.rsplit(['/', '\\']).next().unwrap_or(s)
 }
 
+/// Heuristically decides whether a header's content is C++ rather than C, for
+/// disambiguating ambiguous extensions like `.h`.
+///
+/// Looks for high-precision C++-only signals in a bounded content prefix.
+/// Returns `false` (i.e. "assume C") when no signal is present — matching
+/// ctags, which defaults `.h` to C. The signals are chosen to rarely appear in
+/// plain C or in prose comments; this is a heuristic, not a parser.
+pub fn looks_like_cpp(prefix: &[u8]) -> bool {
+    const SIGNALS: &[&str] = &[
+        "::",
+        "namespace",
+        "template<",
+        "template <",
+        "class ",
+        "public:",
+        "private:",
+        "protected:",
+        "virtual ",
+        "nullptr",
+        "using namespace",
+        "extern \"C\"",
+        "std::",
+    ];
+    let text = String::from_utf8_lossy(prefix);
+    SIGNALS.iter().any(|sig| text.contains(sig))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{glob_match, parse_shebang};
+    use super::{glob_match, looks_like_cpp, parse_shebang};
 
     #[test]
     fn exact_and_literal() {
@@ -205,6 +232,20 @@ mod tests {
             parse_shebang(b"#!/usr/bin/env FOO=bar ruby\n").as_deref(),
             Some("ruby")
         );
+    }
+
+    #[test]
+    fn cpp_detection() {
+        assert!(looks_like_cpp(b"class Widget {\npublic:\n  void run();\n};"));
+        assert!(looks_like_cpp(b"namespace app {\n}"));
+        assert!(looks_like_cpp(b"template <typename T>\nT id(T x);"));
+        assert!(looks_like_cpp(b"int n = std::max(a, b);"));
+        assert!(looks_like_cpp(b"extern \"C\" {\n#include <foo.h>\n}"));
+        // Plain C headers have no C++ signal -> assume C.
+        assert!(!looks_like_cpp(
+            b"#ifndef FOO_H\n#define FOO_H\nint add(int a, int b);\n#endif\n"
+        ));
+        assert!(!looks_like_cpp(b"typedef struct { int x; } Point;"));
     }
 
     #[test]

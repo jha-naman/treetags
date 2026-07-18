@@ -386,6 +386,18 @@ impl LanguageParserRegistry {
             }
         }
 
+        // Register `.h` as ambiguous between C and C++, resolved by content.
+        // Only when `.h` is owned solely by the builtin C parser (i.e. not
+        // claimed by a plugin or user grammar); C stays first so it remains the
+        // default when the selector is inconclusive.
+        let c_id = parsers.iter().position(|p| p.language_name() == "c");
+        let cpp_id = parsers.iter().position(|p| p.language_name() == "c++");
+        if let (Some(c_id), Some(cpp_id)) = (c_id, cpp_id) {
+            if by_extension.get("h").map(Vec::as_slice) == Some(&[c_id]) {
+                by_extension.insert("h".to_string(), vec![c_id, cpp_id]);
+            }
+        }
+
         // Map language names + aliases to `LangId` for `--language-force`.
         // Canonical names are inserted first so the highest-priority parser wins
         // on any collision; aliases (from every source) fill in afterwards.
@@ -496,6 +508,29 @@ impl LanguageParserRegistry {
                 return ids.first().copied();
             }
         }
+        None
+    }
+
+    /// Picks a single language from an ambiguous candidate set using a
+    /// content-based selector. Returns `None` when no selector applies to the
+    /// candidate group, leaving the caller to fall back to the highest-priority
+    /// candidate.
+    ///
+    /// `prefix` is a bounded head of the file's content.
+    pub fn disambiguate(&self, cands: &[LangId], prefix: &[u8]) -> Option<LangId> {
+        let name_of = |id: LangId| self.parsers[id].language_name();
+        let has = |name: &str| cands.iter().any(|&id| name_of(id) == name);
+
+        // C vs C++ (e.g. a `.h` header): default to C, choose C++ on evidence.
+        if has("c") && has("c++") {
+            let want = if crate::lang_resolve::looks_like_cpp(prefix) {
+                "c++"
+            } else {
+                "c"
+            };
+            return cands.iter().copied().find(|&id| name_of(id) == want);
+        }
+
         None
     }
 
@@ -618,6 +653,37 @@ mod tests {
         assert_eq!(lang_for(&reg, "foo.gemspec").as_deref(), Some("ruby"));
         assert_eq!(lang_for(&reg, "tasks.rake").as_deref(), Some("ruby"));
         assert_eq!(lang_for(&reg, "src/prompt.zsh").as_deref(), Some("shell"));
+    }
+
+    #[test]
+    fn h_header_disambiguates_c_vs_cpp() {
+        let reg = registry();
+        let ids = match reg.resolve_by_name(Path::new("include/foo.h")) {
+            NameResolution::Ambiguous(ids) => ids,
+            _ => panic!("expected .h to resolve as ambiguous C/C++"),
+        };
+        // Tie-break default (first candidate) is C.
+        assert_eq!(reg.parser(ids[0]).language_name(), "c");
+        // Content chooses the language.
+        assert_eq!(
+            reg.disambiguate(&ids, b"class Foo {\npublic:\n};")
+                .map(|id| reg.parser(id).language_name()),
+            Some("c++")
+        );
+        assert_eq!(
+            reg.disambiguate(&ids, b"int add(int a, int b);")
+                .map(|id| reg.parser(id).language_name()),
+            Some("c")
+        );
+    }
+
+    #[test]
+    fn plain_c_and_cpp_extensions_stay_unique() {
+        let reg = registry();
+        // Only `.h` is ambiguous; dedicated extensions remain unique.
+        assert_eq!(lang_for(&reg, "a.c").as_deref(), Some("c"));
+        assert_eq!(lang_for(&reg, "a.cpp").as_deref(), Some("c++"));
+        assert_eq!(lang_for(&reg, "a.hpp").as_deref(), Some("c++"));
     }
 
     #[test]

@@ -108,6 +108,11 @@ pub struct Config {
     #[arg(short = 'G', long = "guess-language-eagerly", verbatim_doc_comment)]
     pub guess_language_eagerly: bool,
 
+    /// Print the language selected for each given file (or `NONE`) and exit,
+    /// without generating tags. Useful for debugging language resolution.
+    #[arg(long = "print-language", verbatim_doc_comment)]
+    pub print_language: bool,
+
     /// Parsed fields configuration
     #[clap(skip)]
     pub fields_config: FieldsConfig,

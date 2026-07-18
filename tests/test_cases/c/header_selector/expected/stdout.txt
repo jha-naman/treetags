@@ -1,0 +1,5 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+API_H	api.h	/^#define API_H$/;"	d
+Point	api.h	/^struct Point {$/;"	s
+x	api.h	/^    int x;$/;"	m	struct:Point	typeref:typename:int
+y	api.h	/^    int y;$/;"	m	struct:Point	typeref:typename:int

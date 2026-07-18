@@ -185,12 +185,18 @@ For each input file, treetags picks a language in this order:
 2. **Filename patterns** — globs matched against the base name, e.g. `Rakefile`,
    `Gemfile`, `.bashrc`, or `*.gemspec`. This matches files that have no
    distinguishing extension.
-3. **File extension** — e.g. `.rs`, `.py`, `.rb`.
+3. **File extension** — e.g. `.rs`, `.py`, `.rb`. Some extensions map to more
+   than one language: `.h` may be C or C++, and treetags disambiguates by
+   scanning the file for C++ signals (`class`, `namespace`, `::`, …), defaulting
+   to C when there are none.
 4. **`#!` shebang line** — when the name gives no match, the interpreter
    (`python3`, `bash`, `ruby`, …) selects the language. To keep things cheap,
    this runs **only for files with the executable bit set**, unless you pass
    `--guess-language-eagerly` / `-G`, which enables it for every file. (On
    platforms without an executable bit, shebang detection requires `-G`.)
+
+Run `treetags --print-language <files...>` to see which language each file
+resolves to (or `NONE`) without generating tags.
 
 ## What does treetags do
 

@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+use std::path::Path;
 use std::process;
 
 mod built_in_grammars;
@@ -106,5 +107,22 @@ fn handle_early_exit_commands(config: &Config) -> bool {
         kinds_listing::handle(lang_opt, config);
         return true;
     }
+    if config.print_language {
+        print_languages(config);
+        return true;
+    }
     false
+}
+
+/// Prints the resolved language (or `NONE`) for each supplied file and returns.
+fn print_languages(config: &Config) {
+    let registry = language_parser::LanguageParserRegistry::new(config);
+    let cwd = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
+    for name in &config.file_names {
+        let path = cwd.join(name);
+        let lang = tag_processor::select_language(&registry, config, &path)
+            .map(|id| registry.parser(id).language_name().to_string())
+            .unwrap_or_else(|| "NONE".to_string());
+        println!("{}: {}", name, lang);
+    }
 }
