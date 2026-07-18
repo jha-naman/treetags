@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::language_parser::LanguageParserRegistry;
+use crate::language_parser::{LanguageParserRegistry, NameResolution};
 use crate::tag::Tag;
 use std::fs;
 use std::path::Path;
@@ -90,12 +90,12 @@ impl TagProcessor {
                 Err(_) => file_name.clone(),
             };
 
-            let Some(extension) = file_path.extension().and_then(|e| e.to_str()) else {
-                continue;
-            };
-
-            let Some(lp) = registry.for_extension(extension) else {
-                continue;
+            let lp = match registry.resolve_by_name(&file_path) {
+                NameResolution::Unique(id) => registry.parser(id),
+                // No ambiguous extensions exist yet; fall back to the
+                // highest-priority candidate until selectors land.
+                NameResolution::Ambiguous(ids) => registry.parser(ids[0]),
+                NameResolution::None => continue,
             };
 
             let code = match fs::read(&file_path) {

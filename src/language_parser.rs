@@ -154,13 +154,37 @@ impl LanguageParser for QueryLanguageParser {
 // Registry
 // ---------------------------------------------------------------------------
 
-/// Maps file extensions to `LanguageParser` strategies.
+/// Stable index into `LanguageParserRegistry::parsers`.
+pub type LangId = usize;
+
+/// Outcome of matching a file to languages by name (extension/pattern), before
+/// any content-based disambiguation.
+///
+/// Today only extension matching populates this, and every extension resolves
+/// to at most one candidate, so `Ambiguous` is not yet produced. Later phases
+/// (filename patterns, and co-registering `.h` for both C and C++) will start
+/// returning `Ambiguous`, which the worker resolves via selectors.
+pub enum NameResolution {
+    /// Exactly one language matched.
+    Unique(LangId),
+    /// Several languages matched; ordered by tie-break precedence.
+    Ambiguous(Vec<LangId>),
+    /// No language matched by name.
+    None,
+}
+
+/// Maps file names to `LanguageParser` strategies.
 ///
 /// One `Arc<LanguageParserRegistry>` is shared across all worker threads.
 /// Each worker thread has its own `Parser` (mutable execution engine), which
 /// is created via `create_parser`.
+///
+/// Each parser is owned once in `parsers`; the lookup tables store `LangId`
+/// indices into it. `by_extension` maps an extension to an ordered list of
+/// candidate languages (highest-priority first).
 pub struct LanguageParserRegistry {
-    by_extension: HashMap<String, Box<dyn LanguageParser>>,
+    parsers: Vec<Box<dyn LanguageParser>>,
+    by_extension: HashMap<String, Vec<LangId>>,
     grammar_store: Arc<GrammarStore>,
     /// Kept so `create_parser` can hand a shared compiled registry to each
     /// per-thread `Parser` for WASM execution.
@@ -178,11 +202,20 @@ impl LanguageParserRegistry {
             &config.plugin_cache,
         ));
 
-        let mut map: HashMap<String, Box<dyn LanguageParser>> = HashMap::new();
+        let mut parsers: Vec<Box<dyn LanguageParser>> = Vec::new();
+        let mut by_extension: HashMap<String, Vec<LangId>> = HashMap::new();
+
+        // Priorities are applied in order; the first tier to claim an extension
+        // owns it (matching the historical `or_insert_with` behaviour). Storing
+        // `Vec<LangId>` leaves room for later phases to register several
+        // candidates per extension and disambiguate by content.
 
         // Priority 1: WASM plugins
         let plugin_infos = scan_ext_infos(&config.plugin_dirs, Some(&config.plugins_dir));
         for info in plugin_infos {
+            if by_extension.contains_key(&info.ext) {
+                continue;
+            }
             let lang = info.lang.clone().unwrap_or_else(|| info.ext.clone());
             let kind_infos: Vec<KindInfo> = info
                 .kinds
@@ -193,34 +226,46 @@ impl LanguageParserRegistry {
                     default: mk.default,
                 })
                 .collect();
-            map.entry(info.ext.clone()).or_insert_with(|| {
-                Box::new(WasmLanguageParser {
-                    extension: info.ext,
-                    lang,
-                    kind_infos,
-                })
-            });
+            let id = parsers.len();
+            parsers.push(Box::new(WasmLanguageParser {
+                extension: info.ext.clone(),
+                lang,
+                kind_infos,
+            }));
+            by_extension.insert(info.ext, vec![id]);
         }
 
-        // Priority 2: Builtin tree-walker parsers
+        // Priority 2: Builtin tree-walker parsers.
+        // One parser instance per language, shared across all its extensions.
         for desc in BUILTIN_LANG_DESCRIPTORS {
-            let lp = BuiltinLanguageParser::from_desc(desc, config);
+            let id = parsers.len();
+            let mut used = false;
             for ext in desc.extensions {
-                map.entry(ext.to_string())
-                    .or_insert_with(|| Box::new(lp.clone()));
+                if by_extension.contains_key(*ext) {
+                    continue;
+                }
+                by_extension.insert((*ext).to_string(), vec![id]);
+                used = true;
+            }
+            if used {
+                parsers.push(Box::new(BuiltinLanguageParser::from_desc(desc, config)));
             }
         }
 
         // Priority 3: Query grammar fallbacks
         for (extensions, grammar_result) in crate::built_in_grammars::load() {
-            if grammar_result.is_ok() {
-                for ext in extensions {
-                    map.entry(ext.to_string()).or_insert_with(|| {
-                        Box::new(QueryLanguageParser {
-                            extension: ext.to_string(),
-                        })
-                    });
+            if grammar_result.is_err() {
+                continue;
+            }
+            for ext in extensions {
+                if by_extension.contains_key(ext) {
+                    continue;
                 }
+                let id = parsers.len();
+                parsers.push(Box::new(QueryLanguageParser {
+                    extension: ext.to_string(),
+                }));
+                by_extension.insert(ext.to_string(), vec![id]);
             }
         }
 
@@ -231,28 +276,49 @@ impl LanguageParserRegistry {
             for ext in
                 crate::user_grammars::resolve_extensions(&ug.language_name, ug.extensions.as_ref())
             {
-                map.entry(ext.clone())
-                    .or_insert_with(|| Box::new(QueryLanguageParser { extension: ext }));
+                if by_extension.contains_key(&ext) {
+                    continue;
+                }
+                let id = parsers.len();
+                parsers.push(Box::new(QueryLanguageParser {
+                    extension: ext.clone(),
+                }));
+                by_extension.insert(ext, vec![id]);
             }
         }
 
         Self {
-            by_extension: map,
+            parsers,
+            by_extension,
             grammar_store,
             plugin_registry,
         }
     }
 
-    /// Returns the `LanguageParser` for the given file extension, if any.
-    pub fn for_extension(&self, ext: &str) -> Option<&dyn LanguageParser> {
-        self.by_extension.get(ext).map(|b| b.as_ref())
+    /// Resolves a file to candidate languages by name (currently by extension).
+    /// Performs no file IO — content-based disambiguation of `Ambiguous`
+    /// results is the caller's responsibility.
+    pub fn resolve_by_name(&self, path: &Path) -> NameResolution {
+        let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
+            return NameResolution::None;
+        };
+        match self.by_extension.get(ext) {
+            Some(ids) if ids.len() == 1 => NameResolution::Unique(ids[0]),
+            Some(ids) if !ids.is_empty() => NameResolution::Ambiguous(ids.clone()),
+            _ => NameResolution::None,
+        }
+    }
+
+    /// Returns the parser for a resolved `LangId`.
+    pub fn parser(&self, id: LangId) -> &dyn LanguageParser {
+        self.parsers[id].as_ref()
     }
 
     /// Returns the `LanguageParser` for the given language name, if any.
     /// Searches by `language_name()`, stopping at first match.
     pub fn for_language(&self, lang: &str) -> Option<&dyn LanguageParser> {
-        self.by_extension
-            .values()
+        self.parsers
+            .iter()
             .map(|b| b.as_ref())
             .find(|lp| lp.language_name() == lang)
     }
@@ -260,7 +326,7 @@ impl LanguageParserRegistry {
     /// Iterates all registered parsers, deduplicated by language name.
     pub fn all_languages(&self) -> impl Iterator<Item = &dyn LanguageParser> {
         let mut seen = std::collections::HashSet::new();
-        self.by_extension.values().filter_map(move |b| {
+        self.parsers.iter().filter_map(move |b| {
             let lp = b.as_ref();
             if seen.insert(lp.language_name().to_string()) {
                 Some(lp)
