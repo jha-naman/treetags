@@ -12,6 +12,7 @@ use fields_config::FieldsConfig;
 
 mod extras_config;
 mod fields_config;
+pub mod lang_map;
 pub mod paths;
 mod plugin_config;
 mod user_grammars;
@@ -113,6 +114,23 @@ pub struct Config {
     #[arg(long = "print-language", verbatim_doc_comment)]
     pub print_language: bool,
 
+    /// Bulk language map edits: `<LANG>:<spec>[,<LANG>:<spec>...]`, where
+    /// `<spec>` is a run of `.ext` and `(pattern)` tokens. A leading `+`
+    /// appends; otherwise it replaces the language's mappings. Repeatable.
+    /// (Fine-grained edits use `--map-<LANG>=[+|-]<item>`.)
+    #[arg(long = "langmap", value_name = "MAP", verbatim_doc_comment)]
+    pub langmap: Vec<String>,
+
+    /// List the effective file extensions and filename patterns for each
+    /// language (or just LANG) and exit.
+    #[arg(long = "list-maps", value_name = "LANG", num_args = 0..=1, default_missing_value = "")]
+    pub list_maps: Option<String>,
+
+    /// Language map edits parsed from `--map-<LANG>` and `--langmap`, applied
+    /// when the registry is built.
+    #[clap(skip)]
+    pub lang_map_edits: lang_map::LangMapEdits,
+
     /// Parsed fields configuration
     #[clap(skip)]
     pub fields_config: FieldsConfig,
@@ -191,6 +209,10 @@ impl Config {
         // Strip --kinds-{lang} / --rust-kinds / --go-kinds so clap doesn't see unknown flags.
         let combined_args = plugin_config::strip_kinds_args(combined_args);
 
+        // Extract and strip --map-{lang} langmap edits (dynamic flag) before clap.
+        let map_edits = lang_map::extract_map_edits(&combined_args);
+        let combined_args = lang_map::strip_map_args(combined_args);
+
         // Scan plugin language names for help augmentation
         let plugin_langs = plugin_config::plugin_language_names(&combined_args);
 
@@ -244,6 +266,11 @@ impl Config {
             .unwrap_or_else(paths::get_default_plugins_dir);
         config.kinds_map = kinds_map;
         config.plugin_langs = plugin_langs;
+
+        // Bulk `--langmap` edits apply first, then fine-grained `--map-<LANG>`.
+        let mut edits = lang_map::parse_langmap_values(&config.langmap);
+        edits.extend(map_edits);
+        config.lang_map_edits = lang_map::LangMapEdits { edits };
 
         config
     }

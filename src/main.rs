@@ -111,7 +111,25 @@ fn handle_early_exit_commands(config: &Config) -> bool {
         print_languages(config);
         return true;
     }
+    if let Some(lang) = &config.list_maps {
+        list_maps(config, lang);
+        return true;
+    }
     false
+}
+
+/// Prints the effective extension/pattern maps (optionally for one language).
+fn list_maps(config: &Config, only: &str) {
+    let registry = language_parser::LanguageParserRegistry::new(config);
+    let filter = if only.is_empty() { None } else { Some(only) };
+    for (lang, exts, patterns) in registry.language_maps() {
+        if filter.is_some_and(|f| !lang.eq_ignore_ascii_case(f)) {
+            continue;
+        }
+        let mut items: Vec<String> = exts.iter().map(|e| format!(".{e}")).collect();
+        items.extend(patterns.iter().cloned());
+        println!("{:<12} {}", lang, items.join(" "));
+    }
 }
 
 /// Prints the resolved language (or `NONE`) for each supplied file and returns.

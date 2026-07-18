@@ -398,6 +398,24 @@ impl LanguageParserRegistry {
             }
         }
 
+        // Apply user langmap edits (`--map-<LANG>` / `--langmap`) over the
+        // built-in defaults. An unknown language name is a fatal error.
+        for edit in &config.lang_map_edits.edits {
+            match parsers
+                .iter()
+                .position(|p| p.language_name().eq_ignore_ascii_case(edit.lang()))
+            {
+                Some(id) => edit.apply(id, &mut by_extension, &mut by_pattern),
+                None => {
+                    eprintln!(
+                        "treetags: unknown language '{}' in --map/--langmap",
+                        edit.lang()
+                    );
+                    std::process::exit(1);
+                }
+            }
+        }
+
         // Map language names + aliases to `LangId` for `--language-force`.
         // Canonical names are inserted first so the highest-priority parser wins
         // on any collision; aliases (from every source) fill in afterwards.
@@ -539,6 +557,36 @@ impl LanguageParserRegistry {
         self.parsers[id].as_ref()
     }
 
+    /// Effective name mappings per language: `(language, sorted extensions,
+    /// patterns in priority order)`. Powers `--list-maps`.
+    pub fn language_maps(&self) -> Vec<(String, Vec<String>, Vec<String>)> {
+        use std::collections::{BTreeMap, BTreeSet};
+        let mut exts: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        let mut pats: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for (ext, ids) in &self.by_extension {
+            for &id in ids {
+                exts.entry(self.parsers[id].language_name().to_string())
+                    .or_default()
+                    .insert(ext.clone());
+            }
+        }
+        for (pat, id) in &self.by_pattern {
+            pats.entry(self.parsers[*id].language_name().to_string())
+                .or_default()
+                .push(pat.clone());
+        }
+        let mut langs: BTreeSet<String> = exts.keys().cloned().collect();
+        langs.extend(pats.keys().cloned());
+        langs
+            .into_iter()
+            .map(|lang| {
+                let e = exts.remove(&lang).unwrap_or_default();
+                let p = pats.remove(&lang).unwrap_or_default();
+                (lang, e.into_iter().collect(), p)
+            })
+            .collect()
+    }
+
     /// Returns the `LanguageParser` for the given language name, if any.
     /// Searches by `language_name()`, stopping at first match.
     pub fn for_language(&self, lang: &str) -> Option<&dyn LanguageParser> {
@@ -675,6 +723,52 @@ mod tests {
                 .map(|id| reg.parser(id).language_name()),
             Some("c")
         );
+    }
+
+    #[test]
+    fn langmap_edits_apply() {
+        use crate::config::lang_map::{LangMapEdit, LangMapEdits};
+
+        // Add an extension and a pattern.
+        let mut cfg = Config::for_test();
+        cfg.lang_map_edits = LangMapEdits {
+            edits: vec![
+                LangMapEdit::AddExt {
+                    lang: "c".into(),
+                    ext: "qc".into(),
+                },
+                LangMapEdit::AddPattern {
+                    lang: "ruby".into(),
+                    pattern: "Jarfile".into(),
+                },
+            ],
+        };
+        let reg = LanguageParserRegistry::new(&cfg);
+        assert_eq!(lang_for(&reg, "widget.qc").as_deref(), Some("c"));
+        assert_eq!(lang_for(&reg, "Jarfile").as_deref(), Some("ruby"));
+
+        // Remove C from `.h`, collapsing the ambiguity to C++.
+        let mut cfg = Config::for_test();
+        cfg.lang_map_edits = LangMapEdits {
+            edits: vec![LangMapEdit::RemoveExt {
+                lang: "c".into(),
+                ext: "h".into(),
+            }],
+        };
+        let reg = LanguageParserRegistry::new(&cfg);
+        assert_eq!(lang_for(&reg, "foo.h").as_deref(), Some("c++"));
+
+        // Replace a language's extensions wholesale.
+        let mut cfg = Config::for_test();
+        cfg.lang_map_edits = LangMapEdits {
+            edits: vec![LangMapEdit::Replace {
+                lang: "python".into(),
+                exts: vec!["mypy".into()],
+                patterns: vec![],
+            }],
+        };
+        let reg = LanguageParserRegistry::new(&cfg);
+        assert_eq!(lang_for(&reg, "a.mypy").as_deref(), Some("python"));
     }
 
     #[test]

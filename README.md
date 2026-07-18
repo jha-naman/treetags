@@ -198,6 +198,20 @@ For each input file, treetags picks a language in this order:
 Run `treetags --print-language <files...>` to see which language each file
 resolves to (or `NONE`) without generating tags.
 
+### Customizing the language map
+
+You can override which extensions and filename patterns map to a language
+(syntax mirrors Universal Ctags):
+
+- `--map-<LANG>=[+|-]<item>` — add (`+`, the default) or remove (`-`) a single
+  `.ext` extension or `(pattern)` glob. Repeatable. Examples:
+  `--map-c=.qc`, `--map-ruby=(Jarfile)`, `--map-c=-.h`.
+- `--langmap=<LANG>:<spec>[,<LANG>:<spec>...]` — bulk form. `<spec>` is a run of
+  `.ext` and `(pattern)` tokens (e.g. `.c.h` or `(Makefile).mak`). A leading `+`
+  on the spec appends; otherwise it replaces the language's mappings.
+- `--list-maps[=<LANG>]` — print the effective extensions and patterns for every
+  language (or just `<LANG>`) and exit.
+
 ## What does treetags do
 
 Treetags creates a tags file that vim can use for allowing the user to easily
