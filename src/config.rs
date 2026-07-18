@@ -236,6 +236,26 @@ impl Config {
         config
     }
 
+    /// Builds a `Config` with default values for unit tests.
+    ///
+    /// Unlike [`Config::new`], this does not read `std::env::args()`, scan
+    /// plugin directories, or load user-grammar config files. Plugin and
+    /// user-grammar sources are forced empty so that language resolution is
+    /// deterministic and independent of the host environment.
+    #[cfg(test)]
+    pub(crate) fn for_test() -> Self {
+        let mut config = Self::try_parse_from(["treetags"]).expect("default args parse");
+        config.sort = true;
+        config.recurse = true;
+        config.append = false;
+        config.extras_config = ExtrasConfig::from_string(&config.extras);
+        config.fields_config = FieldsConfig::from_string(&config.fields);
+        config.user_grammars = Vec::new();
+        config.plugin_dirs = Vec::new();
+        config.plugins_dir = std::path::PathBuf::new();
+        config
+    }
+
     /// Extracts the `--options` value from raw args without clap.
     fn extract_options_path(args: &[String]) -> String {
         extract_flag_values(args, "options")

@@ -344,3 +344,61 @@ impl LanguageParserRegistry {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+
+    fn registry() -> LanguageParserRegistry {
+        LanguageParserRegistry::new(&Config::for_test())
+    }
+
+    /// Language selected for a file name, taking the highest-priority candidate
+    /// (mirrors the worker's Phase 0 resolution).
+    fn lang_for(reg: &LanguageParserRegistry, file: &str) -> Option<String> {
+        match reg.resolve_by_name(Path::new(file)) {
+            NameResolution::Unique(id) => Some(reg.parser(id).language_name().to_string()),
+            NameResolution::Ambiguous(ids) => Some(reg.parser(ids[0]).language_name().to_string()),
+            NameResolution::None => None,
+        }
+    }
+
+    #[test]
+    fn resolves_builtin_extensions() {
+        let reg = registry();
+        assert_eq!(lang_for(&reg, "src/main.rs").as_deref(), Some("rust"));
+        assert_eq!(lang_for(&reg, "app.go").as_deref(), Some("go"));
+    }
+
+    #[test]
+    fn builtin_tree_walker_wins_over_query_fallback() {
+        // `.py` is claimed by both the builtin Python tree-walker (priority 2)
+        // and the query-grammar fallback (priority 3). The builtin must win.
+        let reg = registry();
+        assert_eq!(lang_for(&reg, "script.py").as_deref(), Some("python"));
+    }
+
+    #[test]
+    fn extension_matching_is_case_sensitive() {
+        // `.h` -> C, `.H` -> C++: the distinction relies on case-sensitive
+        // extension matching (see src/parser/cpp.rs extension tables).
+        let reg = registry();
+        assert_eq!(lang_for(&reg, "foo.h").as_deref(), Some("c"));
+        assert_eq!(lang_for(&reg, "foo.H").as_deref(), Some("c++"));
+    }
+
+    #[test]
+    fn unknown_and_extensionless_resolve_to_none() {
+        let reg = registry();
+        assert!(matches!(
+            reg.resolve_by_name(Path::new("notes.unknownext")),
+            NameResolution::None
+        ));
+        // Extensionless files are not matched yet (filename patterns land later).
+        assert!(matches!(
+            reg.resolve_by_name(Path::new("Makefile")),
+            NameResolution::None
+        ));
+    }
+}
