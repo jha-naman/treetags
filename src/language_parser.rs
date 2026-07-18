@@ -185,10 +185,38 @@ pub enum NameResolution {
 pub struct LanguageParserRegistry {
     parsers: Vec<Box<dyn LanguageParser>>,
     by_extension: HashMap<String, Vec<LangId>>,
+    /// Set by `--language-force`; when present, every file resolves to this
+    /// language regardless of its name.
+    forced: Option<LangId>,
     grammar_store: Arc<GrammarStore>,
     /// Kept so `create_parser` can hand a shared compiled registry to each
     /// per-thread `Parser` for WASM execution.
     plugin_registry: Arc<PluginRegistry>,
+}
+
+/// Resolves a `--language-force` value against the known language/alias map.
+///
+/// Returns `Ok(None)` when forcing is disabled (empty or `auto`), `Ok(Some(id))`
+/// for a recognized name/alias, and `Err(message)` — listing the known
+/// languages — for an unrecognized value.
+fn resolve_forced_language(
+    force: &str,
+    aliases: &HashMap<String, LangId>,
+) -> Result<Option<LangId>, String> {
+    let trimmed = force.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("auto") {
+        return Ok(None);
+    }
+    if let Some(&id) = aliases.get(&trimmed.to_lowercase()) {
+        return Ok(Some(id));
+    }
+    let mut known: Vec<&str> = aliases.keys().map(|s| s.as_str()).collect();
+    known.sort_unstable();
+    Err(format!(
+        "treetags: unknown --language-force '{}'; known languages: {}",
+        force,
+        known.join(", ")
+    ))
 }
 
 impl LanguageParserRegistry {
@@ -287,9 +315,33 @@ impl LanguageParserRegistry {
             }
         }
 
+        // Map language names + builtin aliases to `LangId` for `--language-force`.
+        // Canonical names are inserted first so the highest-priority parser wins
+        // on any collision; builtin aliases fill in afterwards.
+        let mut aliases: HashMap<String, LangId> = HashMap::new();
+        for (id, p) in parsers.iter().enumerate() {
+            aliases.entry(p.language_name().to_lowercase()).or_insert(id);
+        }
+        for desc in BUILTIN_LANG_DESCRIPTORS {
+            if let Some(&id) = aliases.get(&desc.lang.to_lowercase()) {
+                for alias in desc.aliases {
+                    aliases.entry(alias.to_lowercase()).or_insert(id);
+                }
+            }
+        }
+
+        let forced = match resolve_forced_language(&config.language_force, &aliases) {
+            Ok(f) => f,
+            Err(msg) => {
+                eprintln!("{}", msg);
+                std::process::exit(1);
+            }
+        };
+
         Self {
             parsers,
             by_extension,
+            forced,
             grammar_store,
             plugin_registry,
         }
@@ -298,7 +350,13 @@ impl LanguageParserRegistry {
     /// Resolves a file to candidate languages by name (currently by extension).
     /// Performs no file IO — content-based disambiguation of `Ambiguous`
     /// results is the caller's responsibility.
+    ///
+    /// When `--language-force` is set, every file resolves to the forced
+    /// language regardless of its name.
     pub fn resolve_by_name(&self, path: &Path) -> NameResolution {
+        if let Some(id) = self.forced {
+            return NameResolution::Unique(id);
+        }
         let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
             return NameResolution::None;
         };
@@ -354,6 +412,12 @@ mod tests {
         LanguageParserRegistry::new(&Config::for_test())
     }
 
+    fn registry_forced(lang: &str) -> LanguageParserRegistry {
+        let mut cfg = Config::for_test();
+        cfg.language_force = lang.to_string();
+        LanguageParserRegistry::new(&cfg)
+    }
+
     /// Language selected for a file name, taking the highest-priority candidate
     /// (mirrors the worker's Phase 0 resolution).
     fn lang_for(reg: &LanguageParserRegistry, file: &str) -> Option<String> {
@@ -400,5 +464,48 @@ mod tests {
             reg.resolve_by_name(Path::new("Makefile")),
             NameResolution::None
         ));
+    }
+
+    #[test]
+    fn language_force_overrides_name_selection() {
+        let reg = registry_forced("python");
+        // Every file — including non-Python, unknown, and extensionless — becomes Python.
+        assert_eq!(lang_for(&reg, "notes.txt").as_deref(), Some("python"));
+        assert_eq!(lang_for(&reg, "Makefile").as_deref(), Some("python"));
+        assert_eq!(lang_for(&reg, "src/main.rs").as_deref(), Some("python"));
+    }
+
+    #[test]
+    fn language_force_accepts_aliases_case_insensitively() {
+        assert_eq!(lang_for(&registry_forced("golang"), "x.rs").as_deref(), Some("go"));
+        assert_eq!(lang_for(&registry_forced("CPP"), "x.rs").as_deref(), Some("c++"));
+        assert_eq!(
+            lang_for(&registry_forced("JavaScript"), "x.py").as_deref(),
+            Some("javascript")
+        );
+    }
+
+    #[test]
+    fn language_force_auto_and_empty_disable_forcing() {
+        assert_eq!(lang_for(&registry_forced("auto"), "x.rs").as_deref(), Some("rust"));
+        assert_eq!(lang_for(&registry_forced(""), "x.rs").as_deref(), Some("rust"));
+    }
+
+    #[test]
+    fn resolve_forced_language_cases() {
+        let mut aliases = HashMap::new();
+        aliases.insert("python".to_string(), 3usize);
+        aliases.insert("c++".to_string(), 5usize);
+        aliases.insert("cpp".to_string(), 5usize);
+
+        assert_eq!(resolve_forced_language("", &aliases), Ok(None));
+        assert_eq!(resolve_forced_language("auto", &aliases), Ok(None));
+        assert_eq!(resolve_forced_language("AUTO", &aliases), Ok(None));
+        assert_eq!(resolve_forced_language("Python", &aliases), Ok(Some(3)));
+        assert_eq!(resolve_forced_language("CPP", &aliases), Ok(Some(5)));
+
+        let err = resolve_forced_language("nope", &aliases).unwrap_err();
+        assert!(err.contains("unknown --language-force 'nope'"));
+        assert!(err.contains("python"));
     }
 }

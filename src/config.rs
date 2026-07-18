@@ -96,10 +96,11 @@ pub struct Config {
     /// Include selected extension fields (e.g., +l for line numbers, +S for signatures)
     #[arg(long = "fields", default_value = "", verbatim_doc_comment)]
     pub fields: String,
-    /// Value passed in this arg is currently being ignored.
-    /// Kept for compatibility with `tagbar` plugin.
+    /// Force a language for every input file, bypassing name-based selection.
+    /// Accepts a language name or alias (case-insensitive). The special value
+    /// `auto` (or empty) disables forcing and restores automatic selection.
     #[arg(long = "language-force", default_value = "", verbatim_doc_comment)]
-    pub _language_force: String,
+    pub language_force: String,
 
     /// Parsed fields configuration
     #[clap(skip)]
