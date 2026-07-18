@@ -189,6 +189,9 @@ pub enum NameResolution {
 pub struct LanguageParserRegistry {
     parsers: Vec<Box<dyn LanguageParser>>,
     by_extension: HashMap<String, Vec<LangId>>,
+    /// Filename glob patterns in registration (priority) order. Matched against
+    /// the basename before extensions.
+    by_pattern: Vec<(String, LangId)>,
     /// Set by `--language-force`; when present, every file resolves to this
     /// language regardless of its name.
     forced: Option<LangId>,
@@ -239,6 +242,8 @@ impl LanguageParserRegistry {
         // Force aliases collected per source, applied after canonical names so
         // that a canonical name always wins over an alias on collision.
         let mut alias_specs: Vec<(LangId, String)> = Vec::new();
+        // Filename glob patterns in tier/registration order.
+        let mut by_pattern: Vec<(String, LangId)> = Vec::new();
 
         // Priorities are applied in order; the first tier to claim an extension
         // owns it (matching the historical `or_insert_with` behaviour). Storing
@@ -265,6 +270,9 @@ impl LanguageParserRegistry {
             for alias in &info.aliases {
                 alias_specs.push((id, alias.clone()));
             }
+            for pat in &info.patterns {
+                by_pattern.push((pat.clone(), id));
+            }
             parsers.push(Box::new(WasmLanguageParser {
                 extension: info.ext.clone(),
                 lang,
@@ -289,6 +297,9 @@ impl LanguageParserRegistry {
                 for alias in desc.aliases {
                     alias_specs.push((id, (*alias).to_string()));
                 }
+                for pat in desc.patterns {
+                    by_pattern.push(((*pat).to_string(), id));
+                }
                 parsers.push(Box::new(BuiltinLanguageParser::from_desc(desc, config)));
             }
         }
@@ -298,19 +309,28 @@ impl LanguageParserRegistry {
             if grammar.config.is_err() {
                 continue;
             }
+            // A grammar spans several extensions; its aliases and patterns attach
+            // to the first (representative) parser created for it.
+            let mut rep_id: Option<LangId> = None;
             for ext in grammar.extensions {
                 if by_extension.contains_key(*ext) {
                     continue;
                 }
                 let id = parsers.len();
-                for alias in grammar.aliases {
-                    alias_specs.push((id, (*alias).to_string()));
-                }
+                rep_id.get_or_insert(id);
                 parsers.push(Box::new(QueryLanguageParser {
                     extension: (*ext).to_string(),
                     lang: grammar.lang.to_string(),
                 }));
                 by_extension.insert((*ext).to_string(), vec![id]);
+            }
+            if let Some(id) = rep_id {
+                for alias in grammar.aliases {
+                    alias_specs.push((id, (*alias).to_string()));
+                }
+                for pat in grammar.patterns {
+                    by_pattern.push(((*pat).to_string(), id));
+                }
             }
         }
 
@@ -318,6 +338,7 @@ impl LanguageParserRegistry {
         // Extensions registered for routing; TagsConfiguration and library
         // lifetimes are held by the shared GrammarStore.
         for ug in &config.user_grammars {
+            let mut rep_id: Option<LangId> = None;
             for ext in
                 crate::user_grammars::resolve_extensions(&ug.language_name, ug.extensions.as_ref())
             {
@@ -325,11 +346,26 @@ impl LanguageParserRegistry {
                     continue;
                 }
                 let id = parsers.len();
+                rep_id.get_or_insert(id);
                 parsers.push(Box::new(QueryLanguageParser {
                     extension: ext.clone(),
                     lang: ug.language_name.clone(),
                 }));
                 by_extension.insert(ext, vec![id]);
+            }
+            // Patterns attach to the grammar's representative parser. A grammar
+            // needs at least one extension so its compiled config is reachable in
+            // GrammarStore (which is keyed by extension); pattern-only user
+            // grammars are therefore not supported and their patterns are skipped.
+            if let Some(id) = rep_id {
+                for pat in &ug.patterns {
+                    by_pattern.push((pat.clone(), id));
+                }
+            } else if !ug.patterns.is_empty() {
+                eprintln!(
+                    "treetags: ignoring patterns for user grammar '{}': it declares no extensions",
+                    ug.language_name
+                );
             }
         }
 
@@ -355,29 +391,63 @@ impl LanguageParserRegistry {
         Self {
             parsers,
             by_extension,
+            by_pattern,
             forced,
             grammar_store,
             plugin_registry,
         }
     }
 
-    /// Resolves a file to candidate languages by name (currently by extension).
-    /// Performs no file IO — content-based disambiguation of `Ambiguous`
-    /// results is the caller's responsibility.
+    /// Resolves a file to candidate languages by name. Performs no file IO —
+    /// content-based disambiguation of `Ambiguous` results is the caller's
+    /// responsibility.
     ///
-    /// When `--language-force` is set, every file resolves to the forced
-    /// language regardless of its name.
+    /// Resolution order (matching ctags): `--language-force`, then filename
+    /// glob patterns, then file extension. Patterns take full precedence — if
+    /// any pattern matches the basename, the extension is not consulted.
     pub fn resolve_by_name(&self, path: &Path) -> NameResolution {
         if let Some(id) = self.forced {
             return NameResolution::Unique(id);
         }
-        let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
-            return NameResolution::None;
-        };
-        match self.by_extension.get(ext) {
-            Some(ids) if ids.len() == 1 => NameResolution::Unique(ids[0]),
-            Some(ids) if !ids.is_empty() => NameResolution::Ambiguous(ids.clone()),
-            _ => NameResolution::None,
+
+        // Stage 1: filename patterns against the basename.
+        let mut cands: Vec<LangId> = Vec::new();
+        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+            for (pat, id) in &self.by_pattern {
+                if crate::lang_resolve::glob_match(pat, name) {
+                    cands.push(*id);
+                }
+            }
+        }
+
+        // Stage 2: file extension (only when no pattern matched).
+        if cands.is_empty() {
+            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                if let Some(ids) = self.by_extension.get(ext) {
+                    cands.extend_from_slice(ids);
+                }
+            }
+        }
+
+        self.finalize_candidates(cands)
+    }
+
+    /// Deduplicates candidates by language name (preserving order) and collapses
+    /// to `Unique`/`Ambiguous`/`None`. Dedup keeps a single candidate when the
+    /// same language is reached via multiple keys (e.g. a plugin declaring a
+    /// pattern across several of its extensions).
+    fn finalize_candidates(&self, cands: Vec<LangId>) -> NameResolution {
+        let mut seen = std::collections::HashSet::new();
+        let mut unique: Vec<LangId> = Vec::new();
+        for id in cands {
+            if seen.insert(self.parsers[id].language_name()) {
+                unique.push(id);
+            }
+        }
+        match unique.len() {
+            0 => NameResolution::None,
+            1 => NameResolution::Unique(unique[0]),
+            _ => NameResolution::Ambiguous(unique),
         }
     }
 
@@ -473,11 +543,33 @@ mod tests {
             reg.resolve_by_name(Path::new("notes.unknownext")),
             NameResolution::None
         ));
-        // Extensionless files are not matched yet (filename patterns land later).
+        // Extensionless files with no matching pattern are skipped (no Make parser).
         assert!(matches!(
             reg.resolve_by_name(Path::new("Makefile")),
             NameResolution::None
         ));
+        assert!(matches!(
+            reg.resolve_by_name(Path::new("README")),
+            NameResolution::None
+        ));
+    }
+
+    #[test]
+    fn filename_patterns_match_extensionless_files() {
+        let reg = registry();
+        assert_eq!(lang_for(&reg, "Rakefile").as_deref(), Some("ruby"));
+        assert_eq!(lang_for(&reg, "Gemfile").as_deref(), Some("ruby"));
+        assert_eq!(lang_for(&reg, "project/.bashrc").as_deref(), Some("shell"));
+        assert_eq!(lang_for(&reg, "PKGBUILD").as_deref(), Some("shell"));
+        assert_eq!(lang_for(&reg, "SConstruct").as_deref(), Some("python"));
+    }
+
+    #[test]
+    fn glob_patterns_match_by_basename() {
+        let reg = registry();
+        assert_eq!(lang_for(&reg, "foo.gemspec").as_deref(), Some("ruby"));
+        assert_eq!(lang_for(&reg, "tasks.rake").as_deref(), Some("ruby"));
+        assert_eq!(lang_for(&reg, "src/prompt.zsh").as_deref(), Some("shell"));
     }
 
     #[test]

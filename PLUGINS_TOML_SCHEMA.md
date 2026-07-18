@@ -10,6 +10,7 @@
 | `extensions` | array of strings | yes | — | File extensions this plugin handles (e.g. `["java"]`) |
 | `language` | string | no | — | Language name used to match `--kinds-{lang}=fn` CLI argument and `--language-force` |
 | `aliases` | array of strings | no | `[]` | Additional names accepted by `--language-force` for this plugin's language |
+| `patterns` | array of strings | no | `[]` | `fnmatch`-style filename globs (matched against the basename) that select this plugin, e.g. `Dockerfile` or `*.bzl` |
 | `wasm_file` | string | no | `"plugin.wasm"` | Path to the `.wasm` component file, relative to this manifest file. `treetags-build-plugin` sets it to `plugin.wasm` explicitly|
 | `[[kinds]]` | array of `Kind` | no | — | Tag kinds the plugin can generate; used for `--list-kinds` output |
 

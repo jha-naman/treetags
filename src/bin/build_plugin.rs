@@ -269,6 +269,8 @@ extensions = []
 # language = "java"
 # Extra names accepted by --language-force (optional)
 # aliases = ["jvm"]
+# Filename globs (matched against the basename) that select this plugin (optional)
+# patterns = ["Dockerfile", "*.bzl"]
 "#;
     std::fs::write(path, template)
         .map_err(|e| anyhow::anyhow!("cannot write {}: {e}", path.display()))

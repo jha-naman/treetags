@@ -21,6 +21,7 @@ pub mod built_in_grammars;
 pub mod builtin_langs;
 pub mod config;
 pub mod file_finder;
+pub mod lang_resolve;
 pub mod language_parser;
 pub mod parser;
 pub mod plugin;

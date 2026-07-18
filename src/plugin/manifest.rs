@@ -30,6 +30,10 @@ pub struct PluginManifest {
     /// language. Defaults to empty when omitted from `plugin.toml`.
     #[serde(default)]
     pub aliases: Vec<String>,
+    /// `fnmatch`-style filename globs (matched against the basename) that select
+    /// this plugin, e.g. `Dockerfile` or `*.bzl`. Defaults to empty.
+    #[serde(default)]
+    pub patterns: Vec<String>,
     /// Path to the .wasm component file, relative to the directory containing this manifest.
     #[serde(default = "default_wasm_file")]
     pub wasm_file: String,

@@ -15,6 +15,7 @@ struct PluginEntry {
     wasm_path: PathBuf,
     language: Option<String>,
     aliases: Vec<String>,
+    patterns: Vec<String>,
     name: String,
     kinds: Vec<super::manifest::ManifestKind>,
 }
@@ -238,6 +239,7 @@ pub struct PluginExtInfo {
     pub ext: String,
     pub lang: Option<String>,
     pub aliases: Vec<String>,
+    pub patterns: Vec<String>,
     pub kinds: Vec<super::manifest::ManifestKind>,
 }
 
@@ -250,6 +252,7 @@ pub fn scan_ext_infos(dirs: &[PathBuf], plugins_dir: Option<&PathBuf>) -> Vec<Pl
             ext,
             lang: entry.language,
             aliases: entry.aliases,
+            patterns: entry.patterns,
             kinds: entry.kinds,
         })
         .collect()
@@ -383,6 +386,7 @@ fn load_manifest(manifest_path: &Path, entries: &mut HashMap<String, PluginEntry
     }
     let language = manifest.language.clone();
     let aliases = manifest.aliases.clone();
+    let patterns = manifest.patterns.clone();
     let name = manifest.name.clone();
     let kinds = manifest.kinds.clone().unwrap_or_default();
     for ext in &manifest.extensions {
@@ -392,6 +396,7 @@ fn load_manifest(manifest_path: &Path, entries: &mut HashMap<String, PluginEntry
                 wasm_path: wasm_path.clone(),
                 language: language.clone(),
                 aliases: aliases.clone(),
+                patterns: patterns.clone(),
                 name: name.clone(),
                 kinds: kinds.clone(),
             },

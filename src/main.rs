@@ -7,6 +7,7 @@ mod builtin_langs;
 mod config;
 mod file_finder;
 mod kinds_listing;
+mod lang_resolve;
 mod language_parser;
 mod parser;
 mod plugin;
