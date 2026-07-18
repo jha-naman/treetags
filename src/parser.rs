@@ -48,11 +48,11 @@ impl GrammarStore {
         let mut grammar_configs = Vec::new();
         let mut extension_config_map = HashMap::new();
 
-        for (extensions, config_res) in built_in_grammars::load() {
+        for grammar in built_in_grammars::load() {
             let index = grammar_configs.len();
-            grammar_configs.push(config_res);
-            for ext in extensions {
-                extension_config_map.insert(ext.to_string(), index);
+            grammar_configs.push(grammar.config);
+            for ext in grammar.extensions {
+                extension_config_map.insert((*ext).to_string(), index);
             }
         }
 

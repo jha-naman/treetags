@@ -23,8 +23,13 @@ pub struct PluginManifest {
     /// ABI version the plugin targets. Must match the host's `PLUGIN_ABI_VERSION`.
     pub abi_version: u32,
     pub extensions: Vec<String>,
-    /// Language name used to look up `--kinds-{lang}` config.
+    /// Language name used to look up `--kinds-{lang}` config and to match
+    /// `--language-force`.
     pub language: Option<String>,
+    /// Additional names accepted by `--language-force` for this plugin's
+    /// language. Defaults to empty when omitted from `plugin.toml`.
+    #[serde(default)]
+    pub aliases: Vec<String>,
     /// Path to the .wasm component file, relative to the directory containing this manifest.
     #[serde(default = "default_wasm_file")]
     pub wasm_file: String,

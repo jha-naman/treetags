@@ -2,117 +2,149 @@ use crate::queries;
 use crate::tags_config::get_tags_config;
 use tree_sitter_tags::TagsConfiguration;
 
-pub fn load() -> Vec<(
-    Vec<&'static str>,
-    Result<TagsConfiguration, tree_sitter_tags::Error>,
-)> {
+/// A built-in query-based grammar: its canonical language name, `--language-force`
+/// aliases, file extensions, and compiled tags configuration.
+pub struct BuiltinGrammar {
+    pub lang: &'static str,
+    pub aliases: &'static [&'static str],
+    pub extensions: &'static [&'static str],
+    pub config: Result<TagsConfiguration, tree_sitter_tags::Error>,
+}
+
+pub fn load() -> Vec<BuiltinGrammar> {
     vec![
-        (
-            vec!["rb"],
-            get_tags_config(
+        BuiltinGrammar {
+            lang: "ruby",
+            aliases: &[],
+            extensions: &["rb"],
+            config: get_tags_config(
                 tree_sitter_ruby::LANGUAGE.into(),
                 tree_sitter_ruby::TAGS_QUERY,
                 "ruby",
             ),
-        ),
-        (
-            vec!["py", "pyw"],
-            get_tags_config(
+        },
+        BuiltinGrammar {
+            lang: "python",
+            aliases: &[],
+            extensions: &["py", "pyw"],
+            config: get_tags_config(
                 tree_sitter_python::LANGUAGE.into(),
                 tree_sitter_python::TAGS_QUERY,
                 "python",
             ),
-        ),
-        (
-            vec!["c", "h", "i"],
-            get_tags_config(
+        },
+        BuiltinGrammar {
+            lang: "c",
+            aliases: &[],
+            extensions: &["c", "h", "i"],
+            config: get_tags_config(
                 tree_sitter_c::LANGUAGE.into(),
                 tree_sitter_c::TAGS_QUERY,
                 "c",
             ),
-        ),
-        (
-            vec![
+        },
+        BuiltinGrammar {
+            lang: "c++",
+            aliases: &["cpp", "cxx", "cplusplus"],
+            extensions: &[
                 "cc", "cpp", "CPP", "cxx", "c++", "cp", "C", "cppm", "ixx", "ii", "H", "hh", "hpp",
                 "HPP", "hxx", "h++", "tcc",
             ],
-            get_tags_config(
+            config: get_tags_config(
                 tree_sitter_cpp::LANGUAGE.into(),
                 tree_sitter_cpp::TAGS_QUERY,
                 "c++",
             ),
-        ),
-        (
-            vec!["java"],
-            get_tags_config(
+        },
+        BuiltinGrammar {
+            lang: "java",
+            aliases: &[],
+            extensions: &["java"],
+            config: get_tags_config(
                 tree_sitter_java::LANGUAGE.into(),
                 tree_sitter_java::TAGS_QUERY,
                 "java",
             ),
-        ),
-        (
-            vec!["ml"],
-            get_tags_config(
+        },
+        BuiltinGrammar {
+            lang: "ocaml",
+            aliases: &[],
+            extensions: &["ml"],
+            config: get_tags_config(
                 tree_sitter_ocaml::LANGUAGE_OCAML.into(),
                 tree_sitter_ocaml::TAGS_QUERY,
                 "ocaml",
             ),
-        ),
-        (
-            vec!["php"],
-            get_tags_config(
+        },
+        BuiltinGrammar {
+            lang: "php",
+            aliases: &[],
+            extensions: &["php"],
+            config: get_tags_config(
                 tree_sitter_php::LANGUAGE_PHP.into(),
                 tree_sitter_php::TAGS_QUERY,
                 "php",
             ),
-        ),
-        (
-            vec!["ex"],
-            get_tags_config(
+        },
+        BuiltinGrammar {
+            lang: "elixir",
+            aliases: &[],
+            extensions: &["ex"],
+            config: get_tags_config(
                 tree_sitter_elixir::LANGUAGE.into(),
                 tree_sitter_elixir::TAGS_QUERY,
                 "elixir",
             ),
-        ),
-        (
-            vec!["lua"],
-            get_tags_config(
+        },
+        BuiltinGrammar {
+            lang: "lua",
+            aliases: &[],
+            extensions: &["lua"],
+            config: get_tags_config(
                 tree_sitter_lua::LANGUAGE.into(),
                 tree_sitter_lua::TAGS_QUERY,
                 "lua",
             ),
-        ),
-        (
-            vec!["cs"],
-            get_tags_config(
+        },
+        BuiltinGrammar {
+            lang: "c#",
+            aliases: &["csharp"],
+            extensions: &["cs"],
+            config: get_tags_config(
                 tree_sitter_c_sharp::LANGUAGE.into(),
                 queries::C_SHARP_TAGS_QUERY,
                 "c#",
             ),
-        ),
-        (
-            vec!["sh", "bash"],
-            get_tags_config(
+        },
+        BuiltinGrammar {
+            lang: "shell",
+            aliases: &["sh", "bash"],
+            extensions: &["sh", "bash"],
+            config: get_tags_config(
                 tree_sitter_bash::LANGUAGE.into(),
                 queries::BASH_TAGS_QUERY,
-                "bash",
+                "shell",
             ),
-        ),
-        (
-            vec!["scala"],
-            get_tags_config(
+        },
+        BuiltinGrammar {
+            lang: "scala",
+            aliases: &[],
+            extensions: &["scala"],
+            config: get_tags_config(
                 tree_sitter_scala::LANGUAGE.into(),
                 queries::SCALA_TAGS_QUERY,
                 "scala",
             ),
-        ),
-        (
-            vec!["jl"],
-            get_tags_config(
+        },
+        BuiltinGrammar {
+            lang: "julia",
+            aliases: &[],
+            extensions: &["jl"],
+            config: get_tags_config(
                 tree_sitter_julia::LANGUAGE.into(),
                 queries::JULIA_TAGS_QUERY,
                 "julia",
             ),
-        ),
+        },
     ]
 }

@@ -126,7 +126,11 @@ impl LanguageParser for WasmLanguageParser {
 // ---------------------------------------------------------------------------
 
 pub(crate) struct QueryLanguageParser {
+    /// File extension used to look up the compiled grammar in `GrammarStore`.
     extension: String,
+    /// Canonical language name (e.g. `ruby`, `shell`), used for `--list-kinds`
+    /// and `--language-force`.
+    lang: String,
 }
 
 impl LanguageParser for QueryLanguageParser {
@@ -146,7 +150,7 @@ impl LanguageParser for QueryLanguageParser {
     }
 
     fn language_name(&self) -> &str {
-        &self.extension
+        &self.lang
     }
 }
 
@@ -232,6 +236,9 @@ impl LanguageParserRegistry {
 
         let mut parsers: Vec<Box<dyn LanguageParser>> = Vec::new();
         let mut by_extension: HashMap<String, Vec<LangId>> = HashMap::new();
+        // Force aliases collected per source, applied after canonical names so
+        // that a canonical name always wins over an alias on collision.
+        let mut alias_specs: Vec<(LangId, String)> = Vec::new();
 
         // Priorities are applied in order; the first tier to claim an extension
         // owns it (matching the historical `or_insert_with` behaviour). Storing
@@ -255,6 +262,9 @@ impl LanguageParserRegistry {
                 })
                 .collect();
             let id = parsers.len();
+            for alias in &info.aliases {
+                alias_specs.push((id, alias.clone()));
+            }
             parsers.push(Box::new(WasmLanguageParser {
                 extension: info.ext.clone(),
                 lang,
@@ -276,24 +286,31 @@ impl LanguageParserRegistry {
                 used = true;
             }
             if used {
+                for alias in desc.aliases {
+                    alias_specs.push((id, (*alias).to_string()));
+                }
                 parsers.push(Box::new(BuiltinLanguageParser::from_desc(desc, config)));
             }
         }
 
         // Priority 3: Query grammar fallbacks
-        for (extensions, grammar_result) in crate::built_in_grammars::load() {
-            if grammar_result.is_err() {
+        for grammar in crate::built_in_grammars::load() {
+            if grammar.config.is_err() {
                 continue;
             }
-            for ext in extensions {
-                if by_extension.contains_key(ext) {
+            for ext in grammar.extensions {
+                if by_extension.contains_key(*ext) {
                     continue;
                 }
                 let id = parsers.len();
+                for alias in grammar.aliases {
+                    alias_specs.push((id, (*alias).to_string()));
+                }
                 parsers.push(Box::new(QueryLanguageParser {
-                    extension: ext.to_string(),
+                    extension: (*ext).to_string(),
+                    lang: grammar.lang.to_string(),
                 }));
-                by_extension.insert(ext.to_string(), vec![id]);
+                by_extension.insert((*ext).to_string(), vec![id]);
             }
         }
 
@@ -310,24 +327,21 @@ impl LanguageParserRegistry {
                 let id = parsers.len();
                 parsers.push(Box::new(QueryLanguageParser {
                     extension: ext.clone(),
+                    lang: ug.language_name.clone(),
                 }));
                 by_extension.insert(ext, vec![id]);
             }
         }
 
-        // Map language names + builtin aliases to `LangId` for `--language-force`.
+        // Map language names + aliases to `LangId` for `--language-force`.
         // Canonical names are inserted first so the highest-priority parser wins
-        // on any collision; builtin aliases fill in afterwards.
+        // on any collision; aliases (from every source) fill in afterwards.
         let mut aliases: HashMap<String, LangId> = HashMap::new();
         for (id, p) in parsers.iter().enumerate() {
             aliases.entry(p.language_name().to_lowercase()).or_insert(id);
         }
-        for desc in BUILTIN_LANG_DESCRIPTORS {
-            if let Some(&id) = aliases.get(&desc.lang.to_lowercase()) {
-                for alias in desc.aliases {
-                    aliases.entry(alias.to_lowercase()).or_insert(id);
-                }
-            }
+        for (id, alias) in alias_specs {
+            aliases.entry(alias.to_lowercase()).or_insert(id);
         }
 
         let forced = match resolve_forced_language(&config.language_force, &aliases) {
@@ -483,6 +497,28 @@ mod tests {
             lang_for(&registry_forced("JavaScript"), "x.py").as_deref(),
             Some("javascript")
         );
+    }
+
+    #[test]
+    fn query_fallback_has_proper_language_name() {
+        let reg = registry();
+        // Query-fallback languages report their proper name, not the extension.
+        assert_eq!(lang_for(&reg, "app.rb").as_deref(), Some("ruby"));
+        assert_eq!(lang_for(&reg, "run.sh").as_deref(), Some("shell"));
+        assert_eq!(lang_for(&reg, "prog.cs").as_deref(), Some("c#"));
+        assert!(reg.for_language("ruby").is_some());
+        assert!(reg.for_language("shell").is_some());
+        // The bare extension is no longer a language name.
+        assert!(reg.for_language("rb").is_none());
+    }
+
+    #[test]
+    fn language_force_resolves_query_fallback_names_and_aliases() {
+        assert_eq!(lang_for(&registry_forced("ruby"), "x.txt").as_deref(), Some("ruby"));
+        assert_eq!(lang_for(&registry_forced("shell"), "x.txt").as_deref(), Some("shell"));
+        // `bash`/`sh` are aliases of `shell`; `csharp` is an alias of `c#`.
+        assert_eq!(lang_for(&registry_forced("bash"), "x.txt").as_deref(), Some("shell"));
+        assert_eq!(lang_for(&registry_forced("csharp"), "x.txt").as_deref(), Some("c#"));
     }
 
     #[test]

@@ -14,6 +14,7 @@ use wasmtime::Engine;
 struct PluginEntry {
     wasm_path: PathBuf,
     language: Option<String>,
+    aliases: Vec<String>,
     name: String,
     kinds: Vec<super::manifest::ManifestKind>,
 }
@@ -236,6 +237,7 @@ fn cache_filename(abs_path: &Path) -> String {
 pub struct PluginExtInfo {
     pub ext: String,
     pub lang: Option<String>,
+    pub aliases: Vec<String>,
     pub kinds: Vec<super::manifest::ManifestKind>,
 }
 
@@ -247,6 +249,7 @@ pub fn scan_ext_infos(dirs: &[PathBuf], plugins_dir: Option<&PathBuf>) -> Vec<Pl
         .map(|(ext, entry)| PluginExtInfo {
             ext,
             lang: entry.language,
+            aliases: entry.aliases,
             kinds: entry.kinds,
         })
         .collect()
@@ -379,6 +382,7 @@ fn load_manifest(manifest_path: &Path, entries: &mut HashMap<String, PluginEntry
         return;
     }
     let language = manifest.language.clone();
+    let aliases = manifest.aliases.clone();
     let name = manifest.name.clone();
     let kinds = manifest.kinds.clone().unwrap_or_default();
     for ext in &manifest.extensions {
@@ -387,6 +391,7 @@ fn load_manifest(manifest_path: &Path, entries: &mut HashMap<String, PluginEntry
             PluginEntry {
                 wasm_path: wasm_path.clone(),
                 language: language.clone(),
+                aliases: aliases.clone(),
                 name: name.clone(),
                 kinds: kinds.clone(),
             },
@@ -517,6 +522,56 @@ extensions = ["java", "class"]
         assert_eq!(plugins.len(), 1);
         assert_eq!(plugins[0].language, "java");
         assert_eq!(plugins[0].extensions, vec!["class", "java"]);
+    }
+
+    #[test]
+    fn test_manifest_aliases_parsed() {
+        let dir = tempdir().unwrap();
+        let p = dir.path().join("mylang");
+        fs::create_dir_all(&p).unwrap();
+        fs::write(
+            p.join("plugin.toml"),
+            r#"
+name = "mylang-plugin"
+version = "0.1.0"
+abi_version = 3
+wasm_file = "plugin.wasm"
+language = "mylang"
+aliases = ["ml2", "mylanguage"]
+extensions = ["ml2"]
+"#,
+        )
+        .unwrap();
+        fs::write(p.join("plugin.wasm"), "").unwrap();
+
+        let infos = scan_ext_infos(&[], Some(&dir.path().to_path_buf()));
+        assert_eq!(infos.len(), 1);
+        assert_eq!(infos[0].lang.as_deref(), Some("mylang"));
+        assert_eq!(
+            infos[0].aliases,
+            vec!["ml2".to_string(), "mylanguage".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_manifest_aliases_default_empty() {
+        let dir = tempdir().unwrap();
+        fs::write(
+            dir.path().join("plugin.toml"),
+            r#"
+name = "noalias"
+version = "0.1.0"
+abi_version = 3
+wasm_file = "plugin.wasm"
+extensions = ["xyz"]
+"#,
+        )
+        .unwrap();
+        fs::write(dir.path().join("plugin.wasm"), "").unwrap();
+
+        let infos = scan_ext_infos(&[dir.path().to_path_buf()], None);
+        assert_eq!(infos.len(), 1);
+        assert!(infos[0].aliases.is_empty());
     }
 
     #[test]
