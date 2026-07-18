@@ -192,6 +192,9 @@ pub struct LanguageParserRegistry {
     /// Filename glob patterns in registration (priority) order. Matched against
     /// the basename before extensions.
     by_pattern: Vec<(String, LangId)>,
+    /// Interpreter name (lowercased) → candidate languages, for `#!` shebang
+    /// resolution. Candidates are in tier/registration order.
+    by_interpreter: HashMap<String, Vec<LangId>>,
     /// Set by `--language-force`; when present, every file resolves to this
     /// language regardless of its name.
     forced: Option<LangId>,
@@ -244,6 +247,8 @@ impl LanguageParserRegistry {
         let mut alias_specs: Vec<(LangId, String)> = Vec::new();
         // Filename glob patterns in tier/registration order.
         let mut by_pattern: Vec<(String, LangId)> = Vec::new();
+        // Interpreter names collected per source, in tier/registration order.
+        let mut interp_specs: Vec<(LangId, String)> = Vec::new();
 
         // Priorities are applied in order; the first tier to claim an extension
         // owns it (matching the historical `or_insert_with` behaviour). Storing
@@ -273,6 +278,9 @@ impl LanguageParserRegistry {
             for pat in &info.patterns {
                 by_pattern.push((pat.clone(), id));
             }
+            for interp in &info.interpreters {
+                interp_specs.push((id, interp.clone()));
+            }
             parsers.push(Box::new(WasmLanguageParser {
                 extension: info.ext.clone(),
                 lang,
@@ -299,6 +307,9 @@ impl LanguageParserRegistry {
                 }
                 for pat in desc.patterns {
                     by_pattern.push(((*pat).to_string(), id));
+                }
+                for interp in desc.interpreters {
+                    interp_specs.push((id, (*interp).to_string()));
                 }
                 parsers.push(Box::new(BuiltinLanguageParser::from_desc(desc, config)));
             }
@@ -331,6 +342,9 @@ impl LanguageParserRegistry {
                 for pat in grammar.patterns {
                     by_pattern.push(((*pat).to_string(), id));
                 }
+                for interp in grammar.interpreters {
+                    interp_specs.push((id, (*interp).to_string()));
+                }
             }
         }
 
@@ -361,9 +375,12 @@ impl LanguageParserRegistry {
                 for pat in &ug.patterns {
                     by_pattern.push((pat.clone(), id));
                 }
-            } else if !ug.patterns.is_empty() {
+                for interp in &ug.interpreters {
+                    interp_specs.push((id, interp.clone()));
+                }
+            } else if !ug.patterns.is_empty() || !ug.interpreters.is_empty() {
                 eprintln!(
-                    "treetags: ignoring patterns for user grammar '{}': it declares no extensions",
+                    "treetags: ignoring patterns/interpreters for user grammar '{}': it declares no extensions",
                     ug.language_name
                 );
             }
@@ -380,6 +397,15 @@ impl LanguageParserRegistry {
             aliases.entry(alias.to_lowercase()).or_insert(id);
         }
 
+        // Interpreter name -> candidate languages, preserving tier order.
+        let mut by_interpreter: HashMap<String, Vec<LangId>> = HashMap::new();
+        for (id, interp) in interp_specs {
+            by_interpreter
+                .entry(interp.to_lowercase())
+                .or_default()
+                .push(id);
+        }
+
         let forced = match resolve_forced_language(&config.language_force, &aliases) {
             Ok(f) => f,
             Err(msg) => {
@@ -392,6 +418,7 @@ impl LanguageParserRegistry {
             parsers,
             by_extension,
             by_pattern,
+            by_interpreter,
             forced,
             grammar_store,
             plugin_registry,
@@ -449,6 +476,27 @@ impl LanguageParserRegistry {
             1 => NameResolution::Unique(unique[0]),
             _ => NameResolution::Ambiguous(unique),
         }
+    }
+
+    /// Resolves a language from a `#!` shebang at the start of `content`.
+    /// Returns the highest-priority language registered for the interpreter, or
+    /// `None`. Falls back to a version-stripped interpreter name (e.g.
+    /// `python3.11` → `python`) when the exact name is unknown.
+    ///
+    /// The caller is responsible for gating this (executable bit / `-G`).
+    pub fn resolve_by_shebang(&self, content: &[u8]) -> Option<LangId> {
+        let interp = crate::lang_resolve::parse_shebang(content)?;
+        let key = interp.to_lowercase();
+        if let Some(ids) = self.by_interpreter.get(&key) {
+            return ids.first().copied();
+        }
+        let stripped = key.trim_end_matches(|c: char| c.is_ascii_digit() || c == '.');
+        if stripped.len() != key.len() {
+            if let Some(ids) = self.by_interpreter.get(stripped) {
+                return ids.first().copied();
+            }
+        }
+        None
     }
 
     /// Returns the parser for a resolved `LangId`.
@@ -570,6 +618,25 @@ mod tests {
         assert_eq!(lang_for(&reg, "foo.gemspec").as_deref(), Some("ruby"));
         assert_eq!(lang_for(&reg, "tasks.rake").as_deref(), Some("ruby"));
         assert_eq!(lang_for(&reg, "src/prompt.zsh").as_deref(), Some("shell"));
+    }
+
+    #[test]
+    fn shebang_resolves_interpreter() {
+        let reg = registry();
+        let lang = |content: &[u8]| {
+            reg.resolve_by_shebang(content)
+                .map(|id| reg.parser(id).language_name().to_string())
+        };
+        assert_eq!(lang(b"#!/usr/bin/env python3\n").as_deref(), Some("python"));
+        assert_eq!(lang(b"#!/bin/bash\n").as_deref(), Some("shell"));
+        assert_eq!(lang(b"#!/bin/sh\n").as_deref(), Some("shell"));
+        assert_eq!(lang(b"#!/usr/bin/ruby\n").as_deref(), Some("ruby"));
+        assert_eq!(lang(b"#!/usr/bin/env node\n").as_deref(), Some("javascript"));
+        // Version-stripped fallback: python3.11 -> python.
+        assert_eq!(lang(b"#!/usr/bin/python3.11\n").as_deref(), Some("python"));
+        // No shebang or unknown interpreter -> None.
+        assert!(lang(b"print(1)\n").is_none());
+        assert!(lang(b"#!/usr/bin/perl\n").is_none());
     }
 
     #[test]

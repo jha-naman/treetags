@@ -102,6 +102,12 @@ pub struct Config {
     #[arg(long = "language-force", default_value = "", verbatim_doc_comment)]
     pub language_force: String,
 
+    /// Guess a file's language from its `#!` shebang line when its name gives no
+    /// match. By default this runs only for files with the executable bit set;
+    /// this flag enables it for all files (matching ctags' `-G`).
+    #[arg(short = 'G', long = "guess-language-eagerly", verbatim_doc_comment)]
+    pub guess_language_eagerly: bool,
+
     /// Parsed fields configuration
     #[clap(skip)]
     pub fields_config: FieldsConfig,

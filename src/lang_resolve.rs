@@ -98,9 +98,44 @@ fn match_class(p: &[char], start: usize, c: char) -> (bool, usize) {
     }
 }
 
+/// Extracts the interpreter name from a `#!` shebang at the very start of
+/// `content`. Only the first line is inspected.
+///
+/// Handles absolute interpreters (`#!/bin/sh` → `sh`, `#!/usr/bin/python3` →
+/// `python3`) and the `env` form (`#!/usr/bin/env python3` → `python3`,
+/// including `env -S`/`env VAR=val` prefixes). Returns the interpreter's
+/// basename, or `None` when there is no shebang or no interpreter follows.
+pub fn parse_shebang(content: &[u8]) -> Option<String> {
+    let line_end = content
+        .iter()
+        .position(|&b| b == b'\n')
+        .unwrap_or(content.len());
+    let rest = content[..line_end].strip_prefix(b"#!")?;
+    let text = std::str::from_utf8(rest).ok()?;
+
+    let mut tokens = text.split_whitespace();
+    let first = basename(tokens.next()?);
+    if first == "env" {
+        // Skip `env` options (`-S`, `-i`, …) and `VAR=value` assignments.
+        for tok in tokens {
+            if tok.starts_with('-') || tok.contains('=') {
+                continue;
+            }
+            return Some(basename(tok).to_string());
+        }
+        return None;
+    }
+    Some(first.to_string())
+}
+
+/// Returns the final path component of `s`, splitting on `/` or `\`.
+fn basename(s: &str) -> &str {
+    s.rsplit(['/', '\\']).next().unwrap_or(s)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::glob_match;
+    use super::{glob_match, parse_shebang};
 
     #[test]
     fn exact_and_literal() {
@@ -144,5 +179,41 @@ mod tests {
     fn unterminated_class_is_literal() {
         assert!(glob_match("[abc", "[abc"));
         assert!(!glob_match("[abc", "a"));
+    }
+
+    #[test]
+    fn shebang_absolute() {
+        assert_eq!(parse_shebang(b"#!/bin/sh\n").as_deref(), Some("sh"));
+        assert_eq!(
+            parse_shebang(b"#!/usr/bin/python3\nprint(1)").as_deref(),
+            Some("python3")
+        );
+        assert_eq!(parse_shebang(b"#!/bin/bash").as_deref(), Some("bash"));
+    }
+
+    #[test]
+    fn shebang_env_form() {
+        assert_eq!(
+            parse_shebang(b"#!/usr/bin/env python3\n").as_deref(),
+            Some("python3")
+        );
+        assert_eq!(
+            parse_shebang(b"#!/usr/bin/env -S python3 -u\n").as_deref(),
+            Some("python3")
+        );
+        assert_eq!(
+            parse_shebang(b"#!/usr/bin/env FOO=bar ruby\n").as_deref(),
+            Some("ruby")
+        );
+    }
+
+    #[test]
+    fn shebang_edge_cases() {
+        assert_eq!(parse_shebang(b"#! /bin/sh\n").as_deref(), Some("sh"));
+        assert_eq!(parse_shebang(b"#!/bin/sh\r\n").as_deref(), Some("sh"));
+        assert_eq!(parse_shebang(b"no shebang here").as_deref(), None);
+        assert_eq!(parse_shebang(b"").as_deref(), None);
+        assert_eq!(parse_shebang(b"#!").as_deref(), None);
+        assert_eq!(parse_shebang(b"#!/usr/bin/env\n").as_deref(), None);
     }
 }

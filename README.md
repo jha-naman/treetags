@@ -176,6 +176,22 @@ Options:
   ... # Options omitted for brevity
 ```
 
+## How treetags selects a language
+
+For each input file, treetags picks a language in this order:
+
+1. `--language-force=<lang>` — if given, every file is parsed as `<lang>`
+   (accepts a language name or alias; `auto` disables it).
+2. **Filename patterns** — globs matched against the base name, e.g. `Rakefile`,
+   `Gemfile`, `.bashrc`, or `*.gemspec`. This matches files that have no
+   distinguishing extension.
+3. **File extension** — e.g. `.rs`, `.py`, `.rb`.
+4. **`#!` shebang line** — when the name gives no match, the interpreter
+   (`python3`, `bash`, `ruby`, …) selects the language. To keep things cheap,
+   this runs **only for files with the executable bit set**, unless you pass
+   `--guess-language-eagerly` / `-G`, which enables it for every file. (On
+   platforms without an executable bit, shebang detection requires `-G`.)
+
 ## What does treetags do
 
 Treetags creates a tags file that vim can use for allowing the user to easily

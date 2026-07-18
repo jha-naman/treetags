@@ -11,6 +11,9 @@ pub struct UserGrammar {
     /// this grammar, e.g. `Rakefile` or `*.bzl`. Defaults to empty.
     #[serde(default)]
     pub patterns: Vec<String>,
+    /// Interpreter names matched against a `#!` shebang line. Defaults to empty.
+    #[serde(default)]
+    pub interpreters: Vec<String>,
     pub query_file_path: Option<PathBuf>,
 }
 

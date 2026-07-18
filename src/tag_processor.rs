@@ -2,9 +2,35 @@ use crate::config::Config;
 use crate::language_parser::{LanguageParserRegistry, NameResolution};
 use crate::tag::Tag;
 use std::fs;
+use std::io::Read;
 use std::path::Path;
 use std::sync::{mpsc, Arc};
 use std::thread;
+
+/// Bytes read from the head of a file to inspect its `#!` shebang line.
+const SHEBANG_PREFIX_BYTES: u64 = 256;
+
+/// Reads up to `max` bytes from the start of `path`.
+fn read_prefix(path: &Path, max: u64) -> std::io::Result<Vec<u8>> {
+    let mut buf = Vec::new();
+    fs::File::open(path)?.take(max).read_to_end(&mut buf)?;
+    Ok(buf)
+}
+
+/// Whether `path` has the executable bit set. Always `false` on non-Unix, where
+/// there is no executable bit, so shebang detection there requires `-G`.
+#[cfg(unix)]
+fn is_executable(path: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    fs::metadata(path)
+        .map(|m| m.permissions().mode() & 0o111 != 0)
+        .unwrap_or(false)
+}
+
+#[cfg(not(unix))]
+fn is_executable(_path: &Path) -> bool {
+    false
+}
 
 pub struct TagProcessor {
     tag_file_path: String,
@@ -95,7 +121,21 @@ impl TagProcessor {
                 // No ambiguous extensions exist yet; fall back to the
                 // highest-priority candidate until selectors land.
                 NameResolution::Ambiguous(ids) => registry.parser(ids[0]),
-                NameResolution::None => continue,
+                NameResolution::None => {
+                    // Shebang fallback, gated (matching ctags) behind the
+                    // executable bit or --guess-language-eagerly. Only a bounded
+                    // prefix is read here, so non-script files are cheap to skip.
+                    if !config.guess_language_eagerly && !is_executable(&file_path) {
+                        continue;
+                    }
+                    match read_prefix(&file_path, SHEBANG_PREFIX_BYTES) {
+                        Ok(prefix) => match registry.resolve_by_shebang(&prefix) {
+                            Some(id) => registry.parser(id),
+                            None => continue,
+                        },
+                        Err(_) => continue,
+                    }
+                }
             };
 
             let code = match fs::read(&file_path) {

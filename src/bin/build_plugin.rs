@@ -271,6 +271,8 @@ extensions = []
 # aliases = ["jvm"]
 # Filename globs (matched against the basename) that select this plugin (optional)
 # patterns = ["Dockerfile", "*.bzl"]
+# Interpreter names matched against a #! shebang line (optional)
+# interpreters = ["node"]
 "#;
     std::fs::write(path, template)
         .map_err(|e| anyhow::anyhow!("cannot write {}: {e}", path.display()))

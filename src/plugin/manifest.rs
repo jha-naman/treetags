@@ -34,6 +34,10 @@ pub struct PluginManifest {
     /// this plugin, e.g. `Dockerfile` or `*.bzl`. Defaults to empty.
     #[serde(default)]
     pub patterns: Vec<String>,
+    /// Interpreter names matched against a `#!` shebang line, e.g. `node`.
+    /// Defaults to empty.
+    #[serde(default)]
+    pub interpreters: Vec<String>,
     /// Path to the .wasm component file, relative to the directory containing this manifest.
     #[serde(default = "default_wasm_file")]
     pub wasm_file: String,
