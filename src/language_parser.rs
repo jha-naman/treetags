@@ -195,6 +195,9 @@ pub struct LanguageParserRegistry {
     /// Interpreter name (lowercased) → candidate languages, for `#!` shebang
     /// resolution. Candidates are in tier/registration order.
     by_interpreter: HashMap<String, Vec<LangId>>,
+    /// Language name / alias (lowercased) → language, for `--language-force` and
+    /// editor-modeline resolution.
+    aliases: HashMap<String, LangId>,
     /// Set by `--language-force`; when present, every file resolves to this
     /// language regardless of its name.
     forced: Option<LangId>,
@@ -449,6 +452,7 @@ impl LanguageParserRegistry {
             by_extension,
             by_pattern,
             by_interpreter,
+            aliases,
             forced,
             grammar_store,
             plugin_registry,
@@ -550,6 +554,26 @@ impl LanguageParserRegistry {
         }
 
         None
+    }
+
+    /// Resolves a language name or alias (case-insensitive) to a `LangId`.
+    /// Also accepts Emacs mode names by stripping a trailing `-mode`.
+    pub fn language_id(&self, name: &str) -> Option<LangId> {
+        let key = name.trim().to_lowercase();
+        if let Some(&id) = self.aliases.get(&key) {
+            return Some(id);
+        }
+        key.strip_suffix("-mode")
+            .and_then(|base| self.aliases.get(base).copied())
+    }
+
+    /// Resolves a language from an editor modeline in the file's head/tail.
+    /// The mode/filetype name is mapped through the language/alias table.
+    ///
+    /// The caller is responsible for gating this (matching ctags: `-G` only).
+    pub fn resolve_by_modeline(&self, head: &[u8], tail: &[u8]) -> Option<LangId> {
+        let mode = crate::lang_resolve::parse_modeline(head, tail)?;
+        self.language_id(&mode)
     }
 
     /// Returns the parser for a resolved `LangId`.
@@ -778,6 +802,24 @@ mod tests {
         assert_eq!(lang_for(&reg, "a.c").as_deref(), Some("c"));
         assert_eq!(lang_for(&reg, "a.cpp").as_deref(), Some("c++"));
         assert_eq!(lang_for(&reg, "a.hpp").as_deref(), Some("c++"));
+    }
+
+    #[test]
+    fn modeline_resolves_language() {
+        let reg = registry();
+        let lang = |h: &[u8], t: &[u8]| {
+            reg.resolve_by_modeline(h, t)
+                .map(|id| reg.parser(id).language_name().to_string())
+        };
+        // Vim `ft` names go through the alias map (`cpp` -> c++).
+        assert_eq!(lang(b"// vim: set ft=cpp:", b"").as_deref(), Some("c++"));
+        assert_eq!(lang(b"# -*- mode: python -*-", b"").as_deref(), Some("python"));
+        // Emacs `-mode` suffix is stripped, then alias-resolved (`sh` -> shell).
+        assert_eq!(
+            lang(b"x\n# Local Variables:\n# mode: sh-mode\n# End:\n", b"").as_deref(),
+            Some("shell")
+        );
+        assert_eq!(lang(b"nothing here", b"").as_deref(), None);
     }
 
     #[test]

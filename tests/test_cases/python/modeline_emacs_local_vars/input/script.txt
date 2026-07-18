@@ -1,0 +1,9 @@
+def handler(request):
+    return request
+
+class Service:
+    pass
+
+# Local Variables:
+# mode: python
+# End:

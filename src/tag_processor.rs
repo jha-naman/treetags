@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::language_parser::{LangId, LanguageParserRegistry, NameResolution};
 use crate::tag::Tag;
 use std::fs;
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::sync::{mpsc, Arc};
 use std::thread;
@@ -13,6 +13,10 @@ const SHEBANG_PREFIX_BYTES: u64 = 256;
 /// Bytes read from the head of a file for content-based selector heuristics
 /// (e.g. C vs C++ for `.h`).
 const SELECTOR_PREFIX_BYTES: u64 = 8192;
+
+/// Bytes read from each of the head and tail of a file to inspect editor
+/// modelines.
+const MODELINE_WINDOW_BYTES: u64 = 4096;
 
 /// Resolves the language for a file through the full ladder: name (force /
 /// pattern / extension), then content-based disambiguation for ambiguous
@@ -35,13 +39,25 @@ pub(crate) fn select_language(
             Some(chosen)
         }
         NameResolution::None => {
-            // Shebang fallback, gated (matching ctags) behind the executable
-            // bit or --guess-language-eagerly.
-            if !config.guess_language_eagerly && !is_executable(path) {
-                return None;
+            // Content guessing (matching ctags): shebang runs for executable
+            // files or under -G; editor modelines run only under -G.
+            if config.guess_language_eagerly || is_executable(path) {
+                if let Some(id) = read_prefix(path, SHEBANG_PREFIX_BYTES)
+                    .ok()
+                    .and_then(|prefix| registry.resolve_by_shebang(&prefix))
+                {
+                    return Some(id);
+                }
             }
-            let prefix = read_prefix(path, SHEBANG_PREFIX_BYTES).ok()?;
-            registry.resolve_by_shebang(&prefix)
+            if config.guess_language_eagerly {
+                if let Some(id) = read_head_and_tail(path, MODELINE_WINDOW_BYTES)
+                    .ok()
+                    .and_then(|(head, tail)| registry.resolve_by_modeline(&head, &tail))
+                {
+                    return Some(id);
+                }
+            }
+            None
         }
     }
 }
@@ -51,6 +67,23 @@ fn read_prefix(path: &Path, max: u64) -> std::io::Result<Vec<u8>> {
     let mut buf = Vec::new();
     fs::File::open(path)?.take(max).read_to_end(&mut buf)?;
     Ok(buf)
+}
+
+/// Reads up to `window` bytes from the head and, for larger files, up to
+/// `window` bytes from the tail. The tail is empty when the whole file already
+/// fits in the head window.
+fn read_head_and_tail(path: &Path, window: u64) -> std::io::Result<(Vec<u8>, Vec<u8>)> {
+    let mut file = fs::File::open(path)?;
+    let len = file.metadata()?.len();
+    let mut head = Vec::new();
+    (&mut file).take(window).read_to_end(&mut head)?;
+    if len <= window {
+        return Ok((head, Vec::new()));
+    }
+    let mut tail = Vec::new();
+    file.seek(SeekFrom::Start(len - window))?;
+    file.take(window).read_to_end(&mut tail)?;
+    Ok((head, tail))
 }
 
 /// Whether `path` has the executable bit set. Always `false` on non-Unix, where

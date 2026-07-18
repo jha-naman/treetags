@@ -1,0 +1,8 @@
+# -*- mode: ruby -*-
+
+def greet(name)
+  name
+end
+
+class Greeter
+end

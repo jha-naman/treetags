@@ -194,6 +194,9 @@ For each input file, treetags picks a language in this order:
    this runs **only for files with the executable bit set**, unless you pass
    `--guess-language-eagerly` / `-G`, which enables it for every file. (On
    platforms without an executable bit, shebang detection requires `-G`.)
+5. **Editor modelines** — as a last resort under `-G`, treetags reads Vim
+   modelines (`vim: set ft=python:`) and Emacs modelines (`-*- mode: python -*-`
+   and trailing `Local Variables:` blocks) from the file's head and tail.
 
 Run `treetags --print-language <files...>` to see which language each file
 resolves to (or `NONE`) without generating tags.
