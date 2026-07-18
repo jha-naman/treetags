@@ -20,10 +20,22 @@ pub struct LangMapEdits {
 /// A single edit to a language's name-based mappings.
 #[derive(Clone, Debug, PartialEq)]
 pub enum LangMapEdit {
-    AddExt { lang: String, ext: String },
-    RemoveExt { lang: String, ext: String },
-    AddPattern { lang: String, pattern: String },
-    RemovePattern { lang: String, pattern: String },
+    AddExt {
+        lang: String,
+        ext: String,
+    },
+    RemoveExt {
+        lang: String,
+        ext: String,
+    },
+    AddPattern {
+        lang: String,
+        pattern: String,
+    },
+    RemovePattern {
+        lang: String,
+        pattern: String,
+    },
     /// Replace all of a language's extensions and patterns.
     Replace {
         lang: String,
@@ -310,10 +322,7 @@ mod tests {
 
     #[test]
     fn spec_parsing() {
-        assert_eq!(
-            parse_spec(".c.h"),
-            (vec!["c".into(), "h".into()], vec![])
-        );
+        assert_eq!(parse_spec(".c.h"), (vec!["c".into(), "h".into()], vec![]));
         assert_eq!(
             parse_spec("(Makefile).mak"),
             (vec!["mak".into()], vec!["Makefile".into()])
@@ -351,10 +360,17 @@ mod tests {
 
     #[test]
     fn extract_and_strip_map_args() {
-        let args: Vec<String> = ["treetags", "--map-c=.foo", "-f", "tags", "--map-make", "(Makefile)"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+        let args: Vec<String> = [
+            "treetags",
+            "--map-c=.foo",
+            "-f",
+            "tags",
+            "--map-make",
+            "(Makefile)",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
         let edits = extract_map_edits(&args);
         assert_eq!(
             edits,

@@ -424,7 +424,9 @@ impl LanguageParserRegistry {
         // on any collision; aliases (from every source) fill in afterwards.
         let mut aliases: HashMap<String, LangId> = HashMap::new();
         for (id, p) in parsers.iter().enumerate() {
-            aliases.entry(p.language_name().to_lowercase()).or_insert(id);
+            aliases
+                .entry(p.language_name().to_lowercase())
+                .or_insert(id);
         }
         for (id, alias) in alias_specs {
             aliases.entry(alias.to_lowercase()).or_insert(id);
@@ -813,7 +815,10 @@ mod tests {
         };
         // Vim `ft` names go through the alias map (`cpp` -> c++).
         assert_eq!(lang(b"// vim: set ft=cpp:", b"").as_deref(), Some("c++"));
-        assert_eq!(lang(b"# -*- mode: python -*-", b"").as_deref(), Some("python"));
+        assert_eq!(
+            lang(b"# -*- mode: python -*-", b"").as_deref(),
+            Some("python")
+        );
         // Emacs `-mode` suffix is stripped, then alias-resolved (`sh` -> shell).
         assert_eq!(
             lang(b"x\n# Local Variables:\n# mode: sh-mode\n# End:\n", b"").as_deref(),
@@ -833,7 +838,10 @@ mod tests {
         assert_eq!(lang(b"#!/bin/bash\n").as_deref(), Some("shell"));
         assert_eq!(lang(b"#!/bin/sh\n").as_deref(), Some("shell"));
         assert_eq!(lang(b"#!/usr/bin/ruby\n").as_deref(), Some("ruby"));
-        assert_eq!(lang(b"#!/usr/bin/env node\n").as_deref(), Some("javascript"));
+        assert_eq!(
+            lang(b"#!/usr/bin/env node\n").as_deref(),
+            Some("javascript")
+        );
         // Version-stripped fallback: python3.11 -> python.
         assert_eq!(lang(b"#!/usr/bin/python3.11\n").as_deref(), Some("python"));
         // No shebang or unknown interpreter -> None.
@@ -852,8 +860,14 @@ mod tests {
 
     #[test]
     fn language_force_accepts_aliases_case_insensitively() {
-        assert_eq!(lang_for(&registry_forced("golang"), "x.rs").as_deref(), Some("go"));
-        assert_eq!(lang_for(&registry_forced("CPP"), "x.rs").as_deref(), Some("c++"));
+        assert_eq!(
+            lang_for(&registry_forced("golang"), "x.rs").as_deref(),
+            Some("go")
+        );
+        assert_eq!(
+            lang_for(&registry_forced("CPP"), "x.rs").as_deref(),
+            Some("c++")
+        );
         assert_eq!(
             lang_for(&registry_forced("JavaScript"), "x.py").as_deref(),
             Some("javascript")
@@ -875,17 +889,35 @@ mod tests {
 
     #[test]
     fn language_force_resolves_query_fallback_names_and_aliases() {
-        assert_eq!(lang_for(&registry_forced("ruby"), "x.txt").as_deref(), Some("ruby"));
-        assert_eq!(lang_for(&registry_forced("shell"), "x.txt").as_deref(), Some("shell"));
+        assert_eq!(
+            lang_for(&registry_forced("ruby"), "x.txt").as_deref(),
+            Some("ruby")
+        );
+        assert_eq!(
+            lang_for(&registry_forced("shell"), "x.txt").as_deref(),
+            Some("shell")
+        );
         // `bash`/`sh` are aliases of `shell`; `csharp` is an alias of `c#`.
-        assert_eq!(lang_for(&registry_forced("bash"), "x.txt").as_deref(), Some("shell"));
-        assert_eq!(lang_for(&registry_forced("csharp"), "x.txt").as_deref(), Some("c#"));
+        assert_eq!(
+            lang_for(&registry_forced("bash"), "x.txt").as_deref(),
+            Some("shell")
+        );
+        assert_eq!(
+            lang_for(&registry_forced("csharp"), "x.txt").as_deref(),
+            Some("c#")
+        );
     }
 
     #[test]
     fn language_force_auto_and_empty_disable_forcing() {
-        assert_eq!(lang_for(&registry_forced("auto"), "x.rs").as_deref(), Some("rust"));
-        assert_eq!(lang_for(&registry_forced(""), "x.rs").as_deref(), Some("rust"));
+        assert_eq!(
+            lang_for(&registry_forced("auto"), "x.rs").as_deref(),
+            Some("rust")
+        );
+        assert_eq!(
+            lang_for(&registry_forced(""), "x.rs").as_deref(),
+            Some("rust")
+        );
     }
 
     #[test]

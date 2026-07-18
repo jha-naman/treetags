@@ -265,7 +265,10 @@ fn parse_emacs_first_line(line: &str) -> Option<String> {
         // e.g. `coding: utf-8; mode: c++`
         for part in inner.split(';') {
             let part = part.trim();
-            if let Some(val) = part.strip_prefix("mode:").or_else(|| part.strip_prefix("Mode:")) {
+            if let Some(val) = part
+                .strip_prefix("mode:")
+                .or_else(|| part.strip_prefix("Mode:"))
+            {
                 let val = val.trim();
                 if !val.is_empty() {
                     return Some(val.to_string());
@@ -428,7 +431,9 @@ mod tests {
 
     #[test]
     fn cpp_detection() {
-        assert!(looks_like_cpp(b"class Widget {\npublic:\n  void run();\n};"));
+        assert!(looks_like_cpp(
+            b"class Widget {\npublic:\n  void run();\n};"
+        ));
         assert!(looks_like_cpp(b"namespace app {\n}"));
         assert!(looks_like_cpp(b"template <typename T>\nT id(T x);"));
         assert!(looks_like_cpp(b"int n = std::max(a, b);"));
