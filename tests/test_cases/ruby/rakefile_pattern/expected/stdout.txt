@@ -1,0 +1,5 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+Bar	Rakefile	/^module Bar < Object$/;"	
+Foo	Rakefile	/^class Foo$/;"	
+baz	Rakefile	/^    def baz$/;"	
+foo	Rakefile	/^    def self.foo$/;"	

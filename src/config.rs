@@ -12,6 +12,7 @@ use fields_config::FieldsConfig;
 
 mod extras_config;
 mod fields_config;
+pub mod lang_map;
 pub mod paths;
 mod plugin_config;
 mod user_grammars;
@@ -96,10 +97,39 @@ pub struct Config {
     /// Include selected extension fields (e.g., +l for line numbers, +S for signatures)
     #[arg(long = "fields", default_value = "", verbatim_doc_comment)]
     pub fields: String,
-    /// Value passed in this arg is currently being ignored.
-    /// Kept for compatibility with `tagbar` plugin.
+    /// Force a language for every input file, bypassing name-based selection.
+    /// Accepts a language name or alias (case-insensitive). The special value
+    /// `auto` (or empty) disables forcing and restores automatic selection.
     #[arg(long = "language-force", default_value = "", verbatim_doc_comment)]
-    pub _language_force: String,
+    pub language_force: String,
+
+    /// Guess a file's language from its `#!` shebang line when its name gives no
+    /// match. By default this runs only for files with the executable bit set;
+    /// this flag enables it for all files (matching ctags' `-G`).
+    #[arg(short = 'G', long = "guess-language-eagerly", verbatim_doc_comment)]
+    pub guess_language_eagerly: bool,
+
+    /// Print the language selected for each given file (or `NONE`) and exit,
+    /// without generating tags. Useful for debugging language resolution.
+    #[arg(long = "print-language", verbatim_doc_comment)]
+    pub print_language: bool,
+
+    /// Bulk language map edits: `<LANG>:<spec>[,<LANG>:<spec>...]`, where
+    /// `<spec>` is a run of `.ext` and `(pattern)` tokens. A leading `+`
+    /// appends; otherwise it replaces the language's mappings. Repeatable.
+    /// (Fine-grained edits use `--map-<LANG>=[+|-]<item>`.)
+    #[arg(long = "langmap", value_name = "MAP", verbatim_doc_comment)]
+    pub langmap: Vec<String>,
+
+    /// List the effective file extensions and filename patterns for each
+    /// language (or just LANG) and exit.
+    #[arg(long = "list-maps", value_name = "LANG", num_args = 0..=1, default_missing_value = "")]
+    pub list_maps: Option<String>,
+
+    /// Language map edits parsed from `--map-<LANG>` and `--langmap`, applied
+    /// when the registry is built.
+    #[clap(skip)]
+    pub lang_map_edits: lang_map::LangMapEdits,
 
     /// Parsed fields configuration
     #[clap(skip)]
@@ -179,6 +209,10 @@ impl Config {
         // Strip --kinds-{lang} / --rust-kinds / --go-kinds so clap doesn't see unknown flags.
         let combined_args = plugin_config::strip_kinds_args(combined_args);
 
+        // Extract and strip --map-{lang} langmap edits (dynamic flag) before clap.
+        let map_edits = lang_map::extract_map_edits(&combined_args);
+        let combined_args = lang_map::strip_map_args(combined_args);
+
         // Scan plugin language names for help augmentation
         let plugin_langs = plugin_config::plugin_language_names(&combined_args);
 
@@ -233,6 +267,31 @@ impl Config {
         config.kinds_map = kinds_map;
         config.plugin_langs = plugin_langs;
 
+        // Bulk `--langmap` edits apply first, then fine-grained `--map-<LANG>`.
+        let mut edits = lang_map::parse_langmap_values(&config.langmap);
+        edits.extend(map_edits);
+        config.lang_map_edits = lang_map::LangMapEdits { edits };
+
+        config
+    }
+
+    /// Builds a `Config` with default values for unit tests.
+    ///
+    /// Unlike [`Config::new`], this does not read `std::env::args()`, scan
+    /// plugin directories, or load user-grammar config files. Plugin and
+    /// user-grammar sources are forced empty so that language resolution is
+    /// deterministic and independent of the host environment.
+    #[cfg(test)]
+    pub(crate) fn for_test() -> Self {
+        let mut config = Self::try_parse_from(["treetags"]).expect("default args parse");
+        config.sort = true;
+        config.recurse = true;
+        config.append = false;
+        config.extras_config = ExtrasConfig::from_string(&config.extras);
+        config.fields_config = FieldsConfig::from_string(&config.fields);
+        config.user_grammars = Vec::new();
+        config.plugin_dirs = Vec::new();
+        config.plugins_dir = std::path::PathBuf::new();
         config
     }
 

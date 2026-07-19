@@ -1,0 +1,7 @@
+# vim: set ft=python:
+
+def handler(request):
+    return request
+
+class Service:
+    pass

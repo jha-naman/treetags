@@ -176,6 +176,45 @@ Options:
   ... # Options omitted for brevity
 ```
 
+## How treetags selects a language
+
+For each input file, treetags picks a language in this order:
+
+1. `--language-force=<lang>` — if given, every file is parsed as `<lang>`
+   (accepts a language name or alias; `auto` disables it).
+2. **Filename patterns** — globs matched against the base name, e.g. `Rakefile`,
+   `Gemfile`, `.bashrc`, or `*.gemspec`. This matches files that have no
+   distinguishing extension.
+3. **File extension** — e.g. `.rs`, `.py`, `.rb`. Some extensions map to more
+   than one language: `.h` may be C or C++, and treetags disambiguates by
+   scanning the file for C++ signals (`class`, `namespace`, `::`, …), defaulting
+   to C when there are none.
+4. **`#!` shebang line** — when the name gives no match, the interpreter
+   (`python3`, `bash`, `ruby`, …) selects the language. To keep things cheap,
+   this runs **only for files with the executable bit set**, unless you pass
+   `--guess-language-eagerly` / `-G`, which enables it for every file. (On
+   platforms without an executable bit, shebang detection requires `-G`.)
+5. **Editor modelines** — as a last resort under `-G`, treetags reads Vim
+   modelines (`vim: set ft=python:`) and Emacs modelines (`-*- mode: python -*-`
+   and trailing `Local Variables:` blocks) from the file's head and tail.
+
+Run `treetags --print-language <files...>` to see which language each file
+resolves to (or `NONE`) without generating tags.
+
+### Customizing the language map
+
+You can override which extensions and filename patterns map to a language
+(syntax mirrors Universal Ctags):
+
+- `--map-<LANG>=[+|-]<item>` — add (`+`, the default) or remove (`-`) a single
+  `.ext` extension or `(pattern)` glob. Repeatable. Examples:
+  `--map-c=.qc`, `--map-ruby=(Jarfile)`, `--map-c=-.h`.
+- `--langmap=<LANG>:<spec>[,<LANG>:<spec>...]` — bulk form. `<spec>` is a run of
+  `.ext` and `(pattern)` tokens (e.g. `.c.h` or `(Makefile).mak`). A leading `+`
+  on the spec appends; otherwise it replaces the language's mappings.
+- `--list-maps[=<LANG>]` — print the effective extensions and patterns for every
+  language (or just `<LANG>`) and exit.
+
 ## What does treetags do
 
 Treetags creates a tags file that vim can use for allowing the user to easily

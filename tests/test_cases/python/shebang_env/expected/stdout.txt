@@ -1,0 +1,4 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+Service	deploy	/^class Service:$/;"	c
+handler	deploy	/^def handler(request):$/;"	f
+run	deploy	/^    def run(self):$/;"	m	class:Service

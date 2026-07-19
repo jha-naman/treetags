@@ -265,8 +265,14 @@ fn write_plugin_toml_template(path: &Path) -> anyhow::Result<()> {
 version = "0.1.0"
 # File extensions this plugin handles (e.g. ["java", "kt"])
 extensions = []
-# Language name used with --kinds-{lang} (optional)
+# Language name used with --kinds-{lang} and --language-force (optional)
 # language = "java"
+# Extra names accepted by --language-force (optional)
+# aliases = ["jvm"]
+# Filename globs (matched against the basename) that select this plugin (optional)
+# patterns = ["Dockerfile", "*.bzl"]
+# Interpreter names matched against a #! shebang line (optional)
+# interpreters = ["node"]
 "#;
     std::fs::write(path, template)
         .map_err(|e| anyhow::anyhow!("cannot write {}: {e}", path.display()))

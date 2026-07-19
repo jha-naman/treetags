@@ -1,10 +1,105 @@
 use crate::config::Config;
-use crate::language_parser::LanguageParserRegistry;
+use crate::language_parser::{LangId, LanguageParserRegistry, NameResolution};
 use crate::tag::Tag;
 use std::fs;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::sync::{mpsc, Arc};
 use std::thread;
+
+/// Bytes read from the head of a file to inspect its `#!` shebang line.
+const SHEBANG_PREFIX_BYTES: u64 = 256;
+
+/// Bytes read from the head of a file for content-based selector heuristics
+/// (e.g. C vs C++ for `.h`).
+const SELECTOR_PREFIX_BYTES: u64 = 8192;
+
+/// Bytes read from each of the head and tail of a file to inspect editor
+/// modelines.
+const MODELINE_WINDOW_BYTES: u64 = 4096;
+
+/// Resolves the language for a file through the full ladder: name (force /
+/// pattern / extension), then content-based disambiguation for ambiguous
+/// names, then a gated `#!` shebang fallback. Reads file content only when the
+/// name is ambiguous or unresolved, so the common case does no IO here.
+///
+/// Shared by the tag-generation worker and `--print-language`.
+pub(crate) fn select_language(
+    registry: &LanguageParserRegistry,
+    config: &Config,
+    path: &Path,
+) -> Option<LangId> {
+    match registry.resolve_by_name(path) {
+        NameResolution::Unique(id) => Some(id),
+        NameResolution::Ambiguous(ids) => {
+            let chosen = match read_prefix(path, SELECTOR_PREFIX_BYTES) {
+                Ok(prefix) => registry.disambiguate(&ids, &prefix).unwrap_or(ids[0]),
+                Err(_) => ids[0],
+            };
+            Some(chosen)
+        }
+        NameResolution::None => {
+            // Content guessing (matching ctags): shebang runs for executable
+            // files or under -G; editor modelines run only under -G.
+            if config.guess_language_eagerly || is_executable(path) {
+                if let Some(id) = read_prefix(path, SHEBANG_PREFIX_BYTES)
+                    .ok()
+                    .and_then(|prefix| registry.resolve_by_shebang(&prefix))
+                {
+                    return Some(id);
+                }
+            }
+            if config.guess_language_eagerly {
+                if let Some(id) = read_head_and_tail(path, MODELINE_WINDOW_BYTES)
+                    .ok()
+                    .and_then(|(head, tail)| registry.resolve_by_modeline(&head, &tail))
+                {
+                    return Some(id);
+                }
+            }
+            None
+        }
+    }
+}
+
+/// Reads up to `max` bytes from the start of `path`.
+fn read_prefix(path: &Path, max: u64) -> std::io::Result<Vec<u8>> {
+    let mut buf = Vec::new();
+    fs::File::open(path)?.take(max).read_to_end(&mut buf)?;
+    Ok(buf)
+}
+
+/// Reads up to `window` bytes from the head and, for larger files, up to
+/// `window` bytes from the tail. The tail is empty when the whole file already
+/// fits in the head window.
+fn read_head_and_tail(path: &Path, window: u64) -> std::io::Result<(Vec<u8>, Vec<u8>)> {
+    let mut file = fs::File::open(path)?;
+    let len = file.metadata()?.len();
+    let mut head = Vec::new();
+    (&mut file).take(window).read_to_end(&mut head)?;
+    if len <= window {
+        return Ok((head, Vec::new()));
+    }
+    let mut tail = Vec::new();
+    file.seek(SeekFrom::Start(len - window))?;
+    file.take(window).read_to_end(&mut tail)?;
+    Ok((head, tail))
+}
+
+/// Whether `path` has the executable bit set. Always `false` on non-Unix, where
+/// there is no executable bit, so shebang detection there requires `-G`.
+#[cfg(unix)]
+fn is_executable(path: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    fs::metadata(path)
+        .map(|m| m.permissions().mode() & 0o111 != 0)
+        .unwrap_or(false)
+}
+
+#[cfg(not(unix))]
+fn is_executable(_path: &Path) -> bool {
+    false
+}
 
 pub struct TagProcessor {
     tag_file_path: String,
@@ -90,12 +185,9 @@ impl TagProcessor {
                 Err(_) => file_name.clone(),
             };
 
-            let Some(extension) = file_path.extension().and_then(|e| e.to_str()) else {
-                continue;
-            };
-
-            let Some(lp) = registry.for_extension(extension) else {
-                continue;
+            let lp = match select_language(&registry, &config, &file_path) {
+                Some(id) => registry.parser(id),
+                None => continue,
             };
 
             let code = match fs::read(&file_path) {

@@ -1,0 +1,3 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+Service	notes.txt	/^class Service:$/;"	c
+handler	notes.txt	/^def handler(request):$/;"	f

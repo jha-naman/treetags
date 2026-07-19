@@ -7,6 +7,13 @@ pub struct UserGrammar {
     pub language_name: String,
     pub grammar_lib_path: PathBuf,
     pub extensions: Option<Vec<String>>,
+    /// `fnmatch`-style filename globs (matched against the basename) that select
+    /// this grammar, e.g. `Rakefile` or `*.bzl`. Defaults to empty.
+    #[serde(default)]
+    pub patterns: Vec<String>,
+    /// Interpreter names matched against a `#!` shebang line. Defaults to empty.
+    #[serde(default)]
+    pub interpreters: Vec<String>,
     pub query_file_path: Option<PathBuf>,
 }
 

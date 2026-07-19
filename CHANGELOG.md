@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+ - Many-to-many mapping between file extensions and parsers
+ - Add support for `--force-language` cli arg
+ - Add support for matching parsers with filename globs (eg "Dockerfile")
+ - Add support for configuring parser matching via cli args
+   Introduces `--map-<lang>=[.ext|glob]`, `--langmap=<lang>:<[.ext]|[glob]> and `--list-maps`
+ - Add support for guessing language based on file content when `-G` is on
+   Uses shebang and vim/emacs modelines
+
 ### Changed
  - Use rayon's parallel sort for sorting the tags
  - Stop writing to a single Vec<Tag> from across workers

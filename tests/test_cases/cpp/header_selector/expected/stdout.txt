@@ -1,0 +1,3 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+WIDGET_H	widget.h	/^#define WIDGET_H$/;"	d
+Widget	widget.h	/^class Widget {$/;"	c	namespace:ui
