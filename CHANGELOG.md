@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ADDED
+ - Add support for relative regex when using `--map-<lang>` cli arg
+ - Add help text for the `--map-<lang>` cli arg
+
+### FIXED
+ - Fix incorrect order of pattern precedence when using `--langmap`
+ - Don't read content resolved files twice
+ - Make sure builtin grammars are loaded only once on startup
+ - Remove some unnecessary allocations from parser matching hotpath
+ - Improve parser matching via patterns/aliases/shebang when all file extensions
+   for a parser are overridden by a plugin
+
 - [0.10.0]
 
 ### Added
