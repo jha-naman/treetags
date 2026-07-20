@@ -192,6 +192,10 @@ pub struct LanguageParserRegistry {
     /// Filename glob patterns in registration (priority) order. Matched against
     /// the basename before extensions.
     by_pattern: Vec<(String, LangId)>,
+    /// Relative-path regular expressions (from `--map-<LANG>=%…%`), matched
+    /// against the whole relative path before patterns and extensions. Empty
+    /// unless the user configured one, so it is off the common hot path.
+    by_rexpr: Vec<(regex::Regex, LangId)>,
     /// Interpreter name (lowercased) → candidate languages, for `#!` shebang
     /// resolution. Candidates are in tier/registration order.
     by_interpreter: HashMap<String, Vec<LangId>>,
@@ -236,7 +240,9 @@ impl LanguageParserRegistry {
     /// Build the full registry, loading and JIT-compiling WASM plugins.
     /// Call this once at startup and share the result via `Arc`.
     pub fn new(config: &Config) -> Self {
-        let grammar_store = Arc::new(GrammarStore::new(config));
+        // Load once and share with the GrammarStore , so the built-in grammars
+        // `TagsConfiguration`s are compiled only once at startup
+        let builtin_grammars = crate::built_in_grammars::load();
         let plugin_registry = Arc::new(PluginRegistry::scan(
             &config.plugin_dirs,
             Some(&config.plugins_dir),
@@ -250,6 +256,8 @@ impl LanguageParserRegistry {
         let mut alias_specs: Vec<(LangId, String)> = Vec::new();
         // Filename glob patterns in tier/registration order.
         let mut by_pattern: Vec<(String, LangId)> = Vec::new();
+        // Relative-path regexes, populated only by user `--map-<LANG>=%…%` edits.
+        let mut by_rexpr: Vec<(regex::Regex, LangId)> = Vec::new();
         // Interpreter names collected per source, in tier/registration order.
         let mut interp_specs: Vec<(LangId, String)> = Vec::new();
 
@@ -296,15 +304,22 @@ impl LanguageParserRegistry {
         // One parser instance per language, shared across all its extensions.
         for desc in BUILTIN_LANG_DESCRIPTORS {
             let id = parsers.len();
-            let mut used = false;
+            let mut claimed = false;
             for ext in desc.extensions {
                 if by_extension.contains_key(*ext) {
                     continue;
                 }
                 by_extension.insert((*ext).to_string(), vec![id]);
-                used = true;
+                claimed = true;
             }
-            if used {
+            // Register the language whenever it claims an extension or carries
+            // name metadata, so its patterns/interpreters/aliases survive even
+            // when a higher-priority source (e.g. a plugin) claims all of its
+            // extensions.
+            let has_metadata = !desc.aliases.is_empty()
+                || !desc.patterns.is_empty()
+                || !desc.interpreters.is_empty();
+            if claimed || has_metadata {
                 for alias in desc.aliases {
                     alias_specs.push((id, (*alias).to_string()));
                 }
@@ -319,7 +334,7 @@ impl LanguageParserRegistry {
         }
 
         // Priority 3: Query grammar fallbacks
-        for grammar in crate::built_in_grammars::load() {
+        for grammar in &builtin_grammars {
             if grammar.config.is_err() {
                 continue;
             }
@@ -338,6 +353,26 @@ impl LanguageParserRegistry {
                 }));
                 by_extension.insert((*ext).to_string(), vec![id]);
             }
+            // If every extension was already claimed, still register the
+            // grammar's metadata against a representative parser so its
+            // aliases/patterns/interpreters are not lost. The parser's
+            // extension is used only for GrammarStore lookup, which is keyed
+            // independently of who claims the extension in `by_extension`.
+            let has_metadata = !grammar.aliases.is_empty()
+                || !grammar.patterns.is_empty()
+                || !grammar.interpreters.is_empty();
+            let rep_id = rep_id.or_else(|| {
+                if !has_metadata {
+                    return None;
+                }
+                let id = parsers.len();
+                let ext = grammar.extensions.first().copied().unwrap_or_default();
+                parsers.push(Box::new(QueryLanguageParser {
+                    extension: ext.to_string(),
+                    lang: grammar.lang.to_string(),
+                }));
+                Some(id)
+            });
             if let Some(id) = rep_id {
                 for alias in grammar.aliases {
                     alias_specs.push((id, (*alias).to_string()));
@@ -408,7 +443,7 @@ impl LanguageParserRegistry {
                 .iter()
                 .position(|p| p.language_name().eq_ignore_ascii_case(edit.lang()))
             {
-                Some(id) => edit.apply(id, &mut by_extension, &mut by_pattern),
+                Some(id) => edit.apply(id, &mut by_extension, &mut by_pattern, &mut by_rexpr),
                 None => {
                     eprintln!(
                         "treetags: unknown language '{}' in --map/--langmap",
@@ -449,10 +484,13 @@ impl LanguageParserRegistry {
             }
         };
 
+        let grammar_store = Arc::new(GrammarStore::build(builtin_grammars, config));
+
         Self {
             parsers,
             by_extension,
             by_pattern,
+            by_rexpr,
             by_interpreter,
             aliases,
             forced,
@@ -465,25 +503,41 @@ impl LanguageParserRegistry {
     /// content-based disambiguation of `Ambiguous` results is the caller's
     /// responsibility.
     ///
-    /// Resolution order (matching ctags): `--language-force`, then filename
-    /// glob patterns, then file extension. Patterns take full precedence — if
-    /// any pattern matches the basename, the extension is not consulted.
+    /// `path` should be the file's path relative to the launch directory, so
+    /// relative-path regexes match the directory components too (like ctags).
+    ///
+    /// Resolution order (matching ctags): `--language-force`, then relative-path
+    /// regexes, then filename glob patterns, then file extension. The first
+    /// stage to match wins — later stages are not consulted.
     pub fn resolve_by_name(&self, path: &Path) -> NameResolution {
         if let Some(id) = self.forced {
             return NameResolution::Unique(id);
         }
 
-        // Stage 1: filename patterns against the basename.
         let mut cands: Vec<LangId> = Vec::new();
-        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-            for (pat, id) in &self.by_pattern {
-                if crate::lang_resolve::glob_match(pat, name) {
+
+        // Stage 0: relative-path regexes (only when any is configured).
+        if !self.by_rexpr.is_empty() {
+            let rel = path.to_string_lossy();
+            for (re, id) in &self.by_rexpr {
+                if re.is_match(&rel) {
                     cands.push(*id);
                 }
             }
         }
 
-        // Stage 2: file extension (only when no pattern matched).
+        // Stage 1: filename patterns against the basename.
+        if cands.is_empty() {
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                for (pat, id) in &self.by_pattern {
+                    if crate::lang_resolve::glob_match(pat, name) {
+                        cands.push(*id);
+                    }
+                }
+            }
+        }
+
+        // Stage 2: file extension (only when nothing matched yet).
         if cands.is_empty() {
             if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                 if let Some(ids) = self.by_extension.get(ext) {
@@ -795,6 +849,76 @@ mod tests {
         };
         let reg = LanguageParserRegistry::new(&cfg);
         assert_eq!(lang_for(&reg, "a.mypy").as_deref(), Some("python"));
+    }
+
+    #[test]
+    fn rexpr_matches_relative_path_and_beats_patterns() {
+        use crate::config::lang_map::{LangMapEdit, LangMapEdits};
+
+        // A relative-path regex matches directory components too, unlike globs.
+        let mut cfg = Config::for_test();
+        cfg.lang_map_edits = LangMapEdits {
+            edits: vec![LangMapEdit::AddRexpr {
+                lang: "c++".into(),
+                regex: r"include/.*\.h".into(),
+                icase: false,
+            }],
+        };
+        let reg = LanguageParserRegistry::new(&cfg);
+        assert_eq!(lang_for(&reg, "include/foo.h").as_deref(), Some("c++"));
+        // Elsewhere, `.h` still goes through the C/C++ selector (defaults to C).
+        assert_eq!(lang_for(&reg, "src/bar.h").as_deref(), Some("c"));
+
+        // Regexes are Stage 0 — they win over filename patterns.
+        assert_eq!(lang_for(&registry(), "Rakefile").as_deref(), Some("ruby"));
+        let mut cfg = Config::for_test();
+        cfg.lang_map_edits = LangMapEdits {
+            edits: vec![LangMapEdit::AddRexpr {
+                lang: "python".into(),
+                regex: "Rakefile".into(),
+                icase: false,
+            }],
+        };
+        let reg = LanguageParserRegistry::new(&cfg);
+        assert_eq!(lang_for(&reg, "Rakefile").as_deref(), Some("python"));
+    }
+
+    #[test]
+    fn shadowed_builtin_keeps_patterns_and_interpreters() {
+        // A plugin that claims all of Python's extensions must not erase the
+        // builtin Python language's filename patterns / shebang interpreters.
+        let dir = tempfile::tempdir().unwrap();
+        let pdir = dir.path().join("pyplugin");
+        std::fs::create_dir_all(&pdir).unwrap();
+        std::fs::write(
+            pdir.join("plugin.toml"),
+            format!(
+                "name = \"pyplugin\"\n\
+                 version = \"0.1.0\"\n\
+                 abi_version = {}\n\
+                 wasm_file = \"plugin.wasm\"\n\
+                 language = \"pyplugin\"\n\
+                 extensions = [\"py\", \"pyw\", \"pyi\"]\n",
+                crate::plugin::PLUGIN_ABI_VERSION
+            ),
+        )
+        .unwrap();
+        std::fs::write(pdir.join("plugin.wasm"), b"").unwrap();
+
+        let mut cfg = Config::for_test();
+        cfg.plugin_dirs = vec![dir.path().to_path_buf()];
+        let reg = LanguageParserRegistry::new(&cfg);
+
+        // The plugin owns the Python extensions ...
+        assert_eq!(lang_for(&reg, "app.py").as_deref(), Some("pyplugin"));
+        // ... but the builtin Python language's name metadata survives.
+        assert_eq!(lang_for(&reg, "SConstruct").as_deref(), Some("python"));
+        assert_eq!(
+            reg.resolve_by_shebang(b"#!/usr/bin/env python3\n")
+                .map(|id| reg.parser(id).language_name().to_string())
+                .as_deref(),
+            Some("python")
+        );
     }
 
     #[test]

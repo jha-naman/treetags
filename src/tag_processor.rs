@@ -23,30 +23,66 @@ const MODELINE_WINDOW_BYTES: u64 = 4096;
 /// names, then a gated `#!` shebang fallback. Reads file content only when the
 /// name is ambiguous or unresolved, so the common case does no IO here.
 ///
+/// A resolved language, plus any file content already read while resolving it,
+/// so the caller can avoid re-reading the file.
+pub(crate) struct Selection {
+    pub lang: LangId,
+    /// The full file content when it was read during resolution (ambiguous
+    /// names), else `None`.
+    pub content: Option<Vec<u8>>,
+}
+
 /// Shared by the tag-generation worker and `--print-language`.
+///
+/// `path` is used for file IO; `rel_path` (the path relative to the launch
+/// directory) is what name resolution matches against, so relative-path regexes
+/// see the directory components.
 pub(crate) fn select_language(
     registry: &LanguageParserRegistry,
     config: &Config,
     path: &Path,
-) -> Option<LangId> {
-    match registry.resolve_by_name(path) {
-        NameResolution::Unique(id) => Some(id),
+    rel_path: &Path,
+) -> Option<Selection> {
+    match registry.resolve_by_name(rel_path) {
+        NameResolution::Unique(id) => Some(Selection {
+            lang: id,
+            content: None,
+        }),
         NameResolution::Ambiguous(ids) => {
-            let chosen = match read_prefix(path, SELECTOR_PREFIX_BYTES) {
-                Ok(prefix) => registry.disambiguate(&ids, &prefix).unwrap_or(ids[0]),
-                Err(_) => ids[0],
-            };
-            Some(chosen)
+            // The file will be parsed whichever candidate wins, so read it in
+            // full once here and hand it back for reuse instead of reading a
+            // prefix now and the whole file again for parsing.
+            match fs::read(path) {
+                Ok(content) => {
+                    let cap = (SELECTOR_PREFIX_BYTES as usize).min(content.len());
+                    let lang = registry
+                        .disambiguate(&ids, &content[..cap])
+                        .unwrap_or(ids[0]);
+                    Some(Selection {
+                        lang,
+                        content: Some(content),
+                    })
+                }
+                // Let the caller surface the read error uniformly.
+                Err(_) => Some(Selection {
+                    lang: ids[0],
+                    content: None,
+                }),
+            }
         }
         NameResolution::None => {
             // Content guessing (matching ctags): shebang runs for executable
-            // files or under -G; editor modelines run only under -G.
+            // files or under -G; editor modelines run only under -G. Only
+            // bounded prefixes are read so unmatched files stay cheap to skip.
             if config.guess_language_eagerly || is_executable(path) {
                 if let Some(id) = read_prefix(path, SHEBANG_PREFIX_BYTES)
                     .ok()
                     .and_then(|prefix| registry.resolve_by_shebang(&prefix))
                 {
-                    return Some(id);
+                    return Some(Selection {
+                        lang: id,
+                        content: None,
+                    });
                 }
             }
             if config.guess_language_eagerly {
@@ -54,7 +90,10 @@ pub(crate) fn select_language(
                     .ok()
                     .and_then(|(head, tail)| registry.resolve_by_modeline(&head, &tail))
                 {
-                    return Some(id);
+                    return Some(Selection {
+                        lang: id,
+                        content: None,
+                    });
                 }
             }
             None
@@ -185,17 +224,24 @@ impl TagProcessor {
                 Err(_) => file_name.clone(),
             };
 
-            let lp = match select_language(&registry, &config, &file_path) {
-                Some(id) => registry.parser(id),
-                None => continue,
-            };
+            let selection =
+                match select_language(&registry, &config, &file_path, Path::new(&file_name)) {
+                    Some(selection) => selection,
+                    None => continue,
+                };
+            let lp = registry.parser(selection.lang);
 
-            let code = match fs::read(&file_path) {
-                Ok(b) => b,
-                Err(e) => {
-                    eprintln!("{}", e);
-                    continue;
-                }
+            // Reuse content already read during resolution (ambiguous names)
+            // instead of reading the file a second time.
+            let code = match selection.content {
+                Some(content) => content,
+                None => match fs::read(&file_path) {
+                    Ok(b) => b,
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        continue;
+                    }
+                },
             };
 
             let mut tags =

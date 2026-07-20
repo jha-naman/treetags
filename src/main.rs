@@ -138,8 +138,8 @@ fn print_languages(config: &Config) {
     let cwd = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
     for name in &config.file_names {
         let path = cwd.join(name);
-        let lang = tag_processor::select_language(&registry, config, &path)
-            .map(|id| registry.parser(id).language_name().to_string())
+        let lang = tag_processor::select_language(&registry, config, &path, Path::new(name))
+            .map(|sel| registry.parser(sel.lang).language_name().to_string())
             .unwrap_or_else(|| "NONE".to_string());
         println!("{}: {}", name, lang);
     }

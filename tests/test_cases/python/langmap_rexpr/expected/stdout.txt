@@ -1,0 +1,4 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+Runner	scripts/tool.txt	/^class Runner:$/;"	c
+deploy	scripts/tool.txt	/^def deploy(env):$/;"	f
+run	scripts/tool.txt	/^    def run(self):$/;"	m	class:Runner

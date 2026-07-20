@@ -216,8 +216,10 @@ impl Config {
         // Scan plugin language names for help augmentation
         let plugin_langs = plugin_config::plugin_language_names(&combined_args);
 
-        // Build command with --kinds-{lang} help entries for all known languages
+        // Build command with --kinds-{lang} help entries for all known languages,
+        // plus the display-only --map-<LANG> help entry.
         let cmd = plugin_config::command_with_all_lang_kinds(&plugin_langs);
+        let cmd = lang_map::inject_help(cmd);
 
         // Parse with combined arguments
         let matches = cmd.get_matches_from(combined_args);
@@ -422,6 +424,7 @@ impl Config {
     /// Scans plugin manifests (no WASM loaded) using the already-resolved plugin dirs.
     pub fn augmented_command_for_completions(&self) -> clap::Command {
         let cmd = plugin_config::command_with_all_lang_kinds(&self.plugin_langs);
+        let cmd = lang_map::inject_help(cmd);
         plugin_config::augment_list_kinds_for_completion(cmd, &self.plugin_langs)
     }
 
