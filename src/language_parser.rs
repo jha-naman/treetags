@@ -296,15 +296,22 @@ impl LanguageParserRegistry {
         // One parser instance per language, shared across all its extensions.
         for desc in BUILTIN_LANG_DESCRIPTORS {
             let id = parsers.len();
-            let mut used = false;
+            let mut claimed = false;
             for ext in desc.extensions {
                 if by_extension.contains_key(*ext) {
                     continue;
                 }
                 by_extension.insert((*ext).to_string(), vec![id]);
-                used = true;
+                claimed = true;
             }
-            if used {
+            // Register the language whenever it claims an extension or carries
+            // name metadata, so its patterns/interpreters/aliases survive even
+            // when a higher-priority source (e.g. a plugin) claims all of its
+            // extensions.
+            let has_metadata = !desc.aliases.is_empty()
+                || !desc.patterns.is_empty()
+                || !desc.interpreters.is_empty();
+            if claimed || has_metadata {
                 for alias in desc.aliases {
                     alias_specs.push((id, (*alias).to_string()));
                 }
@@ -338,6 +345,26 @@ impl LanguageParserRegistry {
                 }));
                 by_extension.insert((*ext).to_string(), vec![id]);
             }
+            // If every extension was already claimed, still register the
+            // grammar's metadata against a representative parser so its
+            // aliases/patterns/interpreters are not lost. The parser's
+            // extension is used only for GrammarStore lookup, which is keyed
+            // independently of who claims the extension in `by_extension`.
+            let has_metadata = !grammar.aliases.is_empty()
+                || !grammar.patterns.is_empty()
+                || !grammar.interpreters.is_empty();
+            let rep_id = rep_id.or_else(|| {
+                if !has_metadata {
+                    return None;
+                }
+                let id = parsers.len();
+                let ext = grammar.extensions.first().copied().unwrap_or_default();
+                parsers.push(Box::new(QueryLanguageParser {
+                    extension: ext.to_string(),
+                    lang: grammar.lang.to_string(),
+                }));
+                Some(id)
+            });
             if let Some(id) = rep_id {
                 for alias in grammar.aliases {
                     alias_specs.push((id, (*alias).to_string()));
@@ -795,6 +822,44 @@ mod tests {
         };
         let reg = LanguageParserRegistry::new(&cfg);
         assert_eq!(lang_for(&reg, "a.mypy").as_deref(), Some("python"));
+    }
+
+    #[test]
+    fn shadowed_builtin_keeps_patterns_and_interpreters() {
+        // A plugin that claims all of Python's extensions must not erase the
+        // builtin Python language's filename patterns / shebang interpreters.
+        let dir = tempfile::tempdir().unwrap();
+        let pdir = dir.path().join("pyplugin");
+        std::fs::create_dir_all(&pdir).unwrap();
+        std::fs::write(
+            pdir.join("plugin.toml"),
+            format!(
+                "name = \"pyplugin\"\n\
+                 version = \"0.1.0\"\n\
+                 abi_version = {}\n\
+                 wasm_file = \"plugin.wasm\"\n\
+                 language = \"pyplugin\"\n\
+                 extensions = [\"py\", \"pyw\", \"pyi\"]\n",
+                crate::plugin::PLUGIN_ABI_VERSION
+            ),
+        )
+        .unwrap();
+        std::fs::write(pdir.join("plugin.wasm"), b"").unwrap();
+
+        let mut cfg = Config::for_test();
+        cfg.plugin_dirs = vec![dir.path().to_path_buf()];
+        let reg = LanguageParserRegistry::new(&cfg);
+
+        // The plugin owns the Python extensions ...
+        assert_eq!(lang_for(&reg, "app.py").as_deref(), Some("pyplugin"));
+        // ... but the builtin Python language's name metadata survives.
+        assert_eq!(lang_for(&reg, "SConstruct").as_deref(), Some("python"));
+        assert_eq!(
+            reg.resolve_by_shebang(b"#!/usr/bin/env python3\n")
+                .map(|id| reg.parser(id).language_name().to_string())
+                .as_deref(),
+            Some("python")
+        );
     }
 
     #[test]

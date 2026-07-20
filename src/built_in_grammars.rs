@@ -67,8 +67,11 @@ pub fn load() -> Vec<BuiltinGrammar> {
             ),
         },
         BuiltinGrammar {
+            // Aliases live on the builtin C++ tree-walker (which always shadows
+            // this query grammar's extensions); duplicating them here would just
+            // create a redundant shadowed parser.
             lang: "c++",
-            aliases: &["cpp", "cxx", "cplusplus"],
+            aliases: &[],
             extensions: &[
                 "cc", "cpp", "CPP", "cxx", "c++", "cp", "C", "cppm", "ixx", "ii", "H", "hh", "hpp",
                 "HPP", "hxx", "h++", "tcc",
