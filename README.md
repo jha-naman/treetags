@@ -207,11 +207,21 @@ You can override which extensions and filename patterns map to a language
 (syntax mirrors Universal Ctags):
 
 - `--map-<LANG>=[+|-]<item>` — add (`+`, the default) or remove (`-`) a single
-  `.ext` extension or `(pattern)` glob. Repeatable. Examples:
-  `--map-c=.qc`, `--map-ruby=(Jarfile)`, `--map-c=-.h`.
+  matcher. `<item>` is one of:
+  - `.ext` — a file extension (e.g. `--map-c=.qc`)
+  - `(pattern)` — an `fnmatch` glob on the basename (e.g. `--map-ruby=(Jarfile)`)
+  - `%regex%` — a regular expression matched against the whole **relative path**
+    (directory components included), so it can express things a basename glob
+    can't (e.g. `--map-c++=%include/.*\.h%` treats headers under `include/` as
+    C++). Append `i` or `{icase}` for case-insensitivity (`%…%i`), and escape a
+    literal `%` as `\%`.
+
+  Repeatable. Regexes take precedence over patterns, which take precedence over
+  extensions. Examples: `--map-c=.qc`, `--map-c=-.h`, `--map-ruby=(Jarfile)`.
 - `--langmap=<LANG>:<spec>[,<LANG>:<spec>...]` — bulk form. `<spec>` is a run of
   `.ext` and `(pattern)` tokens (e.g. `.c.h` or `(Makefile).mak`). A leading `+`
   on the spec appends; otherwise it replaces the language's mappings.
+  (Regexes are only available via `--map-<LANG>`, matching ctags.)
 - `--list-maps[=<LANG>]` — print the effective extensions and patterns for every
   language (or just `<LANG>`) and exit.
 

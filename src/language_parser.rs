@@ -192,6 +192,10 @@ pub struct LanguageParserRegistry {
     /// Filename glob patterns in registration (priority) order. Matched against
     /// the basename before extensions.
     by_pattern: Vec<(String, LangId)>,
+    /// Relative-path regular expressions (from `--map-<LANG>=%…%`), matched
+    /// against the whole relative path before patterns and extensions. Empty
+    /// unless the user configured one, so it is off the common hot path.
+    by_rexpr: Vec<(regex::Regex, LangId)>,
     /// Interpreter name (lowercased) → candidate languages, for `#!` shebang
     /// resolution. Candidates are in tier/registration order.
     by_interpreter: HashMap<String, Vec<LangId>>,
@@ -252,6 +256,8 @@ impl LanguageParserRegistry {
         let mut alias_specs: Vec<(LangId, String)> = Vec::new();
         // Filename glob patterns in tier/registration order.
         let mut by_pattern: Vec<(String, LangId)> = Vec::new();
+        // Relative-path regexes, populated only by user `--map-<LANG>=%…%` edits.
+        let mut by_rexpr: Vec<(regex::Regex, LangId)> = Vec::new();
         // Interpreter names collected per source, in tier/registration order.
         let mut interp_specs: Vec<(LangId, String)> = Vec::new();
 
@@ -437,7 +443,7 @@ impl LanguageParserRegistry {
                 .iter()
                 .position(|p| p.language_name().eq_ignore_ascii_case(edit.lang()))
             {
-                Some(id) => edit.apply(id, &mut by_extension, &mut by_pattern),
+                Some(id) => edit.apply(id, &mut by_extension, &mut by_pattern, &mut by_rexpr),
                 None => {
                     eprintln!(
                         "treetags: unknown language '{}' in --map/--langmap",
@@ -484,6 +490,7 @@ impl LanguageParserRegistry {
             parsers,
             by_extension,
             by_pattern,
+            by_rexpr,
             by_interpreter,
             aliases,
             forced,
@@ -496,25 +503,41 @@ impl LanguageParserRegistry {
     /// content-based disambiguation of `Ambiguous` results is the caller's
     /// responsibility.
     ///
-    /// Resolution order (matching ctags): `--language-force`, then filename
-    /// glob patterns, then file extension. Patterns take full precedence — if
-    /// any pattern matches the basename, the extension is not consulted.
+    /// `path` should be the file's path relative to the launch directory, so
+    /// relative-path regexes match the directory components too (like ctags).
+    ///
+    /// Resolution order (matching ctags): `--language-force`, then relative-path
+    /// regexes, then filename glob patterns, then file extension. The first
+    /// stage to match wins — later stages are not consulted.
     pub fn resolve_by_name(&self, path: &Path) -> NameResolution {
         if let Some(id) = self.forced {
             return NameResolution::Unique(id);
         }
 
-        // Stage 1: filename patterns against the basename.
         let mut cands: Vec<LangId> = Vec::new();
-        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-            for (pat, id) in &self.by_pattern {
-                if crate::lang_resolve::glob_match(pat, name) {
+
+        // Stage 0: relative-path regexes (only when any is configured).
+        if !self.by_rexpr.is_empty() {
+            let rel = path.to_string_lossy();
+            for (re, id) in &self.by_rexpr {
+                if re.is_match(&rel) {
                     cands.push(*id);
                 }
             }
         }
 
-        // Stage 2: file extension (only when no pattern matched).
+        // Stage 1: filename patterns against the basename.
+        if cands.is_empty() {
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                for (pat, id) in &self.by_pattern {
+                    if crate::lang_resolve::glob_match(pat, name) {
+                        cands.push(*id);
+                    }
+                }
+            }
+        }
+
+        // Stage 2: file extension (only when nothing matched yet).
         if cands.is_empty() {
             if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                 if let Some(ids) = self.by_extension.get(ext) {
@@ -826,6 +849,38 @@ mod tests {
         };
         let reg = LanguageParserRegistry::new(&cfg);
         assert_eq!(lang_for(&reg, "a.mypy").as_deref(), Some("python"));
+    }
+
+    #[test]
+    fn rexpr_matches_relative_path_and_beats_patterns() {
+        use crate::config::lang_map::{LangMapEdit, LangMapEdits};
+
+        // A relative-path regex matches directory components too, unlike globs.
+        let mut cfg = Config::for_test();
+        cfg.lang_map_edits = LangMapEdits {
+            edits: vec![LangMapEdit::AddRexpr {
+                lang: "c++".into(),
+                regex: r"include/.*\.h".into(),
+                icase: false,
+            }],
+        };
+        let reg = LanguageParserRegistry::new(&cfg);
+        assert_eq!(lang_for(&reg, "include/foo.h").as_deref(), Some("c++"));
+        // Elsewhere, `.h` still goes through the C/C++ selector (defaults to C).
+        assert_eq!(lang_for(&reg, "src/bar.h").as_deref(), Some("c"));
+
+        // Regexes are Stage 0 — they win over filename patterns.
+        assert_eq!(lang_for(&registry(), "Rakefile").as_deref(), Some("ruby"));
+        let mut cfg = Config::for_test();
+        cfg.lang_map_edits = LangMapEdits {
+            edits: vec![LangMapEdit::AddRexpr {
+                lang: "python".into(),
+                regex: "Rakefile".into(),
+                icase: false,
+            }],
+        };
+        let reg = LanguageParserRegistry::new(&cfg);
+        assert_eq!(lang_for(&reg, "Rakefile").as_deref(), Some("python"));
     }
 
     #[test]

@@ -1,0 +1,2 @@
+--sort yes -f '-' --map-python=%scripts/.*\.txt%
+scripts/tool.txt

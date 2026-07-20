@@ -33,12 +33,17 @@ pub(crate) struct Selection {
 }
 
 /// Shared by the tag-generation worker and `--print-language`.
+///
+/// `path` is used for file IO; `rel_path` (the path relative to the launch
+/// directory) is what name resolution matches against, so relative-path regexes
+/// see the directory components.
 pub(crate) fn select_language(
     registry: &LanguageParserRegistry,
     config: &Config,
     path: &Path,
+    rel_path: &Path,
 ) -> Option<Selection> {
-    match registry.resolve_by_name(path) {
+    match registry.resolve_by_name(rel_path) {
         NameResolution::Unique(id) => Some(Selection {
             lang: id,
             content: None,
@@ -219,10 +224,11 @@ impl TagProcessor {
                 Err(_) => file_name.clone(),
             };
 
-            let selection = match select_language(&registry, &config, &file_path) {
-                Some(selection) => selection,
-                None => continue,
-            };
+            let selection =
+                match select_language(&registry, &config, &file_path, Path::new(&file_name)) {
+                    Some(selection) => selection,
+                    None => continue,
+                };
             let lp = registry.parser(selection.lang);
 
             // Reuse content already read during resolution (ambiguous names)

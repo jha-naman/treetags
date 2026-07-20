@@ -4,11 +4,15 @@
 //!
 //! Syntax mirrors Universal Ctags:
 //! - `--map-<LANG>=[+|-]<item>` — add (`+`, the default) or remove (`-`) one
-//!   `.ext` extension or `(pattern)` glob. Repeatable.
+//!   `.ext` extension, `(pattern)` glob, or `%rexpr%` relative-path regular
+//!   expression. A regex may take a trailing `i`/`{icase}` case-insensitive
+//!   flag, and a literal `%` inside it is escaped as `\%`. Repeatable.
 //! - `--langmap=<LANG>:<spec>[,<LANG>:<spec>...]` — bulk. A leading `+` on the
 //!   spec appends; otherwise it replaces the language's name mappings. `<spec>`
 //!   is a run of `.ext` and `(pattern)` tokens, e.g. `.c.h` or `(Makefile).mak`.
+//!   (Regexes are only supported via `--map-<LANG>`, matching ctags.)
 
+use regex::Regex;
 use std::collections::HashMap;
 
 /// The ordered set of langmap edits gathered from the command line.
@@ -36,6 +40,18 @@ pub enum LangMapEdit {
         lang: String,
         pattern: String,
     },
+    /// A relative-path regular expression, with an optional case-insensitive
+    /// flag. `regex` is the raw pattern (with `\%` already unescaped to `%`).
+    AddRexpr {
+        lang: String,
+        regex: String,
+        icase: bool,
+    },
+    RemoveRexpr {
+        lang: String,
+        regex: String,
+        icase: bool,
+    },
     /// Replace all of a language's extensions and patterns.
     Replace {
         lang: String,
@@ -52,18 +68,21 @@ impl LangMapEdit {
             | LangMapEdit::RemoveExt { lang, .. }
             | LangMapEdit::AddPattern { lang, .. }
             | LangMapEdit::RemovePattern { lang, .. }
+            | LangMapEdit::AddRexpr { lang, .. }
+            | LangMapEdit::RemoveRexpr { lang, .. }
             | LangMapEdit::Replace { lang, .. } => lang,
         }
     }
 
-    /// Applies this edit to the registry's `by_extension` / `by_pattern` tables,
-    /// mapping to the resolved language id. New mappings take precedence (are
-    /// inserted at the front) over existing candidates.
+    /// Applies this edit to the registry's `by_extension` / `by_pattern` /
+    /// `by_rexpr` tables, mapping to the resolved language id. New mappings take
+    /// precedence (are inserted at the front) over existing candidates.
     pub fn apply(
         &self,
         id: usize,
         by_ext: &mut HashMap<String, Vec<usize>>,
         by_pat: &mut Vec<(String, usize)>,
+        by_rexpr: &mut Vec<(Regex, usize)>,
     ) {
         match self {
             LangMapEdit::AddExt { ext, .. } => {
@@ -88,12 +107,30 @@ impl LangMapEdit {
             LangMapEdit::RemovePattern { pattern, .. } => {
                 by_pat.retain(|(p, i)| !(p == pattern && *i == id));
             }
+            LangMapEdit::AddRexpr { regex, icase, .. } => match compile_rexpr(regex, *icase) {
+                Ok(re) => {
+                    if !by_rexpr
+                        .iter()
+                        .any(|(r, i)| r.as_str() == re.as_str() && *i == id)
+                    {
+                        by_rexpr.insert(0, (re, id));
+                    }
+                }
+                Err(e) => eprintln!("treetags: invalid --map regex %{regex}%: {e}"),
+            },
+            LangMapEdit::RemoveRexpr { regex, icase, .. } => {
+                if let Ok(re) = compile_rexpr(regex, *icase) {
+                    let target = re.as_str().to_string();
+                    by_rexpr.retain(|(r, i)| !(r.as_str() == target && *i == id));
+                }
+            }
             LangMapEdit::Replace { exts, patterns, .. } => {
                 by_ext.retain(|_, v| {
                     v.retain(|&x| x != id);
                     !v.is_empty()
                 });
                 by_pat.retain(|(_, i)| *i != id);
+                by_rexpr.retain(|(_, i)| *i != id);
                 for e in exts {
                     by_ext.entry(e.clone()).or_default().insert(0, id);
                 }
@@ -103,6 +140,16 @@ impl LangMapEdit {
                 by_pat.splice(0..0, new);
             }
         }
+    }
+}
+
+/// Compiles a relative-path regex, baking in the case-insensitive flag so the
+/// compiled form (`Regex::as_str`) is enough to identify it for removal.
+fn compile_rexpr(regex: &str, icase: bool) -> Result<Regex, regex::Error> {
+    if icase {
+        Regex::new(&format!("(?i){regex}"))
+    } else {
+        Regex::new(regex)
     }
 }
 
@@ -131,6 +178,18 @@ fn parse_map_item(lang: &str, item: &str) -> Option<LangMapEdit> {
             }
         });
     }
+    if let Some(after_pct) = body.strip_prefix('%') {
+        let (regex, flags) = split_rexpr(after_pct)?;
+        if regex.is_empty() {
+            return None;
+        }
+        let icase = flags == "i" || flags == "{icase}";
+        return Some(if remove {
+            LangMapEdit::RemoveRexpr { lang, regex, icase }
+        } else {
+            LangMapEdit::AddRexpr { lang, regex, icase }
+        });
+    }
     if let Some(ext) = body.strip_prefix('.') {
         if ext.is_empty() {
             return None;
@@ -146,6 +205,25 @@ fn parse_map_item(lang: &str, item: &str) -> Option<LangMapEdit> {
                 ext: ext.to_string(),
             }
         });
+    }
+    None
+}
+
+/// Splits `%<regex>%<flags>` content (the part after the opening `%`) into the
+/// regex (with `\%` unescaped to a literal `%`) and the trailing flag string.
+/// Returns `None` if there is no closing `%`.
+fn split_rexpr(s: &str) -> Option<(String, String)> {
+    let mut regex = String::new();
+    let mut chars = s.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
+        match c {
+            '\\' if chars.peek().map(|&(_, n)| n) == Some('%') => {
+                regex.push('%');
+                chars.next();
+            }
+            '%' => return Some((regex, s[i + 1..].to_string())),
+            _ => regex.push(c),
+        }
     }
     None
 }
@@ -291,7 +369,7 @@ mod tests {
             lang: "ruby".into(),
             pattern: "Jarfile".into(),
         }
-        .apply(3, &mut HashMap::new(), &mut by_pat);
+        .apply(3, &mut HashMap::new(), &mut by_pat, &mut Vec::new());
         assert_eq!(
             by_pat,
             vec![("Jarfile".to_string(), 3), ("Makefile".to_string(), 7)]
@@ -303,7 +381,7 @@ mod tests {
             exts: vec![],
             patterns: vec!["A".into(), "B".into()],
         }
-        .apply(3, &mut HashMap::new(), &mut by_pat);
+        .apply(3, &mut HashMap::new(), &mut by_pat, &mut Vec::new());
         // Front precedence, and the declared order (A before B) is preserved.
         assert_eq!(
             by_pat,
@@ -313,6 +391,54 @@ mod tests {
                 ("Makefile".to_string(), 7),
             ]
         );
+    }
+
+    #[test]
+    fn map_item_rexpr() {
+        assert_eq!(
+            parse_map_item("c++", r"%include/.*\.h%"),
+            Some(LangMapEdit::AddRexpr {
+                lang: "c++".into(),
+                regex: r"include/.*\.h".into(),
+                icase: false,
+            })
+        );
+        assert_eq!(
+            parse_map_item("c++", "%foo%i"),
+            Some(LangMapEdit::AddRexpr {
+                lang: "c++".into(),
+                regex: "foo".into(),
+                icase: true,
+            })
+        );
+        assert_eq!(
+            parse_map_item("c++", "%foo%{icase}"),
+            Some(LangMapEdit::AddRexpr {
+                lang: "c++".into(),
+                regex: "foo".into(),
+                icase: true,
+            })
+        );
+        assert_eq!(
+            parse_map_item("make", "-%Makefile.*%"),
+            Some(LangMapEdit::RemoveRexpr {
+                lang: "make".into(),
+                regex: "Makefile.*".into(),
+                icase: false,
+            })
+        );
+        // `\%` is unescaped to a literal `%` inside the regex.
+        assert_eq!(
+            parse_map_item("x", r"%a\%b%"),
+            Some(LangMapEdit::AddRexpr {
+                lang: "x".into(),
+                regex: "a%b".into(),
+                icase: false,
+            })
+        );
+        // Unterminated or empty regexes are rejected.
+        assert_eq!(parse_map_item("x", "%foo"), None);
+        assert_eq!(parse_map_item("x", "%%"), None);
     }
 
     #[test]
