@@ -45,10 +45,20 @@ pub(crate) struct GrammarStore {
 
 impl GrammarStore {
     pub(crate) fn new(config: &Config) -> Self {
+        Self::build(built_in_grammars::load(), config)
+    }
+
+    /// Builds the store from already-loaded built-in grammars, so callers that
+    /// also need the grammars' metadata (e.g. `LanguageParserRegistry`) don't
+    /// pay to compile every `TagsConfiguration` twice.
+    pub(crate) fn build(
+        builtin_grammars: Vec<built_in_grammars::BuiltinGrammar>,
+        config: &Config,
+    ) -> Self {
         let mut grammar_configs = Vec::new();
         let mut extension_config_map = HashMap::new();
 
-        for grammar in built_in_grammars::load() {
+        for grammar in builtin_grammars {
             let index = grammar_configs.len();
             grammar_configs.push(grammar.config);
             for ext in grammar.extensions {

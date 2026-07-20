@@ -236,7 +236,9 @@ impl LanguageParserRegistry {
     /// Build the full registry, loading and JIT-compiling WASM plugins.
     /// Call this once at startup and share the result via `Arc`.
     pub fn new(config: &Config) -> Self {
-        let grammar_store = Arc::new(GrammarStore::new(config));
+        // Load once and share with the GrammarStore , so the built-in grammars
+        // `TagsConfiguration`s are compiled only once at startup
+        let builtin_grammars = crate::built_in_grammars::load();
         let plugin_registry = Arc::new(PluginRegistry::scan(
             &config.plugin_dirs,
             Some(&config.plugins_dir),
@@ -326,7 +328,7 @@ impl LanguageParserRegistry {
         }
 
         // Priority 3: Query grammar fallbacks
-        for grammar in crate::built_in_grammars::load() {
+        for grammar in &builtin_grammars {
             if grammar.config.is_err() {
                 continue;
             }
@@ -475,6 +477,8 @@ impl LanguageParserRegistry {
                 std::process::exit(1);
             }
         };
+
+        let grammar_store = Arc::new(GrammarStore::build(builtin_grammars, config));
 
         Self {
             parsers,
