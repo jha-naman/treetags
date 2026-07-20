@@ -97,9 +97,10 @@ impl LangMapEdit {
                 for e in exts {
                     by_ext.entry(e.clone()).or_default().insert(0, id);
                 }
-                for p in patterns {
-                    by_pat.push((p.clone(), id));
-                }
+                // Insert at the front (like `AddPattern`) so replaced patterns
+                // take precedence over built-in ones, keeping declared order.
+                let new = patterns.iter().map(|p| (p.clone(), id));
+                by_pat.splice(0..0, new);
             }
         }
     }
@@ -278,6 +279,41 @@ pub fn strip_map_args(args: Vec<String>) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn add_and_replace_patterns_take_front_precedence() {
+        // Both `--map-<LANG>=(pat)` (AddPattern) and `--langmap` (Replace) must
+        // place a language's patterns ahead of pre-existing (built-in) ones.
+        let existing = vec![("Makefile".to_string(), 7usize)];
+
+        let mut by_pat = existing.clone();
+        LangMapEdit::AddPattern {
+            lang: "ruby".into(),
+            pattern: "Jarfile".into(),
+        }
+        .apply(3, &mut HashMap::new(), &mut by_pat);
+        assert_eq!(
+            by_pat,
+            vec![("Jarfile".to_string(), 3), ("Makefile".to_string(), 7)]
+        );
+
+        let mut by_pat = existing.clone();
+        LangMapEdit::Replace {
+            lang: "ruby".into(),
+            exts: vec![],
+            patterns: vec!["A".into(), "B".into()],
+        }
+        .apply(3, &mut HashMap::new(), &mut by_pat);
+        // Front precedence, and the declared order (A before B) is preserved.
+        assert_eq!(
+            by_pat,
+            vec![
+                ("A".to_string(), 3),
+                ("B".to_string(), 3),
+                ("Makefile".to_string(), 7),
+            ]
+        );
+    }
 
     #[test]
     fn map_item_add_remove() {
