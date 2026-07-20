@@ -7,16 +7,19 @@
 /// Matches a filename against an `fnmatch`-style glob pattern.
 ///
 /// Supported syntax (case-sensitive, matched against the whole basename):
-/// - `*` — any run of characters (including empty)
-/// - `?` — exactly one character
+/// - `*` — any run of bytes (including empty)
+/// - `?` — exactly one byte
 /// - `[...]` — a character class, with ranges (`a-z`) and negation (`[!...]`
 ///   or `[^...]`); a literal `]` is allowed as the first class member
 ///
-/// There is no path-separator special-casing: patterns are only ever matched
-/// against a basename, so `*` spans the entire name.
+/// Matching is byte-oriented and allocation-free: it operates directly on
+/// the string bytes, so it is cheap enough to run against every registered
+/// pattern for every file on the resolution hot path. There is no
+/// path-separator special-casing — patterns are only matched against a
+/// basename, so `*` spans the entire name.
 pub fn glob_match(pattern: &str, name: &str) -> bool {
-    let p: Vec<char> = pattern.chars().collect();
-    let n: Vec<char> = name.chars().collect();
+    let p = pattern.as_bytes();
+    let n = name.as_bytes();
     let (mut pi, mut ni) = (0usize, 0usize);
     // Position to resume from on mismatch: (index of '*', name index it covers).
     let mut backtrack: Option<(usize, usize)> = None;
@@ -24,12 +27,12 @@ pub fn glob_match(pattern: &str, name: &str) -> bool {
     while ni < n.len() {
         let mut advanced = false;
         if pi < p.len() {
-            if p[pi] == '*' {
+            if p[pi] == b'*' {
                 backtrack = Some((pi, ni));
                 pi += 1;
                 continue;
             }
-            let (matched, next_pi) = match_single(&p, pi, n[ni]);
+            let (matched, next_pi) = match_single(p, pi, n[ni]);
             if matched {
                 pi = next_pi;
                 ni += 1;
@@ -49,36 +52,36 @@ pub fn glob_match(pattern: &str, name: &str) -> bool {
     }
 
     // Any remaining pattern must be all '*' to match the empty tail.
-    while pi < p.len() && p[pi] == '*' {
+    while pi < p.len() && p[pi] == b'*' {
         pi += 1;
     }
     pi == p.len()
 }
 
-/// Matches the single pattern token at `p[pi]` against char `c`.
+/// Matches the single pattern token at `p[pi]` against byte `c`.
 /// Returns `(matched, index just past the token)`.
-fn match_single(p: &[char], pi: usize, c: char) -> (bool, usize) {
+fn match_single(p: &[u8], pi: usize, c: u8) -> (bool, usize) {
     match p[pi] {
-        '?' => (true, pi + 1),
-        '[' => match_class(p, pi, c),
+        b'?' => (true, pi + 1),
+        b'[' => match_class(p, pi, c),
         lit => (lit == c, pi + 1),
     }
 }
 
-/// Matches a `[...]` character class starting at `p[start]` (`'['`).
+/// Matches a `[...]` character class starting at `p[start]` (`b'['`).
 /// Falls back to treating `[` as a literal if the class is unterminated.
-fn match_class(p: &[char], start: usize, c: char) -> (bool, usize) {
+fn match_class(p: &[u8], start: usize, c: u8) -> (bool, usize) {
     let mut i = start + 1;
     let mut negate = false;
-    if i < p.len() && (p[i] == '!' || p[i] == '^') {
+    if i < p.len() && (p[i] == b'!' || p[i] == b'^') {
         negate = true;
         i += 1;
     }
     let mut matched = false;
     let mut first = true;
-    while i < p.len() && (p[i] != ']' || first) {
+    while i < p.len() && (p[i] != b']' || first) {
         first = false;
-        if i + 2 < p.len() && p[i + 1] == '-' && p[i + 2] != ']' {
+        if i + 2 < p.len() && p[i + 1] == b'-' && p[i + 2] != b']' {
             if p[i] <= c && c <= p[i + 2] {
                 matched = true;
             }
@@ -90,11 +93,11 @@ fn match_class(p: &[char], start: usize, c: char) -> (bool, usize) {
             i += 1;
         }
     }
-    if i < p.len() && p[i] == ']' {
+    if i < p.len() && p[i] == b']' {
         (matched ^ negate, i + 1)
     } else {
         // Unterminated class: treat the opening '[' as a literal character.
-        ('[' == c, start + 1)
+        (b'[' == c, start + 1)
     }
 }
 
@@ -359,6 +362,16 @@ mod tests {
     fn unterminated_class_is_literal() {
         assert!(glob_match("[abc", "[abc"));
         assert!(!glob_match("[abc", "a"));
+    }
+
+    #[test]
+    fn multibyte_names() {
+        // Byte-oriented matching: `*` spans multibyte characters and multibyte
+        // literals compare by bytes, so common patterns still work on non-ASCII
+        // names.
+        assert!(glob_match("*.gemspec", "café.gemspec"));
+        assert!(glob_match("café.rb", "café.rb"));
+        assert!(!glob_match("café.rb", "cafe.rb"));
     }
 
     #[test]
