@@ -43,48 +43,6 @@ pub fn load() -> Vec<BuiltinGrammar> {
             ),
         },
         BuiltinGrammar {
-            lang: "python",
-            aliases: &[],
-            extensions: &["py", "pyw"],
-            patterns: &[],
-            interpreters: &[],
-            config: get_tags_config(
-                tree_sitter_python::LANGUAGE.into(),
-                tree_sitter_python::TAGS_QUERY,
-                "python",
-            ),
-        },
-        BuiltinGrammar {
-            lang: "c",
-            aliases: &[],
-            extensions: &["c", "h", "i"],
-            patterns: &[],
-            interpreters: &[],
-            config: get_tags_config(
-                tree_sitter_c::LANGUAGE.into(),
-                tree_sitter_c::TAGS_QUERY,
-                "c",
-            ),
-        },
-        BuiltinGrammar {
-            // Aliases live on the builtin C++ tree-walker (which always shadows
-            // this query grammar's extensions); duplicating them here would just
-            // create a redundant shadowed parser.
-            lang: "c++",
-            aliases: &[],
-            extensions: &[
-                "cc", "cpp", "CPP", "cxx", "c++", "cp", "C", "cppm", "ixx", "ii", "H", "hh", "hpp",
-                "HPP", "hxx", "h++", "tcc",
-            ],
-            patterns: &[],
-            interpreters: &[],
-            config: get_tags_config(
-                tree_sitter_cpp::LANGUAGE.into(),
-                tree_sitter_cpp::TAGS_QUERY,
-                "c++",
-            ),
-        },
-        BuiltinGrammar {
             lang: "java",
             aliases: &[],
             extensions: &["java"],
