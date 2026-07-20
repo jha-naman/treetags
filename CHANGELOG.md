@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- [0.11.0]
+
 ### ADDED
  - Add support for relative regex when using `--map-<lang>` cli arg
  - Add help text for the `--map-<lang>` cli arg
