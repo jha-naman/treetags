@@ -325,7 +325,10 @@ pub fn extract_map_edits(args: &[String]) -> Vec<LangMapEdit> {
             match parse_map_item(&lang, &item) {
                 Some(edit) => edits.push(edit),
                 None if !item.is_empty() => {
-                    eprintln!("treetags: ignoring malformed --map-{lang}={item}");
+                    eprintln!(
+                        "treetags: ignoring malformed --map-{lang}={item}; expected \
+                         .ext, (glob), or %regex% — use `--help` to check syntax"
+                    );
                 }
                 None => {}
             }
@@ -333,6 +336,27 @@ pub fn extract_map_edits(args: &[String]) -> Vec<LangMapEdit> {
         i += 1;
     }
     edits
+}
+
+/// Adds a display-only `--map-<LANG>` entry to `--help`.
+///
+/// The real, per-language `--map-<lang>=…` flags are pulled out of the raw args
+/// before clap sees them (see [`extract_map_edits`] / [`strip_map_args`]), so
+/// this entry exists purely to document the option in `--help` and completions.
+pub fn inject_help(cmd: clap::Command) -> clap::Command {
+    cmd.arg(
+        clap::Arg::new("map-lang-help")
+            .long("map-<LANG>")
+            .value_name("ITEM")
+            .help(
+                "Configure the files that get matched to a parser for the LANG language (repeatable).\
+                 Prefix ITEM with + to add (the default) or - to remove. ITEM is one of:\n\
+                 .ext        a file extension\n\
+                 (glob)      an fnmatch pattern matched against the basename\n\
+                 %regex%[i]  a regex matched against the relative path (i: case-insensitive)\n\
+                 e.g. --map-c=.qc  --map-ruby=(Jarfile)  --map-c++=%include/.*\\.h%",
+            ),
+    )
 }
 
 /// Removes `--map-<LANG>[=<item>]` args (and their space-separated values) so
@@ -357,6 +381,22 @@ pub fn strip_map_args(args: Vec<String>) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn inject_help_adds_map_entry_without_breaking_parsing() {
+        // Building the command must not panic on the `<LANG>` long name, and the
+        // display-only entry must not interfere with parsing real flags.
+        let cmd = inject_help(
+            clap::Command::new("treetags").arg(clap::Arg::new("f").short('f').num_args(1)),
+        );
+        assert!(cmd
+            .get_arguments()
+            .any(|a| a.get_long() == Some("map-<LANG>")));
+        assert!(cmd
+            .clone()
+            .try_get_matches_from(["treetags", "-f", "tags"])
+            .is_ok());
+    }
 
     #[test]
     fn add_and_replace_patterns_take_front_precedence() {
