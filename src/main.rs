@@ -139,7 +139,7 @@ fn print_languages(config: &Config) {
     for name in &config.file_names {
         let path = cwd.join(name);
         let lang = tag_processor::select_language(&registry, config, &path)
-            .map(|id| registry.parser(id).language_name().to_string())
+            .map(|sel| registry.parser(sel.lang).language_name().to_string())
             .unwrap_or_else(|| "NONE".to_string());
         println!("{}: {}", name, lang);
     }
