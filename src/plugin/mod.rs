@@ -1,5 +1,7 @@
-// Consumed by the treetags-build-index bin and (soon) the plugin-install client;
-// unused from the main treetags binary's copy of this module tree.
+pub mod client;
+// Consumed by the treetags-build-index bin and the plugin-install client; a few
+// items (AbisFile/merged) are only used by the bin, so they read as dead from
+// the main treetags binary's copy of this module tree.
 #[allow(dead_code)]
 pub mod index;
 pub(crate) mod instance;

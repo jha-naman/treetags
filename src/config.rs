@@ -27,7 +27,51 @@ pub enum Commands {
         shell: clap_complete::Shell,
     },
     /// List detected plugins with their language names and file extensions, then exit
+    ///
+    /// Deprecated alias for `treetags plugin installed`.
     ListPlugins,
+    /// Discover, install, and manage WASM plugins
+    Plugin {
+        #[command(subcommand)]
+        action: PluginCommands,
+    },
+}
+
+/// Subcommands under `treetags plugin`.
+#[derive(Subcommand, Clone, Debug)]
+pub enum PluginCommands {
+    /// List plugins available to download for this build's ABI version
+    Available {
+        /// Bypass the cached index and re-fetch it
+        #[arg(long)]
+        refresh: bool,
+    },
+    /// Download and install a plugin by name
+    Install {
+        /// Plugin name (as shown by `plugin available`)
+        name: String,
+        /// Reinstall even if an equal or newer version is present
+        #[arg(long)]
+        force: bool,
+        /// Bypass the cached index and re-fetch it
+        #[arg(long)]
+        refresh: bool,
+    },
+    /// Remove a locally installed plugin by name
+    Uninstall {
+        /// Plugin name to remove
+        name: String,
+    },
+    /// List locally installed plugins
+    Installed,
+    /// Update installed plugins to the latest compatible version
+    Update {
+        /// Only update this plugin (default: all installed plugins)
+        name: Option<String>,
+        /// Bypass the cached index and re-fetch it
+        #[arg(long)]
+        refresh: bool,
+    },
 }
 
 /// Configuration options for the tag generator.
@@ -164,6 +208,12 @@ pub struct Config {
     /// Resolved plugins directory (set during construction, always valid after Config::new()).
     #[clap(skip)]
     pub plugins_dir: std::path::PathBuf,
+
+    /// Base URL of the plugin distribution index. Overrides the compiled-in
+    /// default and the `TREETAGS_PLUGIN_INDEX` env var. Used by `plugin`
+    /// subcommands, which fetch `{URL}/{ABI}/index.json`.
+    #[arg(long = "plugin-index-url", value_name = "URL")]
+    pub plugin_index_url: Option<String>,
 
     /// Kinds filter map keyed by language name, populated from `--kinds-{lang}` args.
     #[clap(skip)]

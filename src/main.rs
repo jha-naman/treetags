@@ -95,6 +95,12 @@ fn handle_early_exit_commands(config: &Config) -> bool {
             config::Commands::ListPlugins => {
                 plugin::print_plugin_list(&config.plugin_dirs, &config.plugins_dir);
             }
+            config::Commands::Plugin { action } => {
+                if let Err(err) = handle_plugin_command(action, config) {
+                    eprintln!("error: {err:#}");
+                    process::exit(1);
+                }
+            }
         }
         return true;
     }
@@ -116,6 +122,31 @@ fn handle_early_exit_commands(config: &Config) -> bool {
         return true;
     }
     false
+}
+
+/// Dispatches a `treetags plugin ...` subcommand.
+fn handle_plugin_command(action: &config::PluginCommands, config: &Config) -> anyhow::Result<()> {
+    use config::PluginCommands;
+    use plugin::client;
+
+    let base = client::resolve_base_url(config.plugin_index_url.as_deref());
+    let plugins_dir = &config.plugins_dir;
+    match action {
+        PluginCommands::Available { refresh } => client::available(&base, *refresh, plugins_dir),
+        PluginCommands::Install {
+            name,
+            force,
+            refresh,
+        } => client::install(&base, name, *force, *refresh, plugins_dir),
+        PluginCommands::Uninstall { name } => client::uninstall(name, plugins_dir),
+        PluginCommands::Installed => {
+            plugin::print_plugin_list(&config.plugin_dirs, plugins_dir);
+            Ok(())
+        }
+        PluginCommands::Update { name, refresh } => {
+            client::update(&base, name.as_deref(), *refresh, plugins_dir)
+        }
+    }
 }
 
 /// Prints the effective extension/pattern maps (optionally for one language).
