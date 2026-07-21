@@ -68,6 +68,11 @@ fn main() {
 
     let files = file_result.files;
 
+    if config.suggest_plugins {
+        suggest_plugins(&config, &files);
+        return;
+    }
+
     let tag_processor = TagProcessor::new(tag_file_path.clone(), config.workers, config.clone());
     let mut tags = tag_processor.process_files(files);
 
@@ -146,6 +151,45 @@ fn handle_plugin_command(action: &config::PluginCommands, config: &Config) -> an
         PluginCommands::Update { name, refresh } => {
             client::update(&base, name.as_deref(), *refresh, plugins_dir)
         }
+    }
+}
+
+/// Reports available (uninstalled) plugins that could handle files in the tree —
+/// both types nothing handles today and natively-supported types a plugin offers
+/// an enhanced take on. Reuses the discovered file set from the main flow.
+fn suggest_plugins(config: &Config, files: &[String]) {
+    use std::collections::BTreeSet;
+
+    let registry = language_parser::LanguageParserRegistry::new(config);
+    let cwd = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
+
+    // Resolve each distinct extension once — name-based resolution is stable per
+    // extension, so this stays cheap even on large trees.
+    let mut discovered: BTreeSet<String> = BTreeSet::new();
+    let mut handled: BTreeSet<String> = BTreeSet::new();
+    for name in files {
+        let rel = Path::new(name);
+        let Some(ext) = rel.extension().and_then(|e| e.to_str()) else {
+            continue;
+        };
+        let ext = ext.to_ascii_lowercase();
+        if !discovered.insert(ext.clone()) {
+            continue; // already classified this extension
+        }
+        if tag_processor::select_language(&registry, config, &cwd.join(name), rel).is_some() {
+            handled.insert(ext);
+        }
+    }
+
+    if discovered.is_empty() {
+        println!("No files with recognizable extensions found; no plugin suggestions.");
+        return;
+    }
+
+    let base = plugin::client::resolve_base_url(config.plugin_index_url.as_deref());
+    if let Err(err) = plugin::client::suggest(&base, &discovered, &handled, &config.plugins_dir) {
+        eprintln!("error: {err:#}");
+        process::exit(1);
     }
 }
 

@@ -6,7 +6,7 @@
 //! with it. Downloads are verified against the `wasm_sha256` in the index.
 
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -72,7 +72,7 @@ pub fn available(base: &str, refresh: bool, plugins_dir: &Path) -> Result<()> {
     }
     let installed = installed_plugins(plugins_dir);
 
-    let rows: Vec<[String; 5]> = index
+    let rows: Vec<Vec<String>> = index
         .plugins
         .iter()
         .map(|p| {
@@ -80,7 +80,7 @@ pub fn available(base: &str, refresh: bool, plugins_dir: &Path) -> Result<()> {
                 None => String::new(),
                 Some(local) => status_label(&local.version, &p.version),
             };
-            [
+            vec![
                 p.name.clone(),
                 p.version.clone(),
                 p.language.clone().unwrap_or_default(),
@@ -90,7 +90,7 @@ pub fn available(base: &str, refresh: bool, plugins_dir: &Path) -> Result<()> {
         })
         .collect();
 
-    print_table(
+    print_rows(
         &["NAME", "VERSION", "LANGUAGE", "EXTENSIONS", "STATUS"],
         &rows,
     );
@@ -137,6 +137,82 @@ pub fn install(
         entry.version,
         dir.display()
     );
+    Ok(())
+}
+
+/// `treetags --suggest-plugins` — list uninstalled plugins from the index that
+/// could handle files in the tree. Covers both file types nothing handles today
+/// (the plugin *adds* support) and natively-supported types (the plugin is an
+/// alternative/enhanced take), labelling each so the distinction is clear.
+///
+/// `discovered_exts` is every file extension seen; `handled_exts` (a subset) are
+/// those the current registry already resolves via a builtin, grammar, or
+/// installed plugin.
+pub fn suggest(
+    base: &str,
+    discovered_exts: &BTreeSet<String>,
+    handled_exts: &BTreeSet<String>,
+    plugins_dir: &Path,
+) -> Result<()> {
+    let index = fetch_index(base, false)?;
+    let installed = installed_plugins(plugins_dir);
+
+    let mut rows: Vec<Vec<String>> = Vec::new();
+    let mut covered: BTreeSet<String> = BTreeSet::new();
+    for entry in &index.plugins {
+        if installed.contains_key(&entry.name) {
+            continue;
+        }
+        let hits: Vec<String> = entry
+            .extensions
+            .iter()
+            .map(|e| e.to_ascii_lowercase())
+            .filter(|e| discovered_exts.contains(e))
+            .collect();
+        if hits.is_empty() {
+            continue;
+        }
+        covered.extend(hits.iter().cloned());
+        let any_native = hits.iter().any(|e| handled_exts.contains(e));
+        let all_native = hits.iter().all(|e| handled_exts.contains(e));
+        let kind = match (any_native, all_native) {
+            (false, _) => "adds support",
+            (true, true) => "enhances native support",
+            (true, false) => "adds + enhances support",
+        };
+        rows.push(vec![
+            entry.name.clone(),
+            ext_globs(&hits),
+            kind.to_string(),
+            format!("treetags plugin install {}", entry.name),
+        ]);
+    }
+
+    let unhandled: BTreeSet<String> = discovered_exts.difference(handled_exts).cloned().collect();
+
+    if rows.is_empty() {
+        if unhandled.is_empty() {
+            println!("No additional plugins available for the file types in your tree.");
+        } else {
+            println!(
+                "No plugins available for unsupported types: {}",
+                ext_globs_iter(&unhandled)
+            );
+        }
+        return Ok(());
+    }
+
+    println!("Plugins available for file types in your tree:\n");
+    print_rows(&["PLUGIN", "HANDLES", "TYPE", "INSTALL WITH"], &rows);
+
+    // Types nothing handles today and no plugin covers — genuine gaps.
+    let uncovered: Vec<String> = unhandled.difference(&covered).cloned().collect();
+    if !uncovered.is_empty() {
+        println!(
+            "\nNo plugin available for unsupported types: {}",
+            ext_globs(&uncovered)
+        );
+    }
     Ok(())
 }
 
@@ -378,18 +454,29 @@ fn status_label(local: &str, remote: &str) -> String {
     }
 }
 
-fn print_table(headers: &[&str; 5], rows: &[[String; 5]]) {
-    let mut widths = [0usize; 5];
-    for (i, h) in headers.iter().enumerate() {
-        widths[i] = h.len();
-    }
+/// Renders a slice of extensions as a comma-separated `*.ext` list.
+fn ext_globs(exts: &[String]) -> String {
+    exts.iter()
+        .map(|e| format!("*.{e}"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Same as [`ext_globs`] for any iterable of extensions.
+fn ext_globs_iter<'a>(exts: impl IntoIterator<Item = &'a String>) -> String {
+    ext_globs(&exts.into_iter().cloned().collect::<Vec<_>>())
+}
+
+/// Prints a left-aligned, column-padded table. Every row must have the same
+/// number of cells as `headers`; the final column is not padded.
+fn print_rows(headers: &[&str], rows: &[Vec<String>]) {
+    let mut widths: Vec<usize> = headers.iter().map(|h| h.len()).collect();
     for row in rows {
         for (i, cell) in row.iter().enumerate() {
             widths[i] = widths[i].max(cell.len());
         }
     }
-    // Last column needs no trailing padding.
-    let render = |cells: &[String; 5]| {
+    let render = |cells: &[String]| {
         let mut line = String::new();
         for (i, cell) in cells.iter().enumerate() {
             if i + 1 == cells.len() {
@@ -400,7 +487,7 @@ fn print_table(headers: &[&str; 5], rows: &[[String; 5]]) {
         }
         line.trim_end().to_string()
     };
-    let header_row: [String; 5] = std::array::from_fn(|i| headers[i].to_string());
+    let header_row: Vec<String> = headers.iter().map(|h| h.to_string()).collect();
     println!("{}", render(&header_row));
     for row in rows {
         println!("{}", render(row));

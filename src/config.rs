@@ -215,6 +215,11 @@ pub struct Config {
     #[arg(long = "plugin-index-url", value_name = "URL")]
     pub plugin_index_url: Option<String>,
 
+    /// Instead of generating tags, report which available (uninstalled) plugins
+    /// could handle files that no builtin, grammar, or installed plugin covers.
+    #[arg(long = "suggest-plugins")]
+    pub suggest_plugins: bool,
+
     /// Kinds filter map keyed by language name, populated from `--kinds-{lang}` args.
     #[clap(skip)]
     pub kinds_map: HashMap<String, String>,
