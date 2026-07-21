@@ -1,3 +1,7 @@
+// Consumed by the treetags-build-index bin and (soon) the plugin-install client;
+// unused from the main treetags binary's copy of this module tree.
+#[allow(dead_code)]
+pub mod index;
 pub(crate) mod instance;
 pub mod manifest;
 pub mod registry;
