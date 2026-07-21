@@ -90,6 +90,12 @@ jobs:
           for manifest in plugins/*/plugin.toml; do
             [ -e "$manifest" ] || continue
             dir=$(dirname "$manifest")
+            # Skip internal (dev/test-only) plugins so their asset is never
+            # uploaded and they stay out of the published index.
+            if grep -qE '^[[:space:]]*internal[[:space:]]*=[[:space:]]*true' "$manifest"; then
+              echo "Skipping internal plugin $dir"
+              continue
+            fi
             echo "::group::Building $dir"
             ./target/release/treetags-build-plugin --output-dir "$DIST" "$dir"
             echo "::endgroup::"

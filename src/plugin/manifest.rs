@@ -43,6 +43,12 @@ pub struct PluginManifest {
     pub wasm_file: String,
     /// Optional list of tag kinds the plugin can generate, for `--list-kinds` output.
     pub kinds: Option<Vec<ManifestKind>>,
+    /// Marks a dev/test-only plugin: it still loads and routes when explicitly
+    /// pointed at (e.g. `--plugin-dir`), but is hidden from `--list-plugins` and
+    /// excluded from the published distribution index so end users never see or
+    /// install it. Defaults to false.
+    #[serde(default)]
+    pub internal: bool,
 }
 
 fn default_wasm_file() -> String {

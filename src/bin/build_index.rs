@@ -61,7 +61,10 @@ fn main() -> anyhow::Result<()> {
     let mut derived_abi: Option<u32> = None;
 
     for dir in &args.plugin_dirs {
-        let (entry, abi) = process_plugin_dir(dir, &args.asset_base_url)?;
+        let Some((entry, abi)) = process_plugin_dir(dir, &args.asset_base_url)? else {
+            println!("Skipping internal plugin at {}", dir.display());
+            continue;
+        };
 
         // All plugins in one index must target the same ABI.
         if let Some(prev) = derived_abi {
@@ -124,13 +127,22 @@ fn main() -> anyhow::Result<()> {
 }
 
 /// Parse a built plugin directory into an [`IndexEntry`], returning the ABI it
-/// targets so the caller can enforce a single ABI across the index.
-fn process_plugin_dir(dir: &Path, asset_base_url: &str) -> anyhow::Result<(IndexEntry, u32)> {
+/// targets so the caller can enforce a single ABI across the index. Returns
+/// `None` for internal (dev/test-only) plugins, which are excluded from the
+/// published index so end users never see or install them.
+fn process_plugin_dir(
+    dir: &Path,
+    asset_base_url: &str,
+) -> anyhow::Result<Option<(IndexEntry, u32)>> {
     let manifest_path = dir.join("plugin.toml");
     let manifest_str = std::fs::read_to_string(&manifest_path)
         .map_err(|e| anyhow::anyhow!("cannot read {}: {e}", manifest_path.display()))?;
     let manifest: PluginManifest = toml::from_str(&manifest_str)
         .map_err(|e| anyhow::anyhow!("cannot parse {}: {e}", manifest_path.display()))?;
+
+    if manifest.internal {
+        return Ok(None);
+    }
 
     let wasm_path = manifest.wasm_path(dir);
     let wasm_bytes = std::fs::read(&wasm_path)
@@ -140,7 +152,7 @@ fn process_plugin_dir(dir: &Path, asset_base_url: &str) -> anyhow::Result<(Index
 
     let abi = manifest.abi_version;
     let entry = IndexEntry::from_manifest(&manifest, asset_base_url, sha256, size);
-    Ok((entry, abi))
+    Ok(Some((entry, abi)))
 }
 
 fn write_json<T: serde::Serialize>(path: &Path, value: &T) -> anyhow::Result<()> {
