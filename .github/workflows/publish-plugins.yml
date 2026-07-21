@@ -1,0 +1,211 @@
+name: Publish plugins
+
+# Builds every WASM plugin under plugins/, uploads the .wasm/.toml artifacts to a
+# per-ABI GitHub Release (the durable blob store), then regenerates that ABI's
+# index.json on the gh-pages branch (the discovery index the treetags binary
+# reads). Only the current ABI bucket is touched; older buckets stay frozen so
+# older treetags binaries keep resolving their last-compatible plugins.
+#
+# Trigger: push a tag like `plugins-release-2026-07-21`, or run manually.
+# Requires: Pages configured to serve from the `gh-pages` branch.
+
+on:
+  push:
+    tags:
+      - "plugins-release-*"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  WASI_SDK_VERSION: "30"
+
+permissions:
+  contents: write
+
+concurrency:
+  # Serialize publishes so two runs can't race on the release assets / gh-pages.
+  group: publish-plugins
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build plugins and publish index
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Cache wasi-sdk
+        id: cache-wasi-sdk
+        uses: actions/cache@v4
+        with:
+          path: ~/wasi-sdk
+          key: wasi-sdk-${{ env.WASI_SDK_VERSION }}-x86_64-linux
+
+      - name: Install wasi-sdk
+        if: steps.cache-wasi-sdk.outputs.cache-hit != 'true'
+        run: |
+          TARBALL="wasi-sdk-${WASI_SDK_VERSION}.0-x86_64-linux.tar.gz"
+          curl -fsSL "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_SDK_VERSION}/${TARBALL}" \
+            -o /tmp/wasi-sdk.tar.gz
+          mkdir -p ~/wasi-sdk
+          tar xzf /tmp/wasi-sdk.tar.gz -C ~/wasi-sdk --strip-components=1
+
+      - name: Configure wasi-sdk
+        run: |
+          echo "WASI_SDK_PATH=$HOME/wasi-sdk" >> "$GITHUB_ENV"
+
+      - name: Determine ABI version
+        id: abi
+        run: |
+          ABI=$(grep -oP 'PLUGIN_ABI_VERSION:\s*u32\s*=\s*\K[0-9]+' src/plugin/mod.rs | head -1)
+          if [ -z "$ABI" ]; then
+            echo "::error::could not read PLUGIN_ABI_VERSION from src/plugin/mod.rs"
+            exit 1
+          fi
+          echo "abi=$ABI" >> "$GITHUB_OUTPUT"
+          echo "Publishing plugins for ABI $ABI"
+
+      - name: Build tooling
+        run: cargo build --release --bin treetags-build-plugin --bin treetags-build-index
+
+      - name: Build all plugins
+        env:
+          DIST: ${{ github.workspace }}/dist
+        run: |
+          set -euo pipefail
+          rm -rf "$DIST"
+          # A plugin is any plugins/*/ directory that carries a plugin.toml.
+          # (Skips plugins/common — the shared SDK — and plugins/target.)
+          found=0
+          for manifest in plugins/*/plugin.toml; do
+            [ -e "$manifest" ] || continue
+            dir=$(dirname "$manifest")
+            echo "::group::Building $dir"
+            ./target/release/treetags-build-plugin --output-dir "$DIST" "$dir"
+            echo "::endgroup::"
+            found=$((found + 1))
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "::error::no plugins with a plugin.toml found under plugins/"
+            exit 1
+          fi
+          echo "Built $found plugin(s)."
+
+      - name: Verify built plugins target the current ABI
+        env:
+          DIST: ${{ github.workspace }}/dist
+          ABI: ${{ steps.abi.outputs.abi }}
+        run: |
+          set -euo pipefail
+          for d in "$DIST"/*/; do
+            got=$(grep -oP 'abi_version\s*=\s*\K[0-9]+' "$d/plugin.toml" | head -1)
+            if [ "$got" != "$ABI" ]; then
+              echo "::error::$(basename "$d") built for ABI $got but expected $ABI"
+              exit 1
+            fi
+          done
+
+      - name: Stage release assets
+        env:
+          DIST: ${{ github.workspace }}/dist
+          UPLOAD: ${{ github.workspace }}/upload
+        run: |
+          set -euo pipefail
+          rm -rf "$UPLOAD"
+          mkdir -p "$UPLOAD"
+          # Release asset names follow the <name>.{wasm,toml} convention the
+          # index generator encodes into wasm_url / manifest_url.
+          for d in "$DIST"/*/; do
+            name=$(basename "$d")
+            cp "$d/plugin.wasm" "$UPLOAD/$name.wasm"
+            cp "$d/plugin.toml" "$UPLOAD/$name.toml"
+          done
+          ls -l "$UPLOAD"
+
+      - name: Upload assets to per-ABI release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPLOAD: ${{ github.workspace }}/upload
+          TAG: plugin-store-v${{ steps.abi.outputs.abi }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --title "Plugin store (ABI ${{ steps.abi.outputs.abi }})" \
+              --notes "Durable blob store for treetags plugins built against ABI ${{ steps.abi.outputs.abi }}. Assets are replaced in place; only the latest compatible build of each plugin is kept."
+          fi
+          # --clobber replaces existing assets, keeping only the latest build.
+          gh release upload "$TAG" "$UPLOAD"/*.wasm "$UPLOAD"/*.toml --clobber
+
+      - name: Check out gh-pages
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git clone --branch gh-pages --depth 1 \
+              "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" gh-pages
+          else
+            echo "gh-pages does not exist yet; creating an orphan branch."
+            git clone --depth 1 \
+              "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" gh-pages
+            cd gh-pages
+            git checkout --orphan gh-pages
+            git rm -rf . >/dev/null 2>&1 || true
+          fi
+
+      - name: Generate index.json and abis.json
+        env:
+          DIST: ${{ github.workspace }}/dist
+          ABI: ${{ steps.abi.outputs.abi }}
+        run: |
+          set -euo pipefail
+          ASSET_BASE="https://github.com/${{ github.repository }}/releases/download/plugin-store-v${ABI}"
+          ./target/release/treetags-build-index \
+            --abi "$ABI" \
+            --asset-base-url "$ASSET_BASE" \
+            --out "gh-pages/${ABI}/index.json" \
+            --abis-file "gh-pages/abis.json" \
+            --generated-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            "$DIST"/*/
+
+      - name: Sync web assets (if present)
+        env:
+          ABI: ${{ steps.abi.outputs.abi }}
+        run: |
+          set -euo pipefail
+          # Optional: a web/ source dir provides the human-navigable site.
+          # Shared files land at the site root; the per-ABI page is templated in.
+          if [ -d web ]; then
+            cp -r web/. gh-pages/
+            if [ -f web/abi/index.html ]; then
+              mkdir -p "gh-pages/${ABI}"
+              cp web/abi/index.html "gh-pages/${ABI}/index.html"
+            fi
+          else
+            echo "no web/ directory; skipping human-facing site sync."
+          fi
+
+      - name: Commit and push gh-pages
+        working-directory: gh-pages
+        env:
+          ABI: ${{ steps.abi.outputs.abi }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No index changes to publish."
+            exit 0
+          fi
+          git commit -m "Publish plugin index for ABI ${ABI} (${GITHUB_SHA::7})"
+          git push origin gh-pages
