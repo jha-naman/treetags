@@ -3,7 +3,7 @@
 //! Each ABI version gets its own `index.json` (one [`IndexEntry`] per plugin,
 //! latest compatible version only) plus a shared `abis.json` enumerating which
 //! ABI buckets exist. These types are the single source of truth shared by the
-//! `treetags-build-index` generator and the client that installs plugins, so
+//! `treetags-build-site` generator and the client that installs plugins, so
 //! the published schema can never drift from what the CLI expects.
 
 use serde::{Deserialize, Serialize};
@@ -53,6 +53,12 @@ pub struct IndexEntry {
     /// Lowercase hex SHA-256 of the `.wasm`, verified by the client on download.
     pub wasm_sha256: String,
     pub wasm_size: u64,
+    /// Reserved for a future detached signature over the `.wasm` (e.g. if the
+    /// project opens to third-party plugins). Absent today: integrity relies on
+    /// a trusted local build plus HTTPS + `wasm_sha256`. Kept optional so it can
+    /// be populated later without a breaking schema change.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wasm_signature: Option<String>,
 }
 
 impl IndexEntry {
@@ -82,6 +88,7 @@ impl IndexEntry {
             manifest_url: format!("{base}/{}.toml", manifest.name),
             wasm_sha256,
             wasm_size,
+            wasm_signature: None,
         }
     }
 }

@@ -76,8 +76,8 @@ name = "treetags-build-plugin"
 path = "src/bin/build_plugin.rs"
 
 [[bin]]
-name = "treetags-build-index"
-path = "src/bin/build_index.rs"
+name = "treetags-build-site"
+path = "src/bin/build_site.rs"
 
 [lib]
 name = "treetags"

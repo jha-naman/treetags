@@ -1,0 +1,65 @@
+{
+  "abi_version": 3,
+  "generated_at": "2026-07-23T04:03:48Z",
+  "plugins": [
+    {
+      "name": "java",
+      "version": "0.2.0",
+      "language": "java",
+      "extensions": [
+        "java"
+      ],
+      "kinds": [
+        {
+          "letter": "a",
+          "name": "annotation",
+          "default": true
+        },
+        {
+          "letter": "c",
+          "name": "class",
+          "default": true
+        },
+        {
+          "letter": "e",
+          "name": "enumConstant",
+          "default": true
+        },
+        {
+          "letter": "f",
+          "name": "field",
+          "default": true
+        },
+        {
+          "letter": "g",
+          "name": "enum",
+          "default": true
+        },
+        {
+          "letter": "i",
+          "name": "interface",
+          "default": true
+        },
+        {
+          "letter": "m",
+          "name": "method",
+          "default": true
+        },
+        {
+          "letter": "p",
+          "name": "package",
+          "default": true
+        },
+        {
+          "letter": "l",
+          "name": "local",
+          "default": false
+        }
+      ],
+      "wasm_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/java.wasm",
+      "manifest_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/java.toml",
+      "wasm_sha256": "fcbed9d3729255c3cb01bd81fcbc6db9606b02e0cd13678e47c8aac9933b9d65",
+      "wasm_size": 676782
+    }
+  ]
+}

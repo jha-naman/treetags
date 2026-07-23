@@ -18,9 +18,9 @@ use super::manifest::PluginManifest;
 use super::PLUGIN_ABI_VERSION;
 use crate::config::paths::get_cache_dir;
 
-/// Default site hosting the per-ABI plugin index. Overridable via
-/// `--plugin-index-url` or the `TREETAGS_PLUGIN_INDEX` env var.
-pub const DEFAULT_PLUGIN_INDEX_BASE: &str = "https://jha-naman.github.io/treetags";
+/// Default site hosting the per-ABI plugin index (Jekyll site under /treetags).
+/// Overridable via `--plugin-index-url` or the `TREETAGS_PLUGIN_INDEX` env var.
+pub const DEFAULT_PLUGIN_INDEX_BASE: &str = "https://namanjha.in/treetags";
 
 /// How long a cached index is served before we re-fetch.
 const INDEX_CACHE_TTL: Duration = Duration::from_secs(3600);
