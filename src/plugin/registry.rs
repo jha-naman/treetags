@@ -19,6 +19,9 @@ struct PluginEntry {
     interpreters: Vec<String>,
     name: String,
     kinds: Vec<super::manifest::ManifestKind>,
+    /// true for Dev/test-only plugin: routes normally but is hidden from
+    /// `list_plugins` and plugin build CI.
+    internal: bool,
 }
 
 struct ExtPlugin {
@@ -105,6 +108,10 @@ impl PluginRegistry {
     pub fn list_plugins(&self) -> Vec<PluginInfo> {
         let mut by_wasm: HashMap<&PathBuf, (String, Vec<String>)> = HashMap::new();
         for (ext, entry) in &self.entries {
+            // Dev/test-only plugins route normally but are hidden from listings.
+            if entry.internal {
+                continue;
+            }
             let display = entry.language.as_deref().unwrap_or(&entry.name).to_string();
             let slot = by_wasm
                 .entry(&entry.wasm_path)
@@ -393,6 +400,7 @@ fn load_manifest(manifest_path: &Path, entries: &mut HashMap<String, PluginEntry
     let interpreters = manifest.interpreters.clone();
     let name = manifest.name.clone();
     let kinds = manifest.kinds.clone().unwrap_or_default();
+    let internal = manifest.internal;
     for ext in &manifest.extensions {
         entries.insert(
             ext.clone(),
@@ -404,6 +412,7 @@ fn load_manifest(manifest_path: &Path, entries: &mut HashMap<String, PluginEntry
                 interpreters: interpreters.clone(),
                 name: name.clone(),
                 kinds: kinds.clone(),
+                internal,
             },
         );
     }
