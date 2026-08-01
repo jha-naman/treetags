@@ -45,7 +45,7 @@ BP=./target/release/treetags-build-plugin
 BS=./target/release/treetags-build-site
 
 # 1. ABI version (single source of truth in the code).
-ABI=$(grep -oP 'PLUGIN_ABI_VERSION:\s*u32\s*=\s*\K[0-9]+' src/plugin/mod.rs | head -1)
+ABI=$(sed -n 's/.*PLUGIN_ABI_VERSION[^=]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' src/plugin/mod.rs | head -1)
 [ -n "$ABI" ] || { echo "could not read PLUGIN_ABI_VERSION" >&2; exit 1; }
 ASSET_BASE="https://github.com/${REPO}/releases/download/plugin-store-v${ABI}"
 echo "==> ABI $ABI  repo $REPO  out $OUT_DIR"

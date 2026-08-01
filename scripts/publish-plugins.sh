@@ -33,7 +33,7 @@ done
 DIST="$ROOT/target/plugin-dist"
 
 # 1. ABI version (single source of truth in the code).
-ABI=$(grep -oP 'PLUGIN_ABI_VERSION:\s*u32\s*=\s*\K[0-9]+' src/plugin/mod.rs | head -1)
+ABI=$(sed -n 's/.*PLUGIN_ABI_VERSION[^=]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' src/plugin/mod.rs | head -1)
 [ -n "$ABI" ] || { echo "could not read PLUGIN_ABI_VERSION" >&2; exit 1; }
 echo "==> ABI $ABI  repo $REPO"
 
