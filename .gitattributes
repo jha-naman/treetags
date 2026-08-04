@@ -1,1 +1,2 @@
-/tests/grammars/ linguist-vendored
+/tests/grammars/**/parser.c linguist-generated
+/tests/grammars/**/parser.h linguist-generated
