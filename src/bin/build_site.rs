@@ -176,7 +176,7 @@ fn process_plugin_dir(
 /// JSON-style front matter, matching the existing site's convention.
 fn front_matter(title: &str) -> String {
     format!(
-        "---\n{{\n  \"layout\": \"page\",\n  \"title\": \"{}\"\n}}\n---\n\n",
+        "---\n{{\n  \"layout\": \"minimal\",\n  \"title\": \"{}\"\n}}\n---\n\n",
         json_escape(title)
     )
 }

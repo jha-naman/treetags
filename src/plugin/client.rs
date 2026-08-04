@@ -18,7 +18,7 @@ use super::manifest::PluginManifest;
 use super::PLUGIN_ABI_VERSION;
 use crate::config::paths::get_cache_dir;
 
-/// Default site hosting the per-ABI plugin index (Jekyll site under /treetags).
+/// Default site hosting the per-ABI plugin index (Jekyll site assumed).
 /// Overridable via `--plugin-index-url` or the `TREETAGS_PLUGIN_INDEX` env var.
 pub const DEFAULT_PLUGIN_INDEX_BASE: &str = "https://namanjha.in/treetags";
 

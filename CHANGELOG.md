@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+ - Add plugin management commands to treetags cli
+ - Add script to release plugin wasm/toml files to github release
+ - Add script to generate available plugins index
+   The index is to be hosted online for consumption by treeetags
+   binary for plugin discovery
+
 - [0.11.0]
 
 ### ADDED

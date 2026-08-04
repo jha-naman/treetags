@@ -11,7 +11,7 @@
 #   3. Build the tooling and every non-internal plugin with `--locked` into
 #      target/plugin-dist.
 #   4. Generate index.json + Jekyll Markdown into plugins_index/ (move to the
-#      blog repo manually afterwards).
+#      jekyll backed plugins index repo manually afterwards).
 #
 # Usage:
 #   scripts/build-plugins.sh [--out-dir DIR]
@@ -28,7 +28,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 REPO="${REPO:-jha-naman/treetags}"
-# Generated content lands here (tracked in this repo); move it into the blog
+# Generated content lands here (tracked in this repo); move it into the jekyll
 # site repo under treetags/ afterwards to publish.
 OUT_DIR="${OUT_DIR:-plugins_index}"
 for arg in "$@"; do
@@ -117,4 +117,4 @@ echo "==> generating site content into $OUT_DIR"
 echo
 echo "Generated content into $OUT_DIR/ and built plugins: ${built[*]}"
 echo "Blobs are staged in $DIST/. Run scripts/publish-plugins.sh to upload them to GitHub Release plugin-store-v${ABI}."
-echo "Then move $OUT_DIR/ into the blog site repo under treetags/ and commit there."
+echo "Then move $OUT_DIR/ into the jekyll site repo under treetags/ and commit there."

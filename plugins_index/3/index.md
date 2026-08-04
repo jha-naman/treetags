@@ -1,6 +1,6 @@
 ---
 {
-  "layout": "page",
+  "layout": "minimal",
   "title": "TreeTags plugins (ABI 3)"
 }
 ---
@@ -13,4 +13,4 @@ Language plugins compatible with treetags builds that support plugin ABI **3**. 
 
 Machine-readable index: [`index.json`](index.json)
 
-<small>Generated 2026-07-23T04:03:48Z</small>
+<small>Generated 2026-08-04T08:52:00Z</small>

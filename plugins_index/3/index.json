@@ -1,6 +1,6 @@
 {
   "abi_version": 3,
-  "generated_at": "2026-07-23T04:03:48Z",
+  "generated_at": "2026-08-04T08:52:00Z",
   "plugins": [
     {
       "name": "java",
@@ -58,8 +58,8 @@
       ],
       "wasm_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/java.wasm",
       "manifest_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/java.toml",
-      "wasm_sha256": "fcbed9d3729255c3cb01bd81fcbc6db9606b02e0cd13678e47c8aac9933b9d65",
-      "wasm_size": 676782
+      "wasm_sha256": "0c08d8a42d7d7ad9023cc35f08c90d8cf953c8c1c5280bc040f5e6e85e6e2cf3",
+      "wasm_size": 686705
     }
   ]
 }

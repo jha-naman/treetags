@@ -1,6 +1,6 @@
 ---
 {
-  "layout": "page",
+  "layout": "minimal",
   "title": "TreeTags plugins"
 }
 ---
@@ -16,4 +16,4 @@ treetags plugin install NAME  # install one
 
 - [ABI 3](3/) — latest
 
-<small>Generated 2026-07-23T04:03:48Z</small>
+<small>Generated 2026-08-04T08:52:00Z</small>

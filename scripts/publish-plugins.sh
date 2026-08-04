@@ -73,4 +73,4 @@ if ! gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
 fi
 echo "==> uploading assets to $TAG"
 gh release upload "$TAG" --repo "$REPO" --clobber "$UPLOAD"/*.wasm "$UPLOAD"/*.toml
-echo "==> done. Move plugins_index/ into the blog site repo under treetags/ and commit there to publish the index + pages."
+echo "==> done. Move plugins_index/ into the jekyll site repo under treetags/ and commit there to publish the index + pages."
