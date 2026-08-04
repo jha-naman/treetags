@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- [0.12.0]
+
 ### Added
  - Add plugin management commands to treetags cli
  - Add script to release plugin wasm/toml files to github release
