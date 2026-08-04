@@ -46,17 +46,29 @@ for more about extension fields.
 
 ## WASM plugins
 
-> [!NOTE]
-> WASM plugins are still a work in progress feature. They provide all of the
-> same functionality as natively supported languages but the discovery and
-> installation flows for users are being worked out. See [here](WASM_PLUGINS.md)
-> for more details on how to install the plugins and for more details of
-> the implementation.
+Treetags functionality can be extended via WASM plugins. WASM plugins are
+functionally equivalent to native tag generators, except they are not installed
+by default and they can be updated independently of treetags releases.
 
-Treetags has support for these languages via user installable WASM plugins
+Plugins can be managed using the treetags cli
+
+```sh
+treetags plugin available # List all known compatible plugins
+treetags plugin installed # List all installed plugins
+treetags plugin install <NAME> # Fetch and install <NAME> plugin
+treetags plugin uninstall <NAME> # Un-install <NAME> plugin
+treetags plugin update # Update all installed plugins
+treetags plugin help # Print `treetags plugin` usage help
+```
+
+See [here](WASM_PLUGINS.md) for more information on plugin implementation
+details.
+
+Treetags has support for these languages via user installable WASM plugins.
 
 ### Full support with extension fields
 - [x] Java
+
 
 ## Extending treetags language support via tree-sitter tag queries and grammars
 

@@ -93,6 +93,7 @@ fn main() -> anyhow::Result<()> {
             "--target",
             "wasm32-wasip2",
             "--release",
+            "--locked",
             "-p",
             &pkg_name,
         ])
