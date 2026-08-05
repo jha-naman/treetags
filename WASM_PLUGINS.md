@@ -58,6 +58,12 @@ be compiled for any of the files being processed by treetags. The WASM plugin is
 compiled lazily only once it is needed. See [plugins_toml_schema.md](PLUGINS_TOML_SCHEMA.md)
 for details on this file.
 
+> [!NOTE]
+> A treetags WASM plugin can be written in any language that compiles to WASM and
+> it is not necessary for the plugin to use tree-sitter. For example it is even
+> possible to wrap universal ctags and expose it as a
+> [treetags plugin](https://github.com/jha-naman/treetags_lisp_plugin).
+
 ## Plugin Host Implementation
 
 Treetags looks for plugins at three places in following order or priority:
