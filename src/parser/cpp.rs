@@ -1,5 +1,5 @@
 use super::helper::{self, iterate_children, Break, Continue, LanguageContext, TagKindConfig};
-use indexmap::IndexMap;
+use crate::tag::ExtensionFields;
 use tree_sitter::{Node, TreeCursor};
 
 use crate::tag;
@@ -144,8 +144,8 @@ impl<'a> CppContext<'a> {
     }
 
     // Build extension fields based on the current scope stack
-    fn create_extension_fields(&self) -> IndexMap<String, String> {
-        let mut fields = IndexMap::new();
+    fn create_extension_fields(&self) -> ExtensionFields {
+        let mut fields = ExtensionFields::new();
         let mut namespace_path = Vec::new();
 
         for (scope_type, name) in &self.scope_stack {
@@ -229,7 +229,7 @@ fn create_tag(
     kind_char: &str,
     node: Node,
     context: &mut CppContext,
-    extra_fields: Option<IndexMap<String, String>>,
+    extra_fields: Option<ExtensionFields>,
 ) {
     if name.is_empty() || name == "_" {
         return;
@@ -241,7 +241,7 @@ fn create_tag(
 
     let row = node.start_position().row;
     let address = helper::address_string_from_line(row, &context.base);
-    let mut extension_fields = IndexMap::new();
+    let mut extension_fields = ExtensionFields::new();
 
     // 1. Kind field (k)
     if context
@@ -491,7 +491,7 @@ fn process_union(cursor: &mut TreeCursor, context: &mut CppContext) -> Option<(S
 fn process_enum(cursor: &mut TreeCursor, context: &mut CppContext) -> Option<(ScopeType, String)> {
     let node = cursor.node();
     let mut enum_name = String::new();
-    let mut extra_fields = IndexMap::new();
+    let mut extra_fields = ExtensionFields::new();
     let mut enum_values = Vec::new();
 
     iterate_children!(cursor, |child_node| {
@@ -542,7 +542,7 @@ fn process_enum(cursor: &mut TreeCursor, context: &mut CppContext) -> Option<(Sc
 
         // Create tags for enum values
         for (value_name, value_node) in enum_values {
-            let mut value_fields = IndexMap::new();
+            let mut value_fields = ExtensionFields::new();
             value_fields.insert("enum".to_string(), enum_name.clone());
             create_tag(value_name, "e", value_node, context, Some(value_fields));
         }
@@ -558,7 +558,7 @@ fn process_function_definition(
     context: &mut CppContext,
 ) -> Option<(ScopeType, String)> {
     let node = cursor.node();
-    let mut extra_fields = IndexMap::new();
+    let mut extra_fields = ExtensionFields::new();
     let mut fn_name = String::new();
 
     iterate_children!(cursor, |child_node| {
@@ -613,7 +613,7 @@ fn process_function_definition(
 fn extract_function_name_from_declarator(
     cursor: &mut TreeCursor,
     context: &mut CppContext,
-    extra_fields: &mut IndexMap<String, String>,
+    extra_fields: &mut ExtensionFields,
 ) -> String {
     let mut fn_name = String::new();
 
@@ -711,9 +711,9 @@ fn process_declaration(
             // Function declarator - handle function prototypes
             "function_declarator" => {
                 let fn_name =
-                    extract_function_name_from_declarator(cursor, context, &mut IndexMap::new());
+                    extract_function_name_from_declarator(cursor, context, &mut ExtensionFields::new());
                 if !fn_name.is_empty() {
-                    let mut proto_fields = IndexMap::new();
+                    let mut proto_fields = ExtensionFields::new();
                     if !type_info.is_empty() {
                         proto_fields.insert("typeref".to_string(), type_info.clone());
                     }
@@ -786,7 +786,7 @@ fn process_declaration(
                 "v"
             };
 
-            let mut extra_fields = IndexMap::new();
+            let mut extra_fields = ExtensionFields::new();
 
             if !type_info.is_empty() {
                 extra_fields.insert("typeref".to_string(), type_info.clone());
@@ -875,7 +875,7 @@ fn process_field_declaration(
     });
 
     if !field_name.is_empty() {
-        let mut extra_fields = IndexMap::new();
+        let mut extra_fields = ExtensionFields::new();
 
         if !type_info.is_empty() {
             let typeref_value = if is_pointer {
@@ -948,7 +948,7 @@ fn process_macro_function_definition(
                     match params_child.kind() {
                         "identifier" => {
                             let param_name = context.base.node_text(&params_child).to_string();
-                            let mut fields = IndexMap::new();
+                            let mut fields = ExtensionFields::new();
                             fields.insert("macro".to_string(), macro_name.clone());
                             create_tag(param_name, "D", params_child, context, Some(fields));
                             Continue
@@ -1039,7 +1039,7 @@ fn process_typedef(
         type_info = format!("struct:{}", anon_name);
     }
 
-    let mut extra_fields = IndexMap::new();
+    let mut extra_fields = ExtensionFields::new();
     if !type_info.is_empty() {
         extra_fields.insert("typeref".to_string(), type_info);
     }
@@ -1289,7 +1289,7 @@ fn process_parameter_list(cursor: &mut TreeCursor, context: &mut CppContext, fn_
             });
 
             if !name.is_empty() {
-                let mut extra_fields = IndexMap::new();
+                let mut extra_fields = ExtensionFields::new();
                 match context.scope_stack.last() {
                     Some((ScopeType::Class, class_name)) => extra_fields.insert(
                         "function".to_string(),

@@ -2250,7 +2250,6 @@ dependencies = [
  "clap",
  "clap_complete",
  "dirs",
- "indexmap",
  "libloading",
  "predicates 2.1.5",
  "rayon",

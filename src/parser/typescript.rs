@@ -1,5 +1,5 @@
 use super::helper::{self, iterate_children, Break, Continue, LanguageContext, TagKindConfig};
-use indexmap::IndexMap;
+use crate::tag::ExtensionFields;
 use tree_sitter::{Node, TreeCursor};
 
 use crate::tag;
@@ -129,7 +129,7 @@ fn create_tag(
     kind: &str,
     node: Node,
     context: &mut TypeScriptContext,
-    extra_fields: Option<IndexMap<String, String>>,
+    extra_fields: Option<ExtensionFields>,
 ) {
     if !context.base.tag_config.is_kind_enabled(kind) {
         return;
@@ -137,7 +137,7 @@ fn create_tag(
 
     let row = node.start_position().row;
     let address = helper::address_string_from_line(row, &context.base);
-    let mut extension_fields = IndexMap::new();
+    let mut extension_fields = ExtensionFields::new();
 
     // Kind
     if context
@@ -383,7 +383,7 @@ fn process_method_definition(
     });
 
     if !name.is_empty() {
-        let mut extras = IndexMap::new();
+        let mut extras = ExtensionFields::new();
         if context
             .base
             .user_config
@@ -424,7 +424,7 @@ fn process_method_signature(
     });
 
     if !name.is_empty() {
-        let mut extras = IndexMap::new();
+        let mut extras = ExtensionFields::new();
         if context
             .base
             .user_config
@@ -546,7 +546,7 @@ fn process_parameter(
 
     if !name.is_empty() && !access.is_empty() {
         if !access.is_empty() {
-            let mut extras = IndexMap::new();
+            let mut extras = ExtensionFields::new();
             if context
                 .base
                 .user_config
@@ -590,7 +590,7 @@ fn process_public_field_definition(
     });
 
     if !name.is_empty() {
-        let mut extras = IndexMap::new();
+        let mut extras = ExtensionFields::new();
         if context
             .base
             .user_config
@@ -626,7 +626,7 @@ fn process_property_signature(
     });
 
     if !name.is_empty() {
-        let mut extras = IndexMap::new();
+        let mut extras = ExtensionFields::new();
         if context
             .base
             .user_config

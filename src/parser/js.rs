@@ -1,5 +1,5 @@
 use super::helper::{self, iterate_children, Break, Continue, LanguageContext, TagKindConfig};
-use indexmap::IndexMap;
+use crate::tag::ExtensionFields;
 use tree_sitter::{Node, TreeCursor};
 
 use crate::tag;
@@ -95,8 +95,8 @@ impl<'a> JsContext<'a> {
         name
     }
 
-    fn create_extension_fields(&self) -> IndexMap<String, String> {
-        let mut fields = IndexMap::new();
+    fn create_extension_fields(&self) -> ExtensionFields {
+        let mut fields = ExtensionFields::new();
 
         for (scope_type, name) in &self.scope_stack {
             match scope_type {
@@ -155,7 +155,7 @@ fn create_tag(
     kind_char: &str,
     node: Node,
     context: &mut JsContext,
-    extra_fields: Option<IndexMap<String, String>>,
+    extra_fields: Option<ExtensionFields>,
 ) {
     if name.is_empty() {
         return;
@@ -167,7 +167,7 @@ fn create_tag(
 
     let row = node.start_position().row;
     let address = helper::address_string_from_line(row, &context.base);
-    let mut extension_fields = IndexMap::new();
+    let mut extension_fields = ExtensionFields::new();
 
     if context
         .base
@@ -451,7 +451,7 @@ fn process_expression_statement(
                 let name = parts.last().unwrap().to_string();
 
                 let mut kind;
-                let mut extra = IndexMap::new();
+                let mut extra = ExtensionFields::new();
 
                 match right.kind() {
                     "function_expression" | "arrow_function" => {

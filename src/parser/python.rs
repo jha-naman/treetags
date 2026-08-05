@@ -1,5 +1,5 @@
 use super::helper::{self, iterate_children, Break, Continue, LanguageContext, TagKindConfig};
-use indexmap::IndexMap;
+use crate::tag::ExtensionFields;
 use tree_sitter::{Node, TreeCursor};
 
 use crate::tag;
@@ -125,7 +125,7 @@ fn create_tag(
     kind: &str,
     node: Node,
     context: &mut PythonContext,
-    extra_fields: Option<IndexMap<String, String>>,
+    extra_fields: Option<ExtensionFields>,
 ) {
     if !context.base.tag_config.is_kind_enabled(kind) {
         return;
@@ -133,7 +133,7 @@ fn create_tag(
 
     let row = node.start_position().row;
     let address = helper::address_string_from_line(row, &context.base);
-    let mut extension_fields = IndexMap::new();
+    let mut extension_fields = ExtensionFields::new();
 
     // Kind
     if context
@@ -300,7 +300,7 @@ fn process_function_definition(
         });
 
         let kind = if is_method { "m" } else { "f" };
-        let mut extras = IndexMap::new();
+        let mut extras = ExtensionFields::new();
 
         if context
             .base
@@ -373,7 +373,7 @@ fn process_assignment_target(
 
             let kind = if is_in_function { "l" } else { "v" };
 
-            let mut extras = IndexMap::new();
+            let mut extras = ExtensionFields::new();
             if let Some(tn) = type_node {
                 extras.insert(
                     "typeref".to_string(),
@@ -410,7 +410,7 @@ fn process_assignment_target(
                     .any(|(scope_type, _)| matches!(scope_type, ScopeType::Class));
 
                 let kind = if is_method { "m" } else { "f" };
-                let mut extras = IndexMap::new();
+                let mut extras = ExtensionFields::new();
 
                 if let Some(params) = val.child_by_field_name("parameters") {
                     let params_text = context.base.node_text(&params);
@@ -482,7 +482,7 @@ fn process_import_from_statement(
                     }
 
                     if !alias.is_empty() {
-                        let mut extras = IndexMap::new();
+                        let mut extras = ExtensionFields::new();
 
                         let nameref = if module_name.is_empty() || module_name == "." {
                             format!("unknown:{}", original_name)
