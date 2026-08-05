@@ -710,8 +710,11 @@ fn process_declaration(
             }
             // Function declarator - handle function prototypes
             "function_declarator" => {
-                let fn_name =
-                    extract_function_name_from_declarator(cursor, context, &mut ExtensionFields::new());
+                let fn_name = extract_function_name_from_declarator(
+                    cursor,
+                    context,
+                    &mut ExtensionFields::new(),
+                );
                 if !fn_name.is_empty() {
                     let mut proto_fields = ExtensionFields::new();
                     if !type_info.is_empty() {
