@@ -7,10 +7,65 @@
 //! across a codebase. This module handles the parsing and formatting of tags
 //! in a format compatible with Vi/Vim.
 
-use indexmap::IndexMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
+
+/// An ordered collection of ctags extension fields.
+///
+/// ctags output requires the fields to appear in a specific, stable order, so
+/// this preserves insertion order. Keys are unique: re-inserting an existing key
+/// updates its value in place rather than appending a duplicate.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ExtensionFields(Vec<(String, String)>);
+
+impl ExtensionFields {
+    pub fn new() -> Self {
+        ExtensionFields(Vec::new())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn get(&self, key: &str) -> Option<&String> {
+        self.0.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+    }
+
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.0.iter().any(|(k, _)| k == key)
+    }
+
+    // Replace an existing key's value in place (preserving its position),
+    // otherwise append.
+    pub fn insert(&mut self, key: String, value: String) {
+        if let Some(slot) = self.0.iter_mut().find(|(k, _)| *k == key) {
+            slot.1 = value;
+        } else {
+            self.0.push((key, value));
+        }
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, (String, String)> {
+        self.0.iter()
+    }
+}
+
+impl Extend<(String, String)> for ExtensionFields {
+    fn extend<T: IntoIterator<Item = (String, String)>>(&mut self, iter: T) {
+        for (k, v) in iter {
+            self.insert(k, v);
+        }
+    }
+}
+
+impl IntoIterator for ExtensionFields {
+    type Item = (String, String);
+    type IntoIter = std::vec::IntoIter<(String, String)>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
 
 /// Represents a Vi compatible tag
 ///
@@ -29,7 +84,7 @@ pub struct Tag {
     /// The tag kind
     pub kind: Option<String>,
     /// The extension fields associated with the tag
-    pub extension_fields: Option<IndexMap<String, String>>,
+    pub extension_fields: Option<ExtensionFields>,
 }
 
 impl Tag {
@@ -134,7 +189,7 @@ impl Tag {
             let module_value = fields.get("module").map(|s| s.as_str());
 
             // Count non-module keys to determine if module is the only field
-            let non_module_keys_count = fields.keys().filter(|k| *k != "module").count();
+            let non_module_keys_count = fields.iter().filter(|(k, _)| k != "module").count();
             let module_only = non_module_keys_count == 0 && module_value.is_some();
 
             // Process module field if it's the only field
@@ -237,7 +292,7 @@ pub fn parse_tag_line(line: &str) -> Option<Tag> {
 
     // Process extension fields (starting from index 3)
     if parts.len() > 3 {
-        let mut fields_map = IndexMap::new();
+        let mut fields_map = ExtensionFields::new();
 
         for field in parts.iter().skip(3) {
             // Skip empty fields
@@ -375,7 +430,7 @@ mod tests {
 
     #[test]
     fn test_bytes_with_module_only() {
-        let mut extension_fields = IndexMap::new();
+        let mut extension_fields = ExtensionFields::new();
         extension_fields.insert("module".to_string(), "example".to_string());
 
         let tag = Tag {
@@ -392,7 +447,7 @@ mod tests {
 
     #[test]
     fn test_bytes_with_non_module_field() {
-        let mut extension_fields = IndexMap::new();
+        let mut extension_fields = ExtensionFields::new();
         extension_fields.insert("implementation".to_string(), "Circle".to_string());
 
         let tag = Tag {
@@ -409,7 +464,7 @@ mod tests {
 
     #[test]
     fn test_bytes_with_module_and_implementation() {
-        let mut extension_fields = IndexMap::new();
+        let mut extension_fields = ExtensionFields::new();
         extension_fields.insert("implementation".to_string(), "Circle".to_string());
         extension_fields.insert("module".to_string(), "example".to_string());
 
@@ -429,7 +484,7 @@ mod tests {
 
     #[test]
     fn test_bytes_with_module_and_trait() {
-        let mut extension_fields = IndexMap::new();
+        let mut extension_fields = ExtensionFields::new();
         extension_fields.insert("trait".to_string(), "Shape".to_string());
         extension_fields.insert("module".to_string(), "example".to_string());
 
@@ -449,7 +504,7 @@ mod tests {
 
     #[test]
     fn test_bytes_with_multiple_extension_fields() {
-        let mut extension_fields = IndexMap::new();
+        let mut extension_fields = ExtensionFields::new();
         extension_fields.insert("trait".to_string(), "Shape".to_string());
         extension_fields.insert("implementation".to_string(), "Circle".to_string());
         extension_fields.insert("module".to_string(), "geometry".to_string());
@@ -482,7 +537,7 @@ mod tests {
             file_name: "types.rs".to_string(),
             address: "/^enum MyEnum {$/".to_string(),
             kind: Some("enum".to_string()),
-            extension_fields: Some(IndexMap::new()), // Empty IndexMap
+            extension_fields: Some(ExtensionFields::new()), // Empty ExtensionFields
         };
 
         let expected = "MyEnum\ttypes.rs\t/^enum MyEnum {$/\tenum\n";

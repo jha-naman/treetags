@@ -3,8 +3,7 @@ use super::manifest::PluginManifest;
 use super::shared::SharedPlugin;
 use crate::config::Config;
 use crate::split_by_newlines::split_by_newlines;
-use crate::tag::Tag;
-use indexmap::IndexMap;
+use crate::tag::{ExtensionFields, Tag};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -427,7 +426,7 @@ fn convert_tags(
         .into_iter()
         .map(|t| {
             let address = format_address(source_lines, t.line);
-            let mut ext_fields = IndexMap::new();
+            let mut ext_fields = ExtensionFields::new();
             if let Some(end) = t.end_line {
                 ext_fields.insert("end".to_string(), end.to_string());
             }

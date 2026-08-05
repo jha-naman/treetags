@@ -1,5 +1,5 @@
 use super::helper::{self, LanguageContext, TagKindConfig};
-use indexmap::IndexMap;
+use crate::tag::ExtensionFields;
 use tree_sitter::{Node, TreeCursor};
 
 use crate::tag;
@@ -85,8 +85,8 @@ impl<'a> RustContext<'a> {
     }
 
     // Build extension fields based on the current scope stack
-    fn create_extension_fields(&self) -> IndexMap<String, String> {
-        let mut fields = IndexMap::new();
+    fn create_extension_fields(&self) -> ExtensionFields {
+        let mut fields = ExtensionFields::new();
         let mut module_path = Vec::new();
 
         for (scope_type, name) in &self.scope_stack {
@@ -220,7 +220,7 @@ fn create_tag(
     node: Node, // Pass the node for position info
     context: &mut RustContext,
     // Allow passing extra fields specific to the item being tagged
-    extra_fields: Option<IndexMap<String, String>>,
+    extra_fields: Option<ExtensionFields>,
 ) {
     if name.is_empty() || name == "_" {
         return; // Don't tag empty or placeholder names
@@ -233,7 +233,7 @@ fn create_tag(
 
     let row = node.start_position().row;
     let address = helper::address_string_from_line(row, &context.base);
-    let mut extension_fields = IndexMap::new();
+    let mut extension_fields = ExtensionFields::new();
 
     // Insert fields in ctags order (alphabetical by field letter, with special cases first):
 
@@ -481,7 +481,7 @@ fn process_identifiers_list(
                         &["identifier", "field_identifier"],
                     ) {
                         // Add enum/struct name context specifically for the variant tag
-                        let mut variant_fields = IndexMap::new();
+                        let mut variant_fields = ExtensionFields::new();
                         variant_fields.insert(variant_type.to_string(), name.to_owned());
                         create_tag(
                             variant_name,
@@ -522,7 +522,7 @@ fn process_impl(cursor: &mut TreeCursor, context: &mut RustContext) -> Option<(S
     let node = cursor.node();
     let (trait_name, type_name) = find_impl_names(cursor, context)?;
 
-    let mut extra_fields = IndexMap::new();
+    let mut extra_fields = ExtensionFields::new();
     let tag_name = type_name?.clone();
     let kind_char = "c";
 
@@ -591,7 +591,7 @@ fn process_function(
 ) {
     let node = cursor.node();
     if let Some(name) = helper::get_node_name(cursor, &context.base, &["identifier"]) {
-        let mut extra_fields = IndexMap::new();
+        let mut extra_fields = ExtensionFields::new();
 
         // Only get the signature string if signature field is enabled
         if context

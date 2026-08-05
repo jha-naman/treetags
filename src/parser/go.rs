@@ -1,5 +1,5 @@
 use super::helper::{self, Context, LanguageContext, TagKindConfig};
-use indexmap::IndexMap;
+use crate::tag::ExtensionFields;
 use tree_sitter::TreeCursor;
 
 use crate::tag;
@@ -62,10 +62,10 @@ fn create_extension_fields_with_language(
     kind_char: &str,
     row: usize,
     node: tree_sitter::Node,
-    extra_fields: Option<IndexMap<String, String>>,
-) -> Option<IndexMap<String, String>> {
+    extra_fields: Option<ExtensionFields>,
+) -> Option<ExtensionFields> {
     let field_order = get_field_order_for_go();
-    let mut extension_fields = IndexMap::new();
+    let mut extension_fields = ExtensionFields::new();
 
     // Process fields in the preferred order
     for &field_name in &field_order {
@@ -205,8 +205,8 @@ impl<'a> GoContext<'a> {
     }
 
     // Build extension fields based on the current scope stack
-    fn create_extension_fields(&self) -> IndexMap<String, String> {
-        let mut fields = IndexMap::new();
+    fn create_extension_fields(&self) -> ExtensionFields {
+        let mut fields = ExtensionFields::new();
 
         for (scope_type, name) in &self.scope_stack {
             match scope_type {
@@ -246,7 +246,7 @@ impl<'a> GoContext<'a> {
         name: String,
         kind_char: &str,
         node: tree_sitter::Node,
-        extra_fields: Option<IndexMap<String, String>>,
+        extra_fields: Option<ExtensionFields>,
     ) {
         if name.is_empty() || name == "_" {
             return; // Don't tag empty or placeholder names
@@ -357,7 +357,7 @@ fn process_imports(cursor: &mut TreeCursor, context: &mut GoContext) {
         match node.kind() {
             "import_spec" => {
                 if let Some((alias_name, import_path)) = get_import_name(cursor, context) {
-                    let mut extra_fields = IndexMap::new();
+                    let mut extra_fields = ExtensionFields::new();
                     extra_fields.insert("package".to_string(), import_path);
                     context.create_go_tag(alias_name, "P", node, Some(extra_fields));
                 }
@@ -370,7 +370,7 @@ fn process_imports(cursor: &mut TreeCursor, context: &mut GoContext) {
                             if let Some((alias_name, import_path)) =
                                 get_import_name(cursor, context)
                             {
-                                let mut extra_fields = IndexMap::new();
+                                let mut extra_fields = ExtensionFields::new();
                                 extra_fields.insert("package".to_string(), import_path);
                                 context.create_go_tag(
                                     alias_name,
@@ -466,7 +466,7 @@ fn process_function(cursor: &mut TreeCursor, context: &mut GoContext) {
 fn process_method(cursor: &mut TreeCursor, context: &mut GoContext) {
     let node = cursor.node();
     if let Some(name) = helper::get_node_name(cursor, &context.base, &["field_identifier"]) {
-        let mut extra_fields = IndexMap::new();
+        let mut extra_fields = ExtensionFields::new();
 
         // Get receiver type - methods should only have struct field, not package
         if let Some(receiver_type) = get_method_receiver_type(cursor, context) {
@@ -915,7 +915,7 @@ fn process_field_declaration(cursor: &mut TreeCursor, context: &mut GoContext, s
 
     // Create tags for all field names
     for (name, node) in field_names {
-        let mut extra_fields = IndexMap::new();
+        let mut extra_fields = ExtensionFields::new();
         let package_name = context.get_package_name();
         if !package_name.is_empty() {
             extra_fields.insert(
@@ -954,7 +954,7 @@ fn process_method_spec_if_in_interface(cursor: &mut TreeCursor, context: &mut Go
 fn process_method_spec(cursor: &mut TreeCursor, context: &mut GoContext, interface_name: &str) {
     if let Some(name) = helper::get_node_name(cursor, &context.base, &["field_identifier"]) {
         let node = cursor.node();
-        let mut extra_fields = IndexMap::new();
+        let mut extra_fields = ExtensionFields::new();
         let package_name = context.get_package_name();
         if !package_name.is_empty() {
             extra_fields.insert(
