@@ -168,8 +168,24 @@ impl Tag {
     ///
     /// A vector of bytes representing the tag in the format:
     /// `name\tfile_name\taddress[;"\tkind:kind_value"][;"\tfield_name:field_value"]...\n`
+    #[cfg(test)]
     pub fn bytes(&self) -> Vec<u8> {
-        let mut output = format!("{}\t{}\t{}", self.name, self.file_name, self.address);
+        let mut output = Vec::new();
+        self.write_into(&mut output);
+        output
+    }
+
+    /// Appends the tag's byte representation to `output`.
+    ///
+    /// This is the allocation-free core used by [`Tag::bytes`]. Callers writing
+    /// many tags should reuse a single buffer (calling `output.clear()` between
+    /// tags) to avoid one allocation per tag
+    pub fn write_into(&self, output: &mut Vec<u8>) {
+        output.extend_from_slice(self.name.as_bytes());
+        output.push(b'\t');
+        output.extend_from_slice(self.file_name.as_bytes());
+        output.push(b'\t');
+        output.extend_from_slice(self.address.as_bytes());
 
         // Only output shorthand kind if we don't have extension fields with a kind field
         let has_kind_extension = self
@@ -180,7 +196,8 @@ impl Tag {
 
         if let Some(ref kind) = self.kind {
             if !has_kind_extension {
-                output.push_str(&format!("\t{}", kind));
+                output.push(b'\t');
+                output.extend_from_slice(kind.as_bytes());
             }
         }
 
@@ -194,34 +211,33 @@ impl Tag {
 
             // Process module field if it's the only field
             if module_only {
-                if let Some(module) = fields.get("module") {
-                    output.push_str(&format!("\tmodule:{}", module));
+                if let Some(module) = module_value {
+                    output.extend_from_slice(b"\tmodule:");
+                    output.extend_from_slice(module.as_bytes());
                 }
             }
 
             // Process all non-module fields
             for (key, value) in fields.iter().filter(|(k, _)| *k != "module") {
-                // Only prepend module value for scope-related fields, not metadata fields
-                let formatted_value = match key.as_str() {
-                    "line" | "end" | "kind" | "file" | "signature" | "access" => {
-                        // These fields should never have module prefixes
-                        value.clone()
-                    }
+                output.push(b'\t');
+                output.extend_from_slice(key.as_bytes());
+                output.push(b':');
+                match key.as_str() {
+                    // These fields should never have module prefixes
+                    "line" | "end" | "kind" | "file" | "signature" | "access" => {}
+                    // For scope-related fields, prepend module value if it exists
                     _ => {
-                        // For scope-related fields, prepend module value if it exists
                         if let Some(module) = module_value {
-                            format!("{}::{}", module, value)
-                        } else {
-                            value.clone()
+                            output.extend_from_slice(module.as_bytes());
+                            output.extend_from_slice(b"::");
                         }
                     }
-                };
-                output.push_str(&format!("\t{}:{}", key, formatted_value));
+                }
+                output.extend_from_slice(value.as_bytes());
             }
         }
 
-        output.push('\n');
-        output.into_bytes()
+        output.push(b'\n');
     }
     ///
     /// Escapes backslashes and forward slashes in the address field
