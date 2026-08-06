@@ -101,13 +101,13 @@ impl<'a> JsContext<'a> {
         for (scope_type, name) in &self.scope_stack {
             match scope_type {
                 ScopeType::Class => {
-                    fields.insert(String::from("class"), name.clone());
+                    fields.insert("class", name.clone());
                 }
                 ScopeType::Function => {
-                    fields.insert(String::from("function"), name.clone());
+                    fields.insert("function", name.clone());
                 }
                 ScopeType::Property => {
-                    fields.insert(String::from("property"), name.clone());
+                    fields.insert("property", name.clone());
                 }
             }
         }
@@ -175,7 +175,7 @@ fn create_tag(
         .fields_config
         .is_field_enabled("kind")
     {
-        extension_fields.insert(String::from("kind"), kind_char.to_string());
+        extension_fields.insert("kind", kind_char.to_string());
     }
 
     if context
@@ -184,7 +184,7 @@ fn create_tag(
         .fields_config
         .is_field_enabled("line")
     {
-        extension_fields.insert(String::from("line"), (row + 1).to_string());
+        extension_fields.insert("line", (row + 1).to_string());
     }
 
     if context
@@ -486,7 +486,7 @@ fn process_expression_statement(
 
                 if full_name.contains(".prototype.") {
                     let class_name = full_name.split(".prototype.").next().unwrap();
-                    extra.insert("class".to_string(), class_name.to_string());
+                    extra.insert("class", class_name.to_string());
                 }
 
                 create_tag(name.clone(), kind, node, context, Some(extra));

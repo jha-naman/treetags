@@ -13,13 +13,20 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::sync::Arc;
 
+/// A single extension field: a `(key, value)` pair.
+///
+/// Both sides are `Cow<'static, str>` so the common case — a static key like
+/// `"line"` and, where applicable, a static value — borrows without allocating,
+/// while dynamic values (line numbers, identifiers) are owned.
+pub type Field = (Cow<'static, str>, Cow<'static, str>);
+
 /// An ordered collection of ctags extension fields.
 ///
 /// ctags output requires the fields to appear in a specific, stable order, so
 /// this preserves insertion order. Keys are unique: re-inserting an existing key
 /// updates its value in place rather than appending a duplicate.
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct ExtensionFields(Vec<(String, String)>);
+pub struct ExtensionFields(Vec<Field>);
 
 impl ExtensionFields {
     pub fn new() -> Self {
@@ -30,17 +37,27 @@ impl ExtensionFields {
         self.0.is_empty()
     }
 
-    pub fn get(&self, key: &str) -> Option<&String> {
-        self.0.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.0
+            .iter()
+            .find(|(k, _)| k.as_ref() == key)
+            .map(|(_, v)| v.as_ref())
     }
 
     pub fn contains_key(&self, key: &str) -> bool {
-        self.0.iter().any(|(k, _)| k == key)
+        self.0.iter().any(|(k, _)| k.as_ref() == key)
     }
 
     // Replace an existing key's value in place (preserving its position),
-    // otherwise append.
-    pub fn insert(&mut self, key: String, value: String) {
+    // otherwise append. Accepts anything convertible to `Cow<'static, str>`, so
+    // static `&'static str` keys/values borrow while owned `String`s move in.
+    pub fn insert(
+        &mut self,
+        key: impl Into<Cow<'static, str>>,
+        value: impl Into<Cow<'static, str>>,
+    ) {
+        let key = key.into();
+        let value = value.into();
         if let Some(slot) = self.0.iter_mut().find(|(k, _)| *k == key) {
             slot.1 = value;
         } else {
@@ -48,13 +65,13 @@ impl ExtensionFields {
         }
     }
 
-    pub fn iter(&self) -> std::slice::Iter<'_, (String, String)> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Field> {
         self.0.iter()
     }
 }
 
-impl Extend<(String, String)> for ExtensionFields {
-    fn extend<T: IntoIterator<Item = (String, String)>>(&mut self, iter: T) {
+impl Extend<Field> for ExtensionFields {
+    fn extend<T: IntoIterator<Item = Field>>(&mut self, iter: T) {
         for (k, v) in iter {
             self.insert(k, v);
         }
@@ -62,8 +79,8 @@ impl Extend<(String, String)> for ExtensionFields {
 }
 
 impl IntoIterator for ExtensionFields {
-    type Item = (String, String);
-    type IntoIter = std::vec::IntoIter<(String, String)>;
+    type Item = Field;
+    type IntoIter = std::vec::IntoIter<Field>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
@@ -168,8 +185,8 @@ impl Tag {
                 (Some(_), None) => std::cmp::Ordering::Greater,
                 (Some(af), Some(bf)) => af
                     .iter()
-                    .map(|(k, v)| (k.as_str(), v.as_str()))
-                    .cmp(bf.iter().map(|(k, v)| (k.as_str(), v.as_str()))),
+                    .map(|(k, v)| (k.as_ref(), v.as_ref()))
+                    .cmp(bf.iter().map(|(k, v)| (k.as_ref(), v.as_ref()))),
             })
     }
 
@@ -214,10 +231,10 @@ impl Tag {
 
         if let Some(ref fields) = self.extension_fields {
             // Extract module value if present
-            let module_value = fields.get("module").map(|s| s.as_str());
+            let module_value = fields.get("module");
 
             // Count non-module keys to determine if module is the only field
-            let non_module_keys_count = fields.iter().filter(|(k, _)| k != "module").count();
+            let non_module_keys_count = fields.iter().filter(|(k, _)| k.as_ref() != "module").count();
             let module_only = non_module_keys_count == 0 && module_value.is_some();
 
             // Process module field if it's the only field
@@ -229,11 +246,11 @@ impl Tag {
             }
 
             // Process all non-module fields
-            for (key, value) in fields.iter().filter(|(k, _)| *k != "module") {
+            for (key, value) in fields.iter().filter(|(k, _)| k.as_ref() != "module") {
                 output.push(b'\t');
                 output.extend_from_slice(key.as_bytes());
                 output.push(b':');
-                match key.as_str() {
+                match key.as_ref() {
                     // These fields should never have module prefixes
                     "line" | "end" | "kind" | "file" | "signature" | "access" => {}
                     // For scope-related fields, prepend module value if it exists

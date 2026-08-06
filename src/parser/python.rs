@@ -142,7 +142,7 @@ fn create_tag(
         .fields_config
         .is_field_enabled("kind")
     {
-        extension_fields.insert("kind".to_string(), kind.to_string());
+        extension_fields.insert("kind", kind.to_string());
     }
 
     // Line
@@ -152,7 +152,7 @@ fn create_tag(
         .fields_config
         .is_field_enabled("line")
     {
-        extension_fields.insert("line".to_string(), (row + 1).to_string());
+        extension_fields.insert("line", (row + 1).to_string());
     }
 
     // Access
@@ -167,7 +167,7 @@ fn create_tag(
         } else {
             get_access_level(&name)
         };
-        extension_fields.insert("access".to_string(), access.to_string());
+        extension_fields.insert("access", access.to_string());
     }
 
     // Roles
@@ -177,7 +177,7 @@ fn create_tag(
         .fields_config
         .is_field_enabled("roles")
     {
-        extension_fields.insert("roles".to_string(), "def".to_string());
+        extension_fields.insert("roles", "def");
     }
 
     if let Some(extras) = extra_fields {
@@ -201,15 +201,15 @@ fn create_tag(
                 .rev()
                 .find(|(t, _)| matches!(t, ScopeType::Class))
             {
-                extension_fields.insert("class".to_string(), name.clone());
+                extension_fields.insert("class", name.clone());
             }
         } else if let Some((scope_type, scope_name)) = context.scope_stack.last() {
             match scope_type {
                 ScopeType::Class => {
-                    extension_fields.insert("class".to_string(), scope_name.clone());
+                    extension_fields.insert("class", scope_name.clone());
                 }
                 ScopeType::Function => {
-                    extension_fields.insert("function".to_string(), scope_name.clone());
+                    extension_fields.insert("function", scope_name.clone());
                 }
             }
         }
@@ -217,7 +217,7 @@ fn create_tag(
 
     // File field
     if context.base.user_config.extras_config.file_scope {
-        extension_fields.insert("file".to_string(), "".to_string());
+        extension_fields.insert("file", "");
     }
 
     // End
@@ -227,7 +227,7 @@ fn create_tag(
         .fields_config
         .is_field_enabled("end")
     {
-        extension_fields.insert("end".to_string(), (node.end_position().row + 1).to_string());
+        extension_fields.insert("end", (node.end_position().row + 1).to_string());
     }
 
     context.base.tags.push(tag::Tag {
@@ -309,11 +309,11 @@ fn process_function_definition(
             .is_field_enabled("signature")
             && !params_signature.is_empty()
         {
-            extras.insert("signature".to_string(), params_signature);
+            extras.insert("signature", params_signature);
         }
 
         if !return_type.is_empty() {
-            extras.insert("typeref".to_string(), format!("typename:{}", return_type));
+            extras.insert("typeref", format!("typename:{}", return_type));
         }
 
         create_tag(name.clone(), kind, node, context, Some(extras));
@@ -414,7 +414,7 @@ fn process_assignment_target(
 
                 if let Some(params) = val.child_by_field_name("parameters") {
                     let params_text = context.base.node_text(&params);
-                    extras.insert("signature".to_string(), format!("({})", params_text));
+                    extras.insert("signature", format!("({})", params_text));
                 }
 
                 create_tag(name, kind, assignment_node, context, Some(extras));
@@ -490,7 +490,7 @@ fn process_import_from_statement(
                             format!("module:{}.{}", module_name, original_name)
                         };
 
-                        extras.insert("nameref".to_string(), nameref);
+                        extras.insert("nameref", nameref);
 
                         create_tag(alias, "Y", node, context, Some(extras));
                     }

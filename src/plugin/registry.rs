@@ -429,7 +429,7 @@ fn convert_tags(
             let address = format_address(source_lines, t.line);
             let mut ext_fields = ExtensionFields::new();
             if let Some(end) = t.end_line {
-                ext_fields.insert("end".to_string(), end.to_string());
+                ext_fields.insert("end", end.to_string());
             }
             let mut extra: Vec<(String, String)> = t.extension_fields;
             extra.sort_unstable_by_key(|(k, _)| k.clone());

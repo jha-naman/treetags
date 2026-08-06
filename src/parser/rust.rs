@@ -93,16 +93,16 @@ impl<'a> RustContext<'a> {
             match scope_type {
                 ScopeType::Module => module_path.push(name.clone()),
                 ScopeType::Struct => {
-                    fields.insert(String::from("struct"), name.clone());
+                    fields.insert("struct", name.clone());
                 }
                 ScopeType::Enum => {
-                    fields.insert(String::from("enum"), name.clone());
+                    fields.insert("enum", name.clone());
                 }
                 ScopeType::Union => {
-                    fields.insert(String::from("union"), name.clone());
+                    fields.insert("union", name.clone());
                 }
                 ScopeType::Trait => {
-                    fields.insert(String::from("interface"), name.clone());
+                    fields.insert("interface", name.clone());
                 }
                 ScopeType::Implementation => {
                     // For impls, store the type being implemented.
@@ -111,7 +111,7 @@ impl<'a> RustContext<'a> {
                     // Let's store the impl type under 'implementation' or 'impl_for'.
                     // Example `impl MyTrait for MyType` might have trait:MyTrait, implementation:MyType
                     // Example `impl MyType` would have implementation:MyType
-                    fields.insert(String::from("implementation"), name.clone());
+                    fields.insert("implementation", name.clone());
                     // Could also store the trait specifically if parsed:
                     // if let Some(trait_name) = find_trait_in_impl_scope(...) {
                     //     fields.insert(String::from("trait"), trait_name);
@@ -121,7 +121,7 @@ impl<'a> RustContext<'a> {
         }
 
         if !module_path.is_empty() {
-            fields.insert(String::from("module"), module_path.join("::"));
+            fields.insert("module", module_path.join("::"));
         }
 
         fields
@@ -244,7 +244,7 @@ fn create_tag(
         .fields_config
         .is_field_enabled("kind")
     {
-        extension_fields.insert(String::from("kind"), kind_char.to_string());
+        extension_fields.insert("kind", kind_char);
     }
 
     // 2. Line number (n) - typically second
@@ -254,7 +254,7 @@ fn create_tag(
         .fields_config
         .is_field_enabled("line")
     {
-        extension_fields.insert(String::from("line"), (row + 1).to_string());
+        extension_fields.insert("line", (row + 1).to_string());
     }
 
     // 3. Access field (a) - access modifier
@@ -266,7 +266,7 @@ fn create_tag(
                 .fields_config
                 .is_field_enabled("access")
             {
-                extension_fields.insert("access".to_string(), access.clone());
+                extension_fields.insert("access", access.to_owned());
             }
         }
     }
@@ -278,7 +278,7 @@ fn create_tag(
         .fields_config
         .is_field_enabled("file")
     {
-        extension_fields.insert(String::from("file"), context.base.file_name.to_string());
+        extension_fields.insert("file", context.base.file_name.to_string());
     }
 
     // 5. Signature field (S) - function signature
@@ -290,7 +290,7 @@ fn create_tag(
                 .fields_config
                 .is_field_enabled("signature")
             {
-                extension_fields.insert("signature".to_string(), signature.clone());
+                extension_fields.insert("signature", signature.to_owned());
             }
         }
     }
@@ -316,7 +316,7 @@ fn create_tag(
                 .fields_config
                 .is_field_enabled("typeref")
             {
-                extension_fields.insert("typeref".to_string(), typeref.clone());
+                extension_fields.insert("typeref", typeref.to_owned());
             }
         }
     }
@@ -328,21 +328,18 @@ fn create_tag(
         .fields_config
         .is_field_enabled("end")
     {
-        extension_fields.insert(
-            String::from("end"),
-            (node.end_position().row + 1).to_string(),
-        );
+        extension_fields.insert("end", (node.end_position().row + 1).to_string());
     }
 
     // Handle remaining extra fields that weren't processed above
     if let Some(extras) = extra_fields {
         for (key, value) in extras {
             // Skip fields we've already processed
-            if matches!(key.as_str(), "access" | "signature" | "typeref") {
+            if matches!(key.as_ref(), "access" | "signature" | "typeref") {
                 continue;
             }
 
-            match key.as_str() {
+            match key.as_ref() {
                 "implementation" | "trait" | "struct" | "enum" | "union" => {
                     if context
                         .base
@@ -482,7 +479,7 @@ fn process_identifiers_list(
                     ) {
                         // Add enum/struct name context specifically for the variant tag
                         let mut variant_fields = ExtensionFields::new();
-                        variant_fields.insert(variant_type.to_string(), name.to_owned());
+                        variant_fields.insert(variant_type, name.to_owned());
                         create_tag(
                             variant_name,
                             tag_kind,
@@ -527,7 +524,7 @@ fn process_impl(cursor: &mut TreeCursor, context: &mut RustContext) -> Option<(S
     let kind_char = "c";
 
     if let Some(tr_name) = &trait_name {
-        extra_fields.insert("trait".to_string(), tr_name.clone());
+        extra_fields.insert("trait", tr_name.clone());
     }
 
     create_tag(
@@ -602,7 +599,7 @@ fn process_function(
         {
             if let Some(signature_str) = get_function_signature_string(node, cursor, &context.base)
             {
-                extra_fields.insert(String::from("signature"), signature_str);
+                extra_fields.insert("signature", signature_str);
             }
         }
 
