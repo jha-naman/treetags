@@ -59,7 +59,7 @@ fn get_field_order_for_go() -> Vec<&'static str> {
 /// Create extension fields with Go-specific ordering
 fn create_extension_fields_with_language(
     context: &Context,
-    kind_char: &str,
+    kind_char: &'static str,
     row: usize,
     node: tree_sitter::Node,
     extra_fields: Option<ExtensionFields>,
@@ -71,27 +71,27 @@ fn create_extension_fields_with_language(
     for &field_name in &field_order {
         match field_name {
             "kind" if context.user_config.fields_config.is_field_enabled("kind") => {
-                extension_fields.insert(String::from("kind"), kind_char.to_string());
+                extension_fields.insert("kind", kind_char);
             }
             "line" if context.user_config.fields_config.is_field_enabled("line") => {
-                extension_fields.insert(String::from("line"), (row + 1).to_string());
+                extension_fields.insert("line", (row + 1).to_string());
             }
             "file" if context.user_config.fields_config.is_field_enabled("file") => {
-                extension_fields.insert(String::from("file"), context.file_name.to_string());
+                extension_fields.insert("file", context.file_name.to_string());
             }
             "end" if context.user_config.fields_config.is_field_enabled("end") => {
                 // Only add end field if the tag spans multiple lines
                 let start_line = node.start_position().row;
                 let end_line = node.end_position().row;
                 if end_line > start_line {
-                    extension_fields.insert(String::from("end"), (end_line + 1).to_string());
+                    extension_fields.insert("end", (end_line + 1).to_string());
                 }
             }
             "access" => {
                 if let Some(extras) = &extra_fields {
                     if let Some(access) = extras.get("access") {
                         if context.user_config.fields_config.is_field_enabled("access") {
-                            extension_fields.insert("access".to_string(), access.clone());
+                            extension_fields.insert("access", access.to_owned());
                         }
                     }
                 }
@@ -104,7 +104,7 @@ fn create_extension_fields_with_language(
                             .fields_config
                             .is_field_enabled("signature")
                         {
-                            extension_fields.insert("signature".to_string(), signature.clone());
+                            extension_fields.insert("signature", signature.to_owned());
                         }
                     }
                 }
@@ -117,7 +117,7 @@ fn create_extension_fields_with_language(
                             .fields_config
                             .is_field_enabled("typeref")
                         {
-                            extension_fields.insert("typeref".to_string(), typeref.clone());
+                            extension_fields.insert("typeref", typeref.to_owned());
                         }
                     }
                 }
@@ -134,7 +134,7 @@ fn create_extension_fields_with_language(
                 {
                     if let Some(extras) = &extra_fields {
                         if let Some(value) = extras.get(field_name) {
-                            extension_fields.insert(field_name.to_string(), value.clone());
+                            extension_fields.insert(field_name, value.to_owned());
                         }
                     }
                 }
@@ -195,7 +195,7 @@ impl<'a> GoContext<'a> {
             base: Context {
                 source_code,
                 lines,
-                file_name,
+                file_name: file_name.into(),
                 tags,
                 tag_config,
                 user_config,
@@ -211,19 +211,13 @@ impl<'a> GoContext<'a> {
         for (scope_type, name) in &self.scope_stack {
             match scope_type {
                 ScopeType::Package => {
-                    fields.insert(String::from("package"), name.clone());
+                    fields.insert("package", name.clone());
                 }
                 ScopeType::Struct => {
-                    fields.insert(
-                        String::from("struct"),
-                        format!("{}.{}", self.get_package_name(), name),
-                    );
+                    fields.insert("struct", format!("{}.{}", self.get_package_name(), name));
                 }
                 ScopeType::Interface => {
-                    fields.insert(
-                        String::from("interface"),
-                        format!("{}.{}", self.get_package_name(), name),
-                    );
+                    fields.insert("interface", format!("{}.{}", self.get_package_name(), name));
                 }
             }
         }
@@ -244,7 +238,7 @@ impl<'a> GoContext<'a> {
     fn create_go_tag(
         &mut self,
         name: String,
-        kind_char: &str,
+        kind_char: &'static str,
         node: tree_sitter::Node,
         extra_fields: Option<ExtensionFields>,
     ) {
@@ -266,9 +260,9 @@ impl<'a> GoContext<'a> {
 
         self.base.tags.push(tag::Tag {
             name,
-            file_name: self.base.file_name.to_string(),
+            file_name: self.base.file_name.clone(),
             address,
-            kind: Some(String::from(kind_char)),
+            kind: Some(kind_char.into()),
             extension_fields,
         });
     }
@@ -358,7 +352,7 @@ fn process_imports(cursor: &mut TreeCursor, context: &mut GoContext) {
             "import_spec" => {
                 if let Some((alias_name, import_path)) = get_import_name(cursor, context) {
                     let mut extra_fields = ExtensionFields::new();
-                    extra_fields.insert("package".to_string(), import_path);
+                    extra_fields.insert("package", import_path);
                     context.create_go_tag(alias_name, "P", node, Some(extra_fields));
                 }
             }
@@ -371,7 +365,7 @@ fn process_imports(cursor: &mut TreeCursor, context: &mut GoContext) {
                                 get_import_name(cursor, context)
                             {
                                 let mut extra_fields = ExtensionFields::new();
-                                extra_fields.insert("package".to_string(), import_path);
+                                extra_fields.insert("package", import_path);
                                 context.create_go_tag(
                                     alias_name,
                                     "P",
@@ -445,13 +439,13 @@ fn process_function(cursor: &mut TreeCursor, context: &mut GoContext) {
             .is_field_enabled("signature")
         {
             if let Some(signature) = get_function_signature(cursor, context) {
-                extra_fields.insert("signature".to_string(), signature);
+                extra_fields.insert("signature", signature);
             }
         }
 
         // Get return type
         if let Some(return_type) = get_function_return_type(cursor, context) {
-            extra_fields.insert("typeref".to_string(), format!("typename:{}", return_type));
+            extra_fields.insert("typeref", format!("typename:{}", return_type));
         }
 
         let final_fields = if extra_fields.is_empty() {
@@ -477,7 +471,7 @@ fn process_method(cursor: &mut TreeCursor, context: &mut GoContext) {
                     format!("{}.{}", package_name, receiver_type),
                 );
             } else {
-                extra_fields.insert("struct".to_string(), format!(".{}", receiver_type));
+                extra_fields.insert("struct", format!(".{}", receiver_type));
             }
         }
 
@@ -489,13 +483,13 @@ fn process_method(cursor: &mut TreeCursor, context: &mut GoContext) {
             .is_field_enabled("signature")
         {
             if let Some(signature) = get_function_signature(cursor, context) {
-                extra_fields.insert("signature".to_string(), signature);
+                extra_fields.insert("signature", signature);
             }
         }
 
         // Get return type
         if let Some(return_type) = get_function_return_type(cursor, context) {
-            extra_fields.insert("typeref".to_string(), format!("typename:{}", return_type));
+            extra_fields.insert("typeref", format!("typename:{}", return_type));
         }
 
         let final_fields = if extra_fields.is_empty() {
@@ -725,7 +719,7 @@ fn process_var_spec(cursor: &mut TreeCursor, context: &mut GoContext) {
     for (name, node) in identifiers {
         let mut extra_fields = context.create_extension_fields();
         if let Some(ref type_name) = type_info {
-            extra_fields.insert("typeref".to_string(), format!("typename:{}", type_name));
+            extra_fields.insert("typeref", format!("typename:{}", type_name));
         }
         let final_fields = if extra_fields.is_empty() {
             None
@@ -923,10 +917,10 @@ fn process_field_declaration(cursor: &mut TreeCursor, context: &mut GoContext, s
                 format!("{}.{}", package_name, struct_name),
             );
         } else {
-            extra_fields.insert("struct".to_string(), format!(".{}", struct_name));
+            extra_fields.insert("struct", format!(".{}", struct_name));
         }
         if let Some(ref type_name) = field_type {
-            extra_fields.insert("typeref".to_string(), format!("typename:{}", type_name));
+            extra_fields.insert("typeref", format!("typename:{}", type_name));
         }
         context.create_go_tag(name, "m", node, Some(extra_fields));
     }
@@ -962,12 +956,12 @@ fn process_method_spec(cursor: &mut TreeCursor, context: &mut GoContext, interfa
                 format!("{}.{}", package_name, interface_name),
             );
         } else {
-            extra_fields.insert("interface".to_string(), format!(".{}", interface_name));
+            extra_fields.insert("interface", format!(".{}", interface_name));
         }
 
         // Get return type if available
         if let Some(return_type) = get_method_spec_return_type(cursor, context) {
-            extra_fields.insert("typeref".to_string(), format!("typename:{}", return_type));
+            extra_fields.insert("typeref", format!("typename:{}", return_type));
         }
 
         context.create_go_tag(name, "n", node, Some(extra_fields));

@@ -7,9 +7,18 @@
 //! across a codebase. This module handles the parsing and formatting of tags
 //! in a format compatible with Vi/Vim.
 
+use std::borrow::Cow;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
+use std::sync::Arc;
+
+/// A single extension field: a `(key, value)` pair.
+///
+/// Both sides are `Cow<'static, str>` so the common case — a static key like
+/// `"line"` and, where applicable, a static value — borrows without allocating,
+/// while dynamic values (line numbers, identifiers) are owned.
+pub type Field = (Cow<'static, str>, Cow<'static, str>);
 
 /// An ordered collection of ctags extension fields.
 ///
@@ -17,7 +26,7 @@ use std::path::Path;
 /// this preserves insertion order. Keys are unique: re-inserting an existing key
 /// updates its value in place rather than appending a duplicate.
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct ExtensionFields(Vec<(String, String)>);
+pub struct ExtensionFields(Vec<Field>);
 
 impl ExtensionFields {
     pub fn new() -> Self {
@@ -28,17 +37,27 @@ impl ExtensionFields {
         self.0.is_empty()
     }
 
-    pub fn get(&self, key: &str) -> Option<&String> {
-        self.0.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.0
+            .iter()
+            .find(|(k, _)| k.as_ref() == key)
+            .map(|(_, v)| v.as_ref())
     }
 
     pub fn contains_key(&self, key: &str) -> bool {
-        self.0.iter().any(|(k, _)| k == key)
+        self.0.iter().any(|(k, _)| k.as_ref() == key)
     }
 
     // Replace an existing key's value in place (preserving its position),
-    // otherwise append.
-    pub fn insert(&mut self, key: String, value: String) {
+    // otherwise append. Accepts anything convertible to `Cow<'static, str>`, so
+    // static `&'static str` keys/values borrow while owned `String`s move in.
+    pub fn insert(
+        &mut self,
+        key: impl Into<Cow<'static, str>>,
+        value: impl Into<Cow<'static, str>>,
+    ) {
+        let key = key.into();
+        let value = value.into();
         if let Some(slot) = self.0.iter_mut().find(|(k, _)| *k == key) {
             slot.1 = value;
         } else {
@@ -46,13 +65,13 @@ impl ExtensionFields {
         }
     }
 
-    pub fn iter(&self) -> std::slice::Iter<'_, (String, String)> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Field> {
         self.0.iter()
     }
 }
 
-impl Extend<(String, String)> for ExtensionFields {
-    fn extend<T: IntoIterator<Item = (String, String)>>(&mut self, iter: T) {
+impl Extend<Field> for ExtensionFields {
+    fn extend<T: IntoIterator<Item = Field>>(&mut self, iter: T) {
         for (k, v) in iter {
             self.insert(k, v);
         }
@@ -60,8 +79,8 @@ impl Extend<(String, String)> for ExtensionFields {
 }
 
 impl IntoIterator for ExtensionFields {
-    type Item = (String, String);
-    type IntoIter = std::vec::IntoIter<(String, String)>;
+    type Item = Field;
+    type IntoIter = std::vec::IntoIter<Field>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
@@ -78,11 +97,16 @@ pub struct Tag {
     /// The name of the tag (e.g., function name, class name)
     pub name: String,
     /// The file where the tag is defined
-    pub file_name: String,
+    pub file_name: Arc<str>,
     /// The search pattern to locate the tag in the file
     pub address: String,
-    /// The tag kind
-    pub kind: Option<String>,
+    /// The tag kind.
+    ///
+    /// Tags produced by the parsers use one of a fixed set of `&'static str`
+    /// kind labels, so this is a `Cow` that borrows those without allocating;
+    /// only kinds read back from an existing tags file (or supplied by a plugin)
+    /// are owned.
+    pub kind: Option<Cow<'static, str>>,
     /// The extension fields associated with the tag
     pub extension_fields: Option<ExtensionFields>,
 }
@@ -102,13 +126,13 @@ impl Tag {
     pub fn from_ts_tag(
         tag: tree_sitter_tags::Tag,
         code: &[u8],
-        file_path: &str,
+        file_name: Arc<str>,
     ) -> Result<Self, String> {
         let name = String::from_utf8(code[tag.name_range.start..tag.name_range.end].to_vec())
             .map_err(|e| {
                 format!(
                     "Failed to decode tag name as UTF-8 in file '{}': {}",
-                    file_path, e
+                    file_name, e
                 )
             })?;
 
@@ -118,7 +142,7 @@ impl Tag {
         .map_err(|e| {
             format!(
                 "Failed to decode line content as UTF-8 in file '{}': {}",
-                file_path, e
+                file_name, e
             )
         })?;
 
@@ -142,7 +166,7 @@ impl Tag {
 
         Ok(Tag {
             name,
-            file_name: String::from(file_path),
+            file_name,
             address,
             kind: None,
             extension_fields: None,
@@ -161,8 +185,8 @@ impl Tag {
                 (Some(_), None) => std::cmp::Ordering::Greater,
                 (Some(af), Some(bf)) => af
                     .iter()
-                    .map(|(k, v)| (k.as_str(), v.as_str()))
-                    .cmp(bf.iter().map(|(k, v)| (k.as_str(), v.as_str()))),
+                    .map(|(k, v)| (k.as_ref(), v.as_ref()))
+                    .cmp(bf.iter().map(|(k, v)| (k.as_ref(), v.as_ref()))),
             })
     }
 
@@ -207,10 +231,13 @@ impl Tag {
 
         if let Some(ref fields) = self.extension_fields {
             // Extract module value if present
-            let module_value = fields.get("module").map(|s| s.as_str());
+            let module_value = fields.get("module");
 
             // Count non-module keys to determine if module is the only field
-            let non_module_keys_count = fields.iter().filter(|(k, _)| k != "module").count();
+            let non_module_keys_count = fields
+                .iter()
+                .filter(|(k, _)| k.as_ref() != "module")
+                .count();
             let module_only = non_module_keys_count == 0 && module_value.is_some();
 
             // Process module field if it's the only field
@@ -222,11 +249,11 @@ impl Tag {
             }
 
             // Process all non-module fields
-            for (key, value) in fields.iter().filter(|(k, _)| *k != "module") {
+            for (key, value) in fields.iter().filter(|(k, _)| k.as_ref() != "module") {
                 output.push(b'\t');
                 output.extend_from_slice(key.as_bytes());
                 output.push(b':');
-                match key.as_str() {
+                match key.as_ref() {
                     // These fields should never have module prefixes
                     "line" | "end" | "kind" | "file" | "signature" | "access" => {}
                     // For scope-related fields, prepend module value if it exists
@@ -244,7 +271,8 @@ impl Tag {
         output.push(b'\n');
     }
     ///
-    /// Escapes backslashes and forward slashes in the address field
+    /// Escapes backslashes, forward slashes, and the regex anchors `^`/`$` in
+    /// the address field
     ///
     /// # Arguments
     ///
@@ -252,7 +280,7 @@ impl Tag {
     ///
     /// # Returns
     ///
-    /// A new string with backslashes and forward slashes escaped
+    /// A new string with the regex significant characters escaped
     #[cfg(test)]
     fn escape_address(address: &str) -> String {
         let mut out = String::with_capacity(address.len() + 8);
@@ -260,12 +288,16 @@ impl Tag {
         out
     }
 
-    /// Appends `address` to `out`, escaping backslashes and forward slashes.
-    fn escape_address_into(address: &str, out: &mut String) {
+    /// Appends `address` to `out`, escaping the characters that are significant
+    /// in a regex search-pattern address: backslash, forward slash, and the
+    /// regex anchors `^` and `$`.
+    pub(crate) fn escape_address_into(address: &str, out: &mut String) {
         for ch in address.chars() {
             match ch {
                 '\\' => out.push_str("\\\\"),
                 '/' => out.push_str("\\/"),
+                '^' => out.push_str("\\^"),
+                '$' => out.push_str("\\$"),
                 _ => out.push(ch),
             }
         }
@@ -333,20 +365,20 @@ pub fn parse_tag_line(line: &str) -> Option<Tag> {
 
             // Store the kind separately if it's the "kind" field
             if key == "kind" {
-                kind = Some(value.to_string());
+                kind = Some(Cow::Owned(value.to_string()));
             } else {
                 fields_map.insert(key.to_string(), value.to_string());
             }
         } else if kind.is_none() {
             // In ctags, a standalone field without colon is typically the kind
             // Only use the first such field as the kind
-            kind = Some(field.to_string());
+            kind = Some(Cow::Owned(field.to_string()));
         }
     }
 
     Some(Tag {
         name: name.to_string(),
-        file_name: file_name.to_string(),
+        file_name: Arc::from(file_name),
         address: format!("{}\t", address), // Keep the tab as in the original code
         kind,
         extension_fields: if fields_map.is_empty() {
@@ -367,9 +399,9 @@ mod tests {
         let tag = parse_tag_line(line).unwrap();
 
         assert_eq!(tag.name, "function_name");
-        assert_eq!(tag.file_name, "file.rs");
+        assert_eq!(&*tag.file_name, "file.rs");
         assert_eq!(tag.address, "/^pub fn function_name() {/;\"\t");
-        assert_eq!(tag.kind, Some("f".to_string()));
+        assert_eq!(tag.kind.as_deref(), Some("f"));
 
         let extension_fields = tag.extension_fields.unwrap();
         assert!(!extension_fields.contains_key("kind"));
@@ -382,9 +414,9 @@ mod tests {
         let tag = parse_tag_line(line).unwrap();
 
         assert_eq!(tag.name, "method");
-        assert_eq!(tag.file_name, "file.rs");
+        assert_eq!(&*tag.file_name, "file.rs");
         assert_eq!(tag.address, "/^pub fn method(&self) {/;\"\t");
-        assert_eq!(tag.kind, Some("m".to_string()));
+        assert_eq!(tag.kind.as_deref(), Some("m"));
 
         let extension_fields = tag.extension_fields.unwrap();
         assert!(!extension_fields.contains_key("kind"));
@@ -398,7 +430,7 @@ mod tests {
         let tag = parse_tag_line(line).unwrap();
 
         assert_eq!(tag.name, "variable");
-        assert_eq!(tag.file_name, "file.rs");
+        assert_eq!(&*tag.file_name, "file.rs");
         assert_eq!(tag.address, "/^let variable = 42;/;\"\t");
         assert_eq!(tag.kind, None);
         assert_eq!(tag.extension_fields, None);
@@ -410,9 +442,9 @@ mod tests {
         let tag = parse_tag_line(line).unwrap();
 
         assert_eq!(tag.name, "struct_name");
-        assert_eq!(tag.file_name, "file.rs");
+        assert_eq!(&*tag.file_name, "file.rs");
         assert_eq!(tag.address, "/^pub struct struct_name {/;\"\t");
-        assert_eq!(tag.kind, Some("s".to_string()));
+        assert_eq!(tag.kind.as_deref(), Some("s"));
         assert_eq!(tag.extension_fields, None);
     }
 
@@ -427,9 +459,9 @@ mod tests {
     fn test_bytes_basic() {
         let tag = Tag {
             name: "test_function".to_string(),
-            file_name: "test.rs".to_string(),
+            file_name: "test.rs".into(),
             address: "/^fn test_function() {$/".to_string(),
-            kind: Some("function".to_string()),
+            kind: Some("function".into()),
             extension_fields: None,
         };
 
@@ -441,7 +473,7 @@ mod tests {
     fn test_bytes_no_kind() {
         let tag = Tag {
             name: "TEST_CONSTANT".to_string(),
-            file_name: "constants.rs".to_string(),
+            file_name: "constants.rs".into(),
             address: "/^const TEST_CONSTANT: i32 = 42;$/".to_string(),
             kind: None,
             extension_fields: None,
@@ -458,9 +490,9 @@ mod tests {
 
         let tag = Tag {
             name: "Model".to_string(),
-            file_name: "model.rs".to_string(),
+            file_name: "model.rs".into(),
             address: "/^struct Model {$/".to_string(),
-            kind: Some("struct".to_string()),
+            kind: Some("struct".into()),
             extension_fields: Some(extension_fields),
         };
 
@@ -475,9 +507,9 @@ mod tests {
 
         let tag = Tag {
             name: "draw".to_string(),
-            file_name: "shapes.rs".to_string(),
+            file_name: "shapes.rs".into(),
             address: "/^fn draw(&self) {$/".to_string(),
-            kind: Some("method".to_string()),
+            kind: Some("method".into()),
             extension_fields: Some(extension_fields),
         };
 
@@ -493,9 +525,9 @@ mod tests {
 
         let tag = Tag {
             name: "draw".to_string(),
-            file_name: "shapes.rs".to_string(),
+            file_name: "shapes.rs".into(),
             address: "/^fn draw(&self) {$/".to_string(),
-            kind: Some("method".to_string()),
+            kind: Some("method".into()),
             extension_fields: Some(extension_fields),
         };
 
@@ -513,9 +545,9 @@ mod tests {
 
         let tag = Tag {
             name: "area".to_string(),
-            file_name: "traits.rs".to_string(),
+            file_name: "traits.rs".into(),
             address: "/^fn area(&self) -> f64 {$/".to_string(),
-            kind: Some("method".to_string()),
+            kind: Some("method".into()),
             extension_fields: Some(extension_fields),
         };
 
@@ -534,9 +566,9 @@ mod tests {
 
         let tag = Tag {
             name: "calculate".to_string(),
-            file_name: "geometry.rs".to_string(),
+            file_name: "geometry.rs".into(),
             address: "/^fn calculate(&self) -> f64 {$/".to_string(),
-            kind: Some("method".to_string()),
+            kind: Some("method".into()),
             extension_fields: Some(extension_fields),
         };
 
@@ -557,9 +589,9 @@ mod tests {
     fn test_bytes_with_no_extension_fields() {
         let tag = Tag {
             name: "MyEnum".to_string(),
-            file_name: "types.rs".to_string(),
+            file_name: "types.rs".into(),
             address: "/^enum MyEnum {$/".to_string(),
-            kind: Some("enum".to_string()),
+            kind: Some("enum".into()),
             extension_fields: Some(ExtensionFields::new()), // Empty ExtensionFields
         };
 
@@ -571,7 +603,7 @@ mod tests {
     fn test_escape_address() {
         assert_eq!(
             Tag::escape_address("/^fn test() {$/"),
-            "\\/^fn test() {$\\/"
+            "\\/\\^fn test() {\\$\\/"
         );
         assert_eq!(Tag::escape_address("\\n\\t"), "\\\\n\\\\t");
         assert_eq!(

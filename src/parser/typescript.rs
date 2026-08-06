@@ -73,7 +73,7 @@ impl<'a> TypeScriptContext<'a> {
             base: helper::Context {
                 source_code,
                 lines,
-                file_name,
+                file_name: file_name.into(),
                 tags,
                 tag_config,
                 user_config,
@@ -126,7 +126,7 @@ fn process_node(
 
 fn create_tag(
     name: String,
-    kind: &str,
+    kind: &'static str,
     node: Node,
     context: &mut TypeScriptContext,
     extra_fields: Option<ExtensionFields>,
@@ -146,7 +146,7 @@ fn create_tag(
         .fields_config
         .is_field_enabled("kind")
     {
-        extension_fields.insert("kind".to_string(), kind.to_string());
+        extension_fields.insert("kind", kind.to_string());
     }
 
     // Line
@@ -156,7 +156,7 @@ fn create_tag(
         .fields_config
         .is_field_enabled("line")
     {
-        extension_fields.insert("line".to_string(), (row + 1).to_string());
+        extension_fields.insert("line", (row + 1).to_string());
     }
 
     // Roles
@@ -166,7 +166,7 @@ fn create_tag(
         .fields_config
         .is_field_enabled("roles")
     {
-        extension_fields.insert("roles".to_string(), "def".to_string());
+        extension_fields.insert("roles", "def");
     }
 
     if let Some(extras) = extra_fields {
@@ -185,19 +185,19 @@ fn create_tag(
         if let Some((scope_type, scope_name)) = context.scope_stack.last() {
             match scope_type {
                 ScopeType::Class => {
-                    extension_fields.insert("class".to_string(), scope_name.clone());
+                    extension_fields.insert("class", scope_name.clone());
                 }
                 ScopeType::Interface => {
-                    extension_fields.insert("interface".to_string(), scope_name.clone());
+                    extension_fields.insert("interface", scope_name.clone());
                 }
                 ScopeType::Enum => {
-                    extension_fields.insert("enum".to_string(), scope_name.clone());
+                    extension_fields.insert("enum", scope_name.clone());
                 }
                 ScopeType::Module => {
-                    extension_fields.insert("module".to_string(), scope_name.clone());
+                    extension_fields.insert("module", scope_name.clone());
                 }
                 ScopeType::Function => {
-                    extension_fields.insert("function".to_string(), scope_name.clone());
+                    extension_fields.insert("function", scope_name.clone());
                 }
             }
         }
@@ -210,14 +210,14 @@ fn create_tag(
         .fields_config
         .is_field_enabled("end")
     {
-        extension_fields.insert("end".to_string(), (node.end_position().row + 1).to_string());
+        extension_fields.insert("end", (node.end_position().row + 1).to_string());
     }
 
     context.base.tags.push(tag::Tag {
         name,
-        file_name: context.base.file_name.to_string(),
+        file_name: context.base.file_name.clone(),
         address,
-        kind: Some(kind.to_string()),
+        kind: Some(kind.into()),
         extension_fields: if extension_fields.is_empty() {
             None
         } else {
@@ -390,7 +390,7 @@ fn process_method_definition(
             .fields_config
             .is_field_enabled("access")
         {
-            extras.insert("access".to_string(), access.to_string());
+            extras.insert("access", access.to_string());
         }
 
         create_tag(name.clone(), "m", node, context, Some(extras));
@@ -431,7 +431,7 @@ fn process_method_signature(
             .fields_config
             .is_field_enabled("access")
         {
-            extras.insert("access".to_string(), access.to_string());
+            extras.insert("access", access.to_string());
         }
 
         create_tag(name, "m", node, context, Some(extras));
@@ -553,7 +553,7 @@ fn process_parameter(
                 .fields_config
                 .is_field_enabled("access")
             {
-                extras.insert("access".to_string(), access);
+                extras.insert("access", access);
             }
             create_tag(name, "p", node, context, Some(extras));
         } else {
@@ -597,7 +597,7 @@ fn process_public_field_definition(
             .fields_config
             .is_field_enabled("access")
         {
-            extras.insert("access".to_string(), access.to_string());
+            extras.insert("access", access.to_string());
         }
         create_tag(name, "p", node, context, Some(extras));
     }
@@ -633,7 +633,7 @@ fn process_property_signature(
             .fields_config
             .is_field_enabled("access")
         {
-            extras.insert("access".to_string(), "public".to_string());
+            extras.insert("access", "public");
         }
         create_tag(name, "p", node, context, Some(extras));
     }

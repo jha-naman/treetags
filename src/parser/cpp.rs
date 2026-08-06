@@ -114,7 +114,7 @@ impl<'a> CppContext<'a> {
             base: helper::Context {
                 source_code,
                 lines,
-                file_name,
+                file_name: file_name.into(),
                 tags,
                 tag_config,
                 user_config,
@@ -152,25 +152,25 @@ impl<'a> CppContext<'a> {
             match scope_type {
                 ScopeType::Namespace => namespace_path.push(name.clone()),
                 ScopeType::Class => {
-                    fields.insert(String::from("class"), name.clone());
+                    fields.insert("class", name.clone());
                 }
                 ScopeType::Struct => {
-                    fields.insert(String::from("struct"), name.clone());
+                    fields.insert("struct", name.clone());
                 }
                 ScopeType::Union => {
-                    fields.insert(String::from("union"), name.clone());
+                    fields.insert("union", name.clone());
                 }
                 ScopeType::Enum => {
-                    fields.insert(String::from("enum"), name.clone());
+                    fields.insert("enum", name.clone());
                 }
                 ScopeType::Function => {
-                    fields.insert(String::from("function"), name.clone());
+                    fields.insert("function", name.clone());
                 }
             }
         }
 
         if !namespace_path.is_empty() {
-            fields.insert(String::from("namespace"), namespace_path.join("::"));
+            fields.insert("namespace", namespace_path.join("::"));
         }
 
         fields
@@ -226,7 +226,7 @@ fn process_node(cursor: &mut TreeCursor, context: &mut CppContext) -> Option<(Sc
 
 fn create_tag(
     name: String,
-    kind_char: &str,
+    kind_char: &'static str,
     node: Node,
     context: &mut CppContext,
     extra_fields: Option<ExtensionFields>,
@@ -250,7 +250,7 @@ fn create_tag(
         .fields_config
         .is_field_enabled("kind")
     {
-        extension_fields.insert(String::from("kind"), kind_char.to_string());
+        extension_fields.insert("kind", kind_char);
     }
 
     // 2. Line number (n)
@@ -260,7 +260,7 @@ fn create_tag(
         .fields_config
         .is_field_enabled("line")
     {
-        extension_fields.insert(String::from("line"), (row + 1).to_string());
+        extension_fields.insert("line", (row + 1).to_string());
     }
 
     // 3. Access field (a)
@@ -272,14 +272,14 @@ fn create_tag(
                 .fields_config
                 .is_field_enabled("access")
             {
-                extension_fields.insert("access".to_string(), access.clone());
+                extension_fields.insert("access", access.to_owned());
             }
         }
     }
 
     // 4. File field (f) - only add if file scope is enabled
     if context.base.user_config.extras_config.file_scope {
-        extension_fields.insert(String::from("file"), String::new());
+        extension_fields.insert("file", String::new());
     }
 
     // 5. Signature field (S)
@@ -291,7 +291,7 @@ fn create_tag(
                 .fields_config
                 .is_field_enabled("signature")
             {
-                extension_fields.insert("signature".to_string(), signature.clone());
+                extension_fields.insert("signature", signature.to_owned());
             }
         }
     }
@@ -311,7 +311,7 @@ fn create_tag(
     // 7. Typeref field (t)
     if let Some(extras) = &extra_fields {
         if let Some(typeref) = extras.get("typeref") {
-            extension_fields.insert("typeref".to_string(), typeref.clone());
+            extension_fields.insert("typeref", typeref.to_owned());
         }
     }
 
@@ -322,20 +322,17 @@ fn create_tag(
         .fields_config
         .is_field_enabled("end")
     {
-        extension_fields.insert(
-            String::from("end"),
-            (node.end_position().row + 1).to_string(),
-        );
+        extension_fields.insert("end", (node.end_position().row + 1).to_string());
     }
 
     // Handle remaining extra fields
     if let Some(extras) = extra_fields {
         for (key, value) in extras {
-            if matches!(key.as_str(), "access" | "signature" | "typeref") {
+            if matches!(key.as_ref(), "access" | "signature" | "typeref") {
                 continue;
             }
 
-            match key.as_str() {
+            match key.as_ref() {
                 "class" | "struct" | "union" | "enum" | "namespace" | "function" => {
                     if context
                         .base
@@ -364,9 +361,9 @@ fn create_tag(
 
     context.base.tags.push(tag::Tag {
         name,
-        file_name: context.base.file_name.to_string(),
+        file_name: context.base.file_name.clone(),
         address,
-        kind: Some(String::from(kind_char)),
+        kind: Some(kind_char.into()),
         extension_fields: if extension_fields.is_empty() {
             None
         } else {
@@ -381,7 +378,7 @@ fn process_named_item(
     cursor: &mut TreeCursor,
     context: &mut CppContext,
     identifier_kinds: &[&str], // e.g., &["type_identifier"], &["identifier"]
-    tag_kind: &str,            // e.g., "n", "c", "s", "u", "d", "t"
+    tag_kind: &'static str,    // e.g., "n", "c", "s", "u", "d", "t"
     scope_type: Option<ScopeType>, // Some(scope_type) for scoped items, None for non-scoped
 ) -> Option<(ScopeType, String)> {
     let node = cursor.node();
@@ -543,7 +540,7 @@ fn process_enum(cursor: &mut TreeCursor, context: &mut CppContext) -> Option<(Sc
         // Create tags for enum values
         for (value_name, value_node) in enum_values {
             let mut value_fields = ExtensionFields::new();
-            value_fields.insert("enum".to_string(), enum_name.clone());
+            value_fields.insert("enum", enum_name.clone());
             create_tag(value_name, "e", value_node, context, Some(value_fields));
         }
 
@@ -718,7 +715,7 @@ fn process_declaration(
                 if !fn_name.is_empty() {
                     let mut proto_fields = ExtensionFields::new();
                     if !type_info.is_empty() {
-                        proto_fields.insert("typeref".to_string(), type_info.clone());
+                        proto_fields.insert("typeref", type_info.clone());
                     }
                     create_tag(fn_name, "p", child_node, context, Some(proto_fields));
                 }
@@ -792,7 +789,7 @@ fn process_declaration(
             let mut extra_fields = ExtensionFields::new();
 
             if !type_info.is_empty() {
-                extra_fields.insert("typeref".to_string(), type_info.clone());
+                extra_fields.insert("typeref", type_info.clone());
             }
 
             create_tag(
@@ -886,7 +883,7 @@ fn process_field_declaration(
             } else {
                 format!("typename:{}", type_info)
             };
-            extra_fields.insert("typeref".to_string(), typeref_value);
+            extra_fields.insert("typeref", typeref_value);
         }
 
         // Add struct scope information for members
@@ -902,7 +899,7 @@ fn process_field_declaration(
                 .fields_config
                 .is_field_enabled("scope")
             {
-                extra_fields.insert("struct".to_string(), struct_name.clone());
+                extra_fields.insert("struct", struct_name.clone());
             }
         }
 
@@ -952,7 +949,7 @@ fn process_macro_function_definition(
                         "identifier" => {
                             let param_name = context.base.node_text(&params_child).to_string();
                             let mut fields = ExtensionFields::new();
-                            fields.insert("macro".to_string(), macro_name.clone());
+                            fields.insert("macro", macro_name.clone());
                             create_tag(param_name, "D", params_child, context, Some(fields));
                             Continue
                         }
@@ -1044,7 +1041,7 @@ fn process_typedef(
 
     let mut extra_fields = ExtensionFields::new();
     if !type_info.is_empty() {
-        extra_fields.insert("typeref".to_string(), type_info);
+        extra_fields.insert("typeref", type_info);
     }
 
     create_tag(
@@ -1298,11 +1295,11 @@ fn process_parameter_list(cursor: &mut TreeCursor, context: &mut CppContext, fn_
                         "function".to_string(),
                         format!("{}::{}", class_name, fn_name),
                     ),
-                    _ => extra_fields.insert("function".to_string(), fn_name.clone()),
+                    _ => extra_fields.insert("function", fn_name.clone()),
                 };
-                // extra_fields.insert("function".to_string(), fn_name.clone());
+                // extra_fields.insert("function", fn_name.clone());
                 if !type_info.is_empty() {
-                    extra_fields.insert("typeref".to_string(), format!("typename:{}", type_info));
+                    extra_fields.insert("typeref", format!("typename:{}", type_info));
                 }
                 create_tag(
                     name,

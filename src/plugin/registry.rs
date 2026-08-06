@@ -422,13 +422,14 @@ fn convert_tags(
     source_lines: &[Vec<u8>],
     file_path: &str,
 ) -> Vec<Tag> {
+    let file_name: std::sync::Arc<str> = std::sync::Arc::from(file_path);
     plugin_tags
         .into_iter()
         .map(|t| {
             let address = format_address(source_lines, t.line);
             let mut ext_fields = ExtensionFields::new();
             if let Some(end) = t.end_line {
-                ext_fields.insert("end".to_string(), end.to_string());
+                ext_fields.insert("end", end.to_string());
             }
             let mut extra: Vec<(String, String)> = t.extension_fields;
             extra.sort_unstable_by_key(|(k, _)| k.clone());
@@ -437,9 +438,9 @@ fn convert_tags(
             }
             Tag {
                 name: t.name,
-                file_name: file_path.to_string(),
+                file_name: file_name.clone(),
                 address,
-                kind: Some(t.kind),
+                kind: Some(std::borrow::Cow::Owned(t.kind)),
                 extension_fields: if ext_fields.is_empty() {
                     None
                 } else {

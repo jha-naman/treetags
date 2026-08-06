@@ -184,6 +184,8 @@ impl Parser {
             Err(err) => eprintln!("Error generating tags for file: {}", err),
             Ok(valid_result) => {
                 let (raw_tags, _) = valid_result;
+                let file_name: std::sync::Arc<str> =
+                    std::sync::Arc::from(file_path_relative_to_tag_file);
                 for tag in raw_tags {
                     match tag {
                         Err(error) => eprintln!("Error generating tags for file: {}", error),
@@ -191,7 +193,7 @@ impl Parser {
                             if !tag.is_definition {
                                 continue;
                             }
-                            match tag::Tag::from_ts_tag(tag, code, file_path_relative_to_tag_file) {
+                            match tag::Tag::from_ts_tag(tag, code, file_name.clone()) {
                                 Ok(new_tag) => tags.push(new_tag),
                                 Err(error_msg) => {
                                     eprintln!("{}", error_msg);

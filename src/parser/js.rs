@@ -68,7 +68,7 @@ impl<'a> JsContext<'a> {
             base: helper::Context {
                 source_code,
                 lines,
-                file_name,
+                file_name: file_name.into(),
                 tags,
                 tag_config,
                 user_config,
@@ -101,13 +101,13 @@ impl<'a> JsContext<'a> {
         for (scope_type, name) in &self.scope_stack {
             match scope_type {
                 ScopeType::Class => {
-                    fields.insert(String::from("class"), name.clone());
+                    fields.insert("class", name.clone());
                 }
                 ScopeType::Function => {
-                    fields.insert(String::from("function"), name.clone());
+                    fields.insert("function", name.clone());
                 }
                 ScopeType::Property => {
-                    fields.insert(String::from("property"), name.clone());
+                    fields.insert("property", name.clone());
                 }
             }
         }
@@ -152,7 +152,7 @@ fn process_node(cursor: &mut TreeCursor, context: &mut JsContext) -> Option<(Sco
 
 fn create_tag(
     name: String,
-    kind_char: &str,
+    kind_char: &'static str,
     node: Node,
     context: &mut JsContext,
     extra_fields: Option<ExtensionFields>,
@@ -175,7 +175,7 @@ fn create_tag(
         .fields_config
         .is_field_enabled("kind")
     {
-        extension_fields.insert(String::from("kind"), kind_char.to_string());
+        extension_fields.insert("kind", kind_char.to_string());
     }
 
     if context
@@ -184,7 +184,7 @@ fn create_tag(
         .fields_config
         .is_field_enabled("line")
     {
-        extension_fields.insert(String::from("line"), (row + 1).to_string());
+        extension_fields.insert("line", (row + 1).to_string());
     }
 
     if context
@@ -213,9 +213,9 @@ fn create_tag(
 
     context.base.tags.push(tag::Tag {
         name,
-        file_name: context.base.file_name.to_string(),
+        file_name: context.base.file_name.clone(),
         address,
-        kind: Some(String::from(kind_char)),
+        kind: Some(kind_char.into()),
         extension_fields: if extension_fields.is_empty() {
             None
         } else {
@@ -486,7 +486,7 @@ fn process_expression_statement(
 
                 if full_name.contains(".prototype.") {
                     let class_name = full_name.split(".prototype.").next().unwrap();
-                    extra.insert("class".to_string(), class_name.to_string());
+                    extra.insert("class", class_name.to_string());
                 }
 
                 create_tag(name.clone(), kind, node, context, Some(extra));
