@@ -216,7 +216,7 @@ fn process_node(cursor: &mut TreeCursor, context: &mut RustContext) -> Option<(S
 
 fn create_tag(
     name: String,
-    kind_char: &str,
+    kind_char: &'static str,
     node: Node, // Pass the node for position info
     context: &mut RustContext,
     // Allow passing extra fields specific to the item being tagged
@@ -379,7 +379,7 @@ fn create_tag(
         name,
         file_name: context.base.file_name.clone(),
         address,
-        kind: Some(String::from(kind_char)),
+        kind: Some(kind_char.into()),
         extension_fields: if extension_fields.is_empty() {
             None
         } else {
@@ -452,7 +452,7 @@ fn process_identifiers_list(
     cursor: &mut TreeCursor,
     context: &mut RustContext,
     name: &str,
-    tag_kind: &str,
+    tag_kind: &'static str,
 ) {
     if !cursor.goto_first_child() {
         return;
@@ -587,7 +587,7 @@ fn find_impl_names(
 fn process_function(
     cursor: &mut TreeCursor,
     context: &mut RustContext,
-    kind_char: &str, // e.g., "f"
+    kind_char: &'static str, // e.g., "f"
 ) {
     let node = cursor.node();
     if let Some(name) = helper::get_node_name(cursor, &context.base, &["identifier"]) {

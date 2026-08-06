@@ -122,7 +122,7 @@ fn get_access_level(name: &str) -> &'static str {
 
 fn create_tag(
     name: String,
-    kind: &str,
+    kind: &'static str,
     node: Node,
     context: &mut PythonContext,
     extra_fields: Option<ExtensionFields>,
@@ -234,7 +234,7 @@ fn create_tag(
         name,
         file_name: context.base.file_name.clone(),
         address,
-        kind: Some(kind.to_string()),
+        kind: Some(kind.into()),
         extension_fields: if extension_fields.is_empty() {
             None
         } else {

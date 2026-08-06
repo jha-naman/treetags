@@ -152,7 +152,7 @@ fn process_node(cursor: &mut TreeCursor, context: &mut JsContext) -> Option<(Sco
 
 fn create_tag(
     name: String,
-    kind_char: &str,
+    kind_char: &'static str,
     node: Node,
     context: &mut JsContext,
     extra_fields: Option<ExtensionFields>,
@@ -215,7 +215,7 @@ fn create_tag(
         name,
         file_name: context.base.file_name.clone(),
         address,
-        kind: Some(String::from(kind_char)),
+        kind: Some(kind_char.into()),
         extension_fields: if extension_fields.is_empty() {
             None
         } else {

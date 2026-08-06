@@ -126,7 +126,7 @@ fn process_node(
 
 fn create_tag(
     name: String,
-    kind: &str,
+    kind: &'static str,
     node: Node,
     context: &mut TypeScriptContext,
     extra_fields: Option<ExtensionFields>,
@@ -217,7 +217,7 @@ fn create_tag(
         name,
         file_name: context.base.file_name.clone(),
         address,
-        kind: Some(kind.to_string()),
+        kind: Some(kind.into()),
         extension_fields: if extension_fields.is_empty() {
             None
         } else {

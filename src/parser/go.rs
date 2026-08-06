@@ -244,7 +244,7 @@ impl<'a> GoContext<'a> {
     fn create_go_tag(
         &mut self,
         name: String,
-        kind_char: &str,
+        kind_char: &'static str,
         node: tree_sitter::Node,
         extra_fields: Option<ExtensionFields>,
     ) {
@@ -268,7 +268,7 @@ impl<'a> GoContext<'a> {
             name,
             file_name: self.base.file_name.clone(),
             address,
-            kind: Some(String::from(kind_char)),
+            kind: Some(kind_char.into()),
             extension_fields,
         });
     }

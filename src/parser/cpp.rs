@@ -226,7 +226,7 @@ fn process_node(cursor: &mut TreeCursor, context: &mut CppContext) -> Option<(Sc
 
 fn create_tag(
     name: String,
-    kind_char: &str,
+    kind_char: &'static str,
     node: Node,
     context: &mut CppContext,
     extra_fields: Option<ExtensionFields>,
@@ -366,7 +366,7 @@ fn create_tag(
         name,
         file_name: context.base.file_name.clone(),
         address,
-        kind: Some(String::from(kind_char)),
+        kind: Some(kind_char.into()),
         extension_fields: if extension_fields.is_empty() {
             None
         } else {
@@ -381,7 +381,7 @@ fn process_named_item(
     cursor: &mut TreeCursor,
     context: &mut CppContext,
     identifier_kinds: &[&str], // e.g., &["type_identifier"], &["identifier"]
-    tag_kind: &str,            // e.g., "n", "c", "s", "u", "d", "t"
+    tag_kind: &'static str,    // e.g., "n", "c", "s", "u", "d", "t"
     scope_type: Option<ScopeType>, // Some(scope_type) for scoped items, None for non-scoped
 ) -> Option<(ScopeType, String)> {
     let node = cursor.node();

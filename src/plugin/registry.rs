@@ -440,7 +440,7 @@ fn convert_tags(
                 name: t.name,
                 file_name: file_name.clone(),
                 address,
-                kind: Some(t.kind),
+                kind: Some(std::borrow::Cow::Owned(t.kind)),
                 extension_fields: if ext_fields.is_empty() {
                     None
                 } else {

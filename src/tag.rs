@@ -7,6 +7,7 @@
 //! across a codebase. This module handles the parsing and formatting of tags
 //! in a format compatible with Vi/Vim.
 
+use std::borrow::Cow;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -82,8 +83,13 @@ pub struct Tag {
     pub file_name: Arc<str>,
     /// The search pattern to locate the tag in the file
     pub address: String,
-    /// The tag kind
-    pub kind: Option<String>,
+    /// The tag kind.
+    ///
+    /// Tags produced by the parsers use one of a fixed set of `&'static str`
+    /// kind labels, so this is a `Cow` that borrows those without allocating;
+    /// only kinds read back from an existing tags file (or supplied by a plugin)
+    /// are owned.
+    pub kind: Option<Cow<'static, str>>,
     /// The extension fields associated with the tag
     pub extension_fields: Option<ExtensionFields>,
 }
@@ -339,14 +345,14 @@ pub fn parse_tag_line(line: &str) -> Option<Tag> {
 
             // Store the kind separately if it's the "kind" field
             if key == "kind" {
-                kind = Some(value.to_string());
+                kind = Some(Cow::Owned(value.to_string()));
             } else {
                 fields_map.insert(key.to_string(), value.to_string());
             }
         } else if kind.is_none() {
             // In ctags, a standalone field without colon is typically the kind
             // Only use the first such field as the kind
-            kind = Some(field.to_string());
+            kind = Some(Cow::Owned(field.to_string()));
         }
     }
 
@@ -375,7 +381,7 @@ mod tests {
         assert_eq!(tag.name, "function_name");
         assert_eq!(&*tag.file_name, "file.rs");
         assert_eq!(tag.address, "/^pub fn function_name() {/;\"\t");
-        assert_eq!(tag.kind, Some("f".to_string()));
+        assert_eq!(tag.kind.as_deref(), Some("f"));
 
         let extension_fields = tag.extension_fields.unwrap();
         assert!(!extension_fields.contains_key("kind"));
@@ -390,7 +396,7 @@ mod tests {
         assert_eq!(tag.name, "method");
         assert_eq!(&*tag.file_name, "file.rs");
         assert_eq!(tag.address, "/^pub fn method(&self) {/;\"\t");
-        assert_eq!(tag.kind, Some("m".to_string()));
+        assert_eq!(tag.kind.as_deref(), Some("m"));
 
         let extension_fields = tag.extension_fields.unwrap();
         assert!(!extension_fields.contains_key("kind"));
@@ -418,7 +424,7 @@ mod tests {
         assert_eq!(tag.name, "struct_name");
         assert_eq!(&*tag.file_name, "file.rs");
         assert_eq!(tag.address, "/^pub struct struct_name {/;\"\t");
-        assert_eq!(tag.kind, Some("s".to_string()));
+        assert_eq!(tag.kind.as_deref(), Some("s"));
         assert_eq!(tag.extension_fields, None);
     }
 
@@ -435,7 +441,7 @@ mod tests {
             name: "test_function".to_string(),
             file_name: "test.rs".into(),
             address: "/^fn test_function() {$/".to_string(),
-            kind: Some("function".to_string()),
+            kind: Some("function".into()),
             extension_fields: None,
         };
 
@@ -466,7 +472,7 @@ mod tests {
             name: "Model".to_string(),
             file_name: "model.rs".into(),
             address: "/^struct Model {$/".to_string(),
-            kind: Some("struct".to_string()),
+            kind: Some("struct".into()),
             extension_fields: Some(extension_fields),
         };
 
@@ -483,7 +489,7 @@ mod tests {
             name: "draw".to_string(),
             file_name: "shapes.rs".into(),
             address: "/^fn draw(&self) {$/".to_string(),
-            kind: Some("method".to_string()),
+            kind: Some("method".into()),
             extension_fields: Some(extension_fields),
         };
 
@@ -501,7 +507,7 @@ mod tests {
             name: "draw".to_string(),
             file_name: "shapes.rs".into(),
             address: "/^fn draw(&self) {$/".to_string(),
-            kind: Some("method".to_string()),
+            kind: Some("method".into()),
             extension_fields: Some(extension_fields),
         };
 
@@ -521,7 +527,7 @@ mod tests {
             name: "area".to_string(),
             file_name: "traits.rs".into(),
             address: "/^fn area(&self) -> f64 {$/".to_string(),
-            kind: Some("method".to_string()),
+            kind: Some("method".into()),
             extension_fields: Some(extension_fields),
         };
 
@@ -542,7 +548,7 @@ mod tests {
             name: "calculate".to_string(),
             file_name: "geometry.rs".into(),
             address: "/^fn calculate(&self) -> f64 {$/".to_string(),
-            kind: Some("method".to_string()),
+            kind: Some("method".into()),
             extension_fields: Some(extension_fields),
         };
 
@@ -565,7 +571,7 @@ mod tests {
             name: "MyEnum".to_string(),
             file_name: "types.rs".into(),
             address: "/^enum MyEnum {$/".to_string(),
-            kind: Some("enum".to_string()),
+            kind: Some("enum".into()),
             extension_fields: Some(ExtensionFields::new()), // Empty ExtensionFields
         };
 
