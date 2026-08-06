@@ -7,11 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- [0.13.0]
+
 ### Changed
 - Removed `IndexMap` dependency
 - Reduce allocations when writing and parsing tags file
 - Reduce allocations in code path for creating `Tag` struct by native parsers
   with extension fields support
+- Escape `$` and `^` in tag address content
 
 - [0.12.0]
 
