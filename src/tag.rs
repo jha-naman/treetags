@@ -282,7 +282,6 @@ impl Tag {
 ///
 /// A vector of `Tag` objects parsed from the file
 pub fn parse_tag_file(tag_file_path: &Path) -> Vec<Tag> {
-    dbg!(tag_file_path);
     let file = File::open(tag_file_path).expect("Failed to read the tags file");
     let reader = BufReader::new(file);
     let mut tags = Vec::new();
@@ -311,51 +310,37 @@ pub fn parse_tag_file(tag_file_path: &Path) -> Vec<Tag> {
 ///
 /// An Option containing a `Tag` if the line was successfully parsed, None otherwise
 pub fn parse_tag_line(line: &str) -> Option<Tag> {
-    let parts: Vec<&str> = line.split('\t').collect();
-    if parts.len() < 3 {
-        return None;
-    }
-
-    let name = parts[0];
-    let file_name = parts[1];
-    let address = parts[2];
+    let mut parts = line.split('\t');
+    let name = parts.next()?;
+    let file_name = parts.next()?;
+    let address = parts.next()?;
 
     // Extract the kind if available (typically in the extension fields)
     let mut kind = None;
-    let mut extension_fields = None;
+    let mut fields_map = ExtensionFields::new();
 
-    // Process extension fields (starting from index 3)
-    if parts.len() > 3 {
-        let mut fields_map = ExtensionFields::new();
-
-        for field in parts.iter().skip(3) {
-            // Skip empty fields
-            if field.is_empty() {
-                continue;
-            }
-
-            // Handle both cases: with "key:value" format and standalone kind value
-            if let Some(colon_pos) = field.find(':') {
-                let key = field[..colon_pos].trim().to_string();
-                let value = field[colon_pos + 1..].trim().to_string();
-
-                // Store the kind separately if it's the "kind" field
-                if key == "kind" {
-                    kind = Some(value.clone());
-                } else {
-                    fields_map.insert(key, value);
-                }
-            } else {
-                // In ctags, a standalone field without colon is typically the kind
-                // Only use the first such field as the kind
-                if kind.is_none() {
-                    kind = Some(field.to_string());
-                }
-            }
+    // Process extension fields (everything after the address)
+    for field in parts {
+        // Skip empty fields
+        if field.is_empty() {
+            continue;
         }
 
-        if !fields_map.is_empty() {
-            extension_fields = Some(fields_map);
+        // Handle both cases: with "key:value" format and standalone kind value
+        if let Some(colon_pos) = field.find(':') {
+            let key = field[..colon_pos].trim();
+            let value = field[colon_pos + 1..].trim();
+
+            // Store the kind separately if it's the "kind" field
+            if key == "kind" {
+                kind = Some(value.to_string());
+            } else {
+                fields_map.insert(key.to_string(), value.to_string());
+            }
+        } else if kind.is_none() {
+            // In ctags, a standalone field without colon is typically the kind
+            // Only use the first such field as the kind
+            kind = Some(field.to_string());
         }
     }
 
@@ -364,7 +349,11 @@ pub fn parse_tag_line(line: &str) -> Option<Tag> {
         file_name: file_name.to_string(),
         address: format!("{}\t", address), // Keep the tab as in the original code
         kind,
-        extension_fields,
+        extension_fields: if fields_map.is_empty() {
+            None
+        } else {
+            Some(fields_map)
+        },
     })
 }
 
