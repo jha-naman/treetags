@@ -73,7 +73,7 @@ impl<'a> TypeScriptContext<'a> {
             base: helper::Context {
                 source_code,
                 lines,
-                file_name,
+                file_name: file_name.into(),
                 tags,
                 tag_config,
                 user_config,
@@ -215,7 +215,7 @@ fn create_tag(
 
     context.base.tags.push(tag::Tag {
         name,
-        file_name: context.base.file_name.to_string(),
+        file_name: context.base.file_name.clone(),
         address,
         kind: Some(kind.to_string()),
         extension_fields: if extension_fields.is_empty() {

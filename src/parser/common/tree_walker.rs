@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use tree_sitter::{Node, TreeCursor};
 
 use super::tag_config::TagKindConfig;
@@ -16,7 +17,7 @@ pub trait LanguageContext {
 pub struct Context<'a> {
     pub source_code: &'a str,
     pub lines: Vec<Vec<u8>>,
-    pub file_name: &'a str,
+    pub file_name: Arc<str>,
     pub tags: &'a mut Vec<tag::Tag>,
     pub tag_config: &'a TagKindConfig,
     pub user_config: &'a crate::config::Config,

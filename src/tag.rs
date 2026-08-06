@@ -10,6 +10,7 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
+use std::sync::Arc;
 
 /// An ordered collection of ctags extension fields.
 ///
@@ -78,7 +79,7 @@ pub struct Tag {
     /// The name of the tag (e.g., function name, class name)
     pub name: String,
     /// The file where the tag is defined
-    pub file_name: String,
+    pub file_name: Arc<str>,
     /// The search pattern to locate the tag in the file
     pub address: String,
     /// The tag kind
@@ -102,13 +103,13 @@ impl Tag {
     pub fn from_ts_tag(
         tag: tree_sitter_tags::Tag,
         code: &[u8],
-        file_path: &str,
+        file_name: Arc<str>,
     ) -> Result<Self, String> {
         let name = String::from_utf8(code[tag.name_range.start..tag.name_range.end].to_vec())
             .map_err(|e| {
                 format!(
                     "Failed to decode tag name as UTF-8 in file '{}': {}",
-                    file_path, e
+                    file_name, e
                 )
             })?;
 
@@ -118,7 +119,7 @@ impl Tag {
         .map_err(|e| {
             format!(
                 "Failed to decode line content as UTF-8 in file '{}': {}",
-                file_path, e
+                file_name, e
             )
         })?;
 
@@ -142,7 +143,7 @@ impl Tag {
 
         Ok(Tag {
             name,
-            file_name: String::from(file_path),
+            file_name,
             address,
             kind: None,
             extension_fields: None,
@@ -351,7 +352,7 @@ pub fn parse_tag_line(line: &str) -> Option<Tag> {
 
     Some(Tag {
         name: name.to_string(),
-        file_name: file_name.to_string(),
+        file_name: Arc::from(file_name),
         address: format!("{}\t", address), // Keep the tab as in the original code
         kind,
         extension_fields: if fields_map.is_empty() {
@@ -372,7 +373,7 @@ mod tests {
         let tag = parse_tag_line(line).unwrap();
 
         assert_eq!(tag.name, "function_name");
-        assert_eq!(tag.file_name, "file.rs");
+        assert_eq!(&*tag.file_name, "file.rs");
         assert_eq!(tag.address, "/^pub fn function_name() {/;\"\t");
         assert_eq!(tag.kind, Some("f".to_string()));
 
@@ -387,7 +388,7 @@ mod tests {
         let tag = parse_tag_line(line).unwrap();
 
         assert_eq!(tag.name, "method");
-        assert_eq!(tag.file_name, "file.rs");
+        assert_eq!(&*tag.file_name, "file.rs");
         assert_eq!(tag.address, "/^pub fn method(&self) {/;\"\t");
         assert_eq!(tag.kind, Some("m".to_string()));
 
@@ -403,7 +404,7 @@ mod tests {
         let tag = parse_tag_line(line).unwrap();
 
         assert_eq!(tag.name, "variable");
-        assert_eq!(tag.file_name, "file.rs");
+        assert_eq!(&*tag.file_name, "file.rs");
         assert_eq!(tag.address, "/^let variable = 42;/;\"\t");
         assert_eq!(tag.kind, None);
         assert_eq!(tag.extension_fields, None);
@@ -415,7 +416,7 @@ mod tests {
         let tag = parse_tag_line(line).unwrap();
 
         assert_eq!(tag.name, "struct_name");
-        assert_eq!(tag.file_name, "file.rs");
+        assert_eq!(&*tag.file_name, "file.rs");
         assert_eq!(tag.address, "/^pub struct struct_name {/;\"\t");
         assert_eq!(tag.kind, Some("s".to_string()));
         assert_eq!(tag.extension_fields, None);
@@ -432,7 +433,7 @@ mod tests {
     fn test_bytes_basic() {
         let tag = Tag {
             name: "test_function".to_string(),
-            file_name: "test.rs".to_string(),
+            file_name: "test.rs".into(),
             address: "/^fn test_function() {$/".to_string(),
             kind: Some("function".to_string()),
             extension_fields: None,
@@ -446,7 +447,7 @@ mod tests {
     fn test_bytes_no_kind() {
         let tag = Tag {
             name: "TEST_CONSTANT".to_string(),
-            file_name: "constants.rs".to_string(),
+            file_name: "constants.rs".into(),
             address: "/^const TEST_CONSTANT: i32 = 42;$/".to_string(),
             kind: None,
             extension_fields: None,
@@ -463,7 +464,7 @@ mod tests {
 
         let tag = Tag {
             name: "Model".to_string(),
-            file_name: "model.rs".to_string(),
+            file_name: "model.rs".into(),
             address: "/^struct Model {$/".to_string(),
             kind: Some("struct".to_string()),
             extension_fields: Some(extension_fields),
@@ -480,7 +481,7 @@ mod tests {
 
         let tag = Tag {
             name: "draw".to_string(),
-            file_name: "shapes.rs".to_string(),
+            file_name: "shapes.rs".into(),
             address: "/^fn draw(&self) {$/".to_string(),
             kind: Some("method".to_string()),
             extension_fields: Some(extension_fields),
@@ -498,7 +499,7 @@ mod tests {
 
         let tag = Tag {
             name: "draw".to_string(),
-            file_name: "shapes.rs".to_string(),
+            file_name: "shapes.rs".into(),
             address: "/^fn draw(&self) {$/".to_string(),
             kind: Some("method".to_string()),
             extension_fields: Some(extension_fields),
@@ -518,7 +519,7 @@ mod tests {
 
         let tag = Tag {
             name: "area".to_string(),
-            file_name: "traits.rs".to_string(),
+            file_name: "traits.rs".into(),
             address: "/^fn area(&self) -> f64 {$/".to_string(),
             kind: Some("method".to_string()),
             extension_fields: Some(extension_fields),
@@ -539,7 +540,7 @@ mod tests {
 
         let tag = Tag {
             name: "calculate".to_string(),
-            file_name: "geometry.rs".to_string(),
+            file_name: "geometry.rs".into(),
             address: "/^fn calculate(&self) -> f64 {$/".to_string(),
             kind: Some("method".to_string()),
             extension_fields: Some(extension_fields),
@@ -562,7 +563,7 @@ mod tests {
     fn test_bytes_with_no_extension_fields() {
         let tag = Tag {
             name: "MyEnum".to_string(),
-            file_name: "types.rs".to_string(),
+            file_name: "types.rs".into(),
             address: "/^enum MyEnum {$/".to_string(),
             kind: Some("enum".to_string()),
             extension_fields: Some(ExtensionFields::new()), // Empty ExtensionFields

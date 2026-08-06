@@ -422,6 +422,7 @@ fn convert_tags(
     source_lines: &[Vec<u8>],
     file_path: &str,
 ) -> Vec<Tag> {
+    let file_name: std::sync::Arc<str> = std::sync::Arc::from(file_path);
     plugin_tags
         .into_iter()
         .map(|t| {
@@ -437,7 +438,7 @@ fn convert_tags(
             }
             Tag {
                 name: t.name,
-                file_name: file_path.to_string(),
+                file_name: file_name.clone(),
                 address,
                 kind: Some(t.kind),
                 extension_fields: if ext_fields.is_empty() {

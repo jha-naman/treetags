@@ -195,7 +195,7 @@ impl<'a> GoContext<'a> {
             base: Context {
                 source_code,
                 lines,
-                file_name,
+                file_name: file_name.into(),
                 tags,
                 tag_config,
                 user_config,
@@ -266,7 +266,7 @@ impl<'a> GoContext<'a> {
 
         self.base.tags.push(tag::Tag {
             name,
-            file_name: self.base.file_name.to_string(),
+            file_name: self.base.file_name.clone(),
             address,
             kind: Some(String::from(kind_char)),
             extension_fields,
