@@ -244,7 +244,8 @@ impl Tag {
         output.push(b'\n');
     }
     ///
-    /// Escapes backslashes and forward slashes in the address field
+    /// Escapes backslashes, forward slashes, and the regex anchors `^`/`$` in
+    /// the address field
     ///
     /// # Arguments
     ///
@@ -252,7 +253,7 @@ impl Tag {
     ///
     /// # Returns
     ///
-    /// A new string with backslashes and forward slashes escaped
+    /// A new string with the regex significant characters escaped
     #[cfg(test)]
     fn escape_address(address: &str) -> String {
         let mut out = String::with_capacity(address.len() + 8);
@@ -260,12 +261,16 @@ impl Tag {
         out
     }
 
-    /// Appends `address` to `out`, escaping backslashes and forward slashes.
-    fn escape_address_into(address: &str, out: &mut String) {
+    /// Appends `address` to `out`, escaping the characters that are significant
+    /// in a regex search-pattern address: backslash, forward slash, and the
+    /// regex anchors `^` and `$`.
+    pub(crate) fn escape_address_into(address: &str, out: &mut String) {
         for ch in address.chars() {
             match ch {
                 '\\' => out.push_str("\\\\"),
                 '/' => out.push_str("\\/"),
+                '^' => out.push_str("\\^"),
+                '$' => out.push_str("\\$"),
                 _ => out.push(ch),
             }
         }
@@ -571,7 +576,7 @@ mod tests {
     fn test_escape_address() {
         assert_eq!(
             Tag::escape_address("/^fn test() {$/"),
-            "\\/^fn test() {$\\/"
+            "\\/\\^fn test() {\\$\\/"
         );
         assert_eq!(Tag::escape_address("\\n\\t"), "\\\\n\\\\t");
         assert_eq!(
