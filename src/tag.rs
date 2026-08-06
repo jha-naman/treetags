@@ -250,7 +250,15 @@ impl Tag {
     ///
     /// A new string with backslashes and forward slashes escaped
     fn escape_address(address: &str) -> String {
-        address.replace('\\', "\\\\").replace('/', "\\/")
+        let mut out = String::with_capacity(address.len() + 8);
+        for ch in address.chars() {
+            match ch {
+                '\\' => out.push_str("\\\\"),
+                '/' => out.push_str("\\/"),
+                _ => out.push(ch),
+            }
+        }
+        out
     }
 }
 
