@@ -217,10 +217,7 @@ impl<'a> GoContext<'a> {
                     fields.insert("struct", format!("{}.{}", self.get_package_name(), name));
                 }
                 ScopeType::Interface => {
-                    fields.insert(
-                        "interface",
-                        format!("{}.{}", self.get_package_name(), name),
-                    );
+                    fields.insert("interface", format!("{}.{}", self.get_package_name(), name));
                 }
             }
         }

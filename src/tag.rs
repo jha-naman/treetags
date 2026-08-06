@@ -234,7 +234,10 @@ impl Tag {
             let module_value = fields.get("module");
 
             // Count non-module keys to determine if module is the only field
-            let non_module_keys_count = fields.iter().filter(|(k, _)| k.as_ref() != "module").count();
+            let non_module_keys_count = fields
+                .iter()
+                .filter(|(k, _)| k.as_ref() != "module")
+                .count();
             let module_only = non_module_keys_count == 0 && module_value.is_some();
 
             // Process module field if it's the only field
