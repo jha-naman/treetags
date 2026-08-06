@@ -122,19 +122,23 @@ impl Tag {
             )
         })?;
 
-        let mut escaped_line = Self::escape_address(&line_content);
+        let mut address = String::with_capacity(line_content.len() + 16);
+        address.push_str("/^");
+        let prefix_len = address.len();
+        Self::escape_address_into(&line_content, &mut address);
 
-        // Truncate line_content to 96 characters maximum
-        let address = if escaped_line.len() > 96 {
-            let at = (0..=96)
+        // Truncate the escaped content to 96 bytes maximum
+        if address.len() - prefix_len > 96 {
+            let limit = prefix_len + 96;
+            let at = (prefix_len..=limit)
                 .rev()
-                .find(|&i| escaped_line.is_char_boundary(i))
-                .unwrap_or(0);
-            escaped_line.truncate(at);
-            format!("/^{}/;\"\t", escaped_line) // No '$' if truncated
+                .find(|&i| address.is_char_boundary(i))
+                .unwrap_or(prefix_len);
+            address.truncate(at);
+            address.push_str("/;\"\t"); // No '$' if truncated
         } else {
-            format!("/^{}$/;\"\t", escaped_line)
-        };
+            address.push_str("$/;\"\t");
+        }
 
         Ok(Tag {
             name,
@@ -249,8 +253,15 @@ impl Tag {
     /// # Returns
     ///
     /// A new string with backslashes and forward slashes escaped
+    #[cfg(test)]
     fn escape_address(address: &str) -> String {
         let mut out = String::with_capacity(address.len() + 8);
+        Self::escape_address_into(address, &mut out);
+        out
+    }
+
+    /// Appends `address` to `out`, escaping backslashes and forward slashes.
+    fn escape_address_into(address: &str, out: &mut String) {
         for ch in address.chars() {
             match ch {
                 '\\' => out.push_str("\\\\"),
@@ -258,7 +269,6 @@ impl Tag {
                 _ => out.push(ch),
             }
         }
-        out
     }
 }
 
