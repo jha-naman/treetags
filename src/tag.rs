@@ -122,19 +122,23 @@ impl Tag {
             )
         })?;
 
-        let mut escaped_line = Self::escape_address(&line_content);
+        let mut address = String::with_capacity(line_content.len() + 16);
+        address.push_str("/^");
+        let prefix_len = address.len();
+        Self::escape_address_into(&line_content, &mut address);
 
-        // Truncate line_content to 96 characters maximum
-        let address = if escaped_line.len() > 96 {
-            let at = (0..=96)
+        // Truncate the escaped content to 96 bytes maximum
+        if address.len() - prefix_len > 96 {
+            let limit = prefix_len + 96;
+            let at = (prefix_len..=limit)
                 .rev()
-                .find(|&i| escaped_line.is_char_boundary(i))
-                .unwrap_or(0);
-            escaped_line.truncate(at);
-            format!("/^{}/;\"\t", escaped_line) // No '$' if truncated
+                .find(|&i| address.is_char_boundary(i))
+                .unwrap_or(prefix_len);
+            address.truncate(at);
+            address.push_str("/;\"\t"); // No '$' if truncated
         } else {
-            format!("/^{}$/;\"\t", escaped_line)
-        };
+            address.push_str("$/;\"\t");
+        }
 
         Ok(Tag {
             name,
@@ -168,8 +172,24 @@ impl Tag {
     ///
     /// A vector of bytes representing the tag in the format:
     /// `name\tfile_name\taddress[;"\tkind:kind_value"][;"\tfield_name:field_value"]...\n`
+    #[cfg(test)]
     pub fn bytes(&self) -> Vec<u8> {
-        let mut output = format!("{}\t{}\t{}", self.name, self.file_name, self.address);
+        let mut output = Vec::new();
+        self.write_into(&mut output);
+        output
+    }
+
+    /// Appends the tag's byte representation to `output`.
+    ///
+    /// This is the allocation-free core used by [`Tag::bytes`]. Callers writing
+    /// many tags should reuse a single buffer (calling `output.clear()` between
+    /// tags) to avoid one allocation per tag
+    pub fn write_into(&self, output: &mut Vec<u8>) {
+        output.extend_from_slice(self.name.as_bytes());
+        output.push(b'\t');
+        output.extend_from_slice(self.file_name.as_bytes());
+        output.push(b'\t');
+        output.extend_from_slice(self.address.as_bytes());
 
         // Only output shorthand kind if we don't have extension fields with a kind field
         let has_kind_extension = self
@@ -180,7 +200,8 @@ impl Tag {
 
         if let Some(ref kind) = self.kind {
             if !has_kind_extension {
-                output.push_str(&format!("\t{}", kind));
+                output.push(b'\t');
+                output.extend_from_slice(kind.as_bytes());
             }
         }
 
@@ -194,34 +215,33 @@ impl Tag {
 
             // Process module field if it's the only field
             if module_only {
-                if let Some(module) = fields.get("module") {
-                    output.push_str(&format!("\tmodule:{}", module));
+                if let Some(module) = module_value {
+                    output.extend_from_slice(b"\tmodule:");
+                    output.extend_from_slice(module.as_bytes());
                 }
             }
 
             // Process all non-module fields
             for (key, value) in fields.iter().filter(|(k, _)| *k != "module") {
-                // Only prepend module value for scope-related fields, not metadata fields
-                let formatted_value = match key.as_str() {
-                    "line" | "end" | "kind" | "file" | "signature" | "access" => {
-                        // These fields should never have module prefixes
-                        value.clone()
-                    }
+                output.push(b'\t');
+                output.extend_from_slice(key.as_bytes());
+                output.push(b':');
+                match key.as_str() {
+                    // These fields should never have module prefixes
+                    "line" | "end" | "kind" | "file" | "signature" | "access" => {}
+                    // For scope-related fields, prepend module value if it exists
                     _ => {
-                        // For scope-related fields, prepend module value if it exists
                         if let Some(module) = module_value {
-                            format!("{}::{}", module, value)
-                        } else {
-                            value.clone()
+                            output.extend_from_slice(module.as_bytes());
+                            output.extend_from_slice(b"::");
                         }
                     }
-                };
-                output.push_str(&format!("\t{}:{}", key, formatted_value));
+                }
+                output.extend_from_slice(value.as_bytes());
             }
         }
 
-        output.push('\n');
-        output.into_bytes()
+        output.push(b'\n');
     }
     ///
     /// Escapes backslashes and forward slashes in the address field
@@ -233,8 +253,22 @@ impl Tag {
     /// # Returns
     ///
     /// A new string with backslashes and forward slashes escaped
+    #[cfg(test)]
     fn escape_address(address: &str) -> String {
-        address.replace('\\', "\\\\").replace('/', "\\/")
+        let mut out = String::with_capacity(address.len() + 8);
+        Self::escape_address_into(address, &mut out);
+        out
+    }
+
+    /// Appends `address` to `out`, escaping backslashes and forward slashes.
+    fn escape_address_into(address: &str, out: &mut String) {
+        for ch in address.chars() {
+            match ch {
+                '\\' => out.push_str("\\\\"),
+                '/' => out.push_str("\\/"),
+                _ => out.push(ch),
+            }
+        }
     }
 }
 
@@ -248,7 +282,6 @@ impl Tag {
 ///
 /// A vector of `Tag` objects parsed from the file
 pub fn parse_tag_file(tag_file_path: &Path) -> Vec<Tag> {
-    dbg!(tag_file_path);
     let file = File::open(tag_file_path).expect("Failed to read the tags file");
     let reader = BufReader::new(file);
     let mut tags = Vec::new();
@@ -277,51 +310,37 @@ pub fn parse_tag_file(tag_file_path: &Path) -> Vec<Tag> {
 ///
 /// An Option containing a `Tag` if the line was successfully parsed, None otherwise
 pub fn parse_tag_line(line: &str) -> Option<Tag> {
-    let parts: Vec<&str> = line.split('\t').collect();
-    if parts.len() < 3 {
-        return None;
-    }
-
-    let name = parts[0];
-    let file_name = parts[1];
-    let address = parts[2];
+    let mut parts = line.split('\t');
+    let name = parts.next()?;
+    let file_name = parts.next()?;
+    let address = parts.next()?;
 
     // Extract the kind if available (typically in the extension fields)
     let mut kind = None;
-    let mut extension_fields = None;
+    let mut fields_map = ExtensionFields::new();
 
-    // Process extension fields (starting from index 3)
-    if parts.len() > 3 {
-        let mut fields_map = ExtensionFields::new();
-
-        for field in parts.iter().skip(3) {
-            // Skip empty fields
-            if field.is_empty() {
-                continue;
-            }
-
-            // Handle both cases: with "key:value" format and standalone kind value
-            if let Some(colon_pos) = field.find(':') {
-                let key = field[..colon_pos].trim().to_string();
-                let value = field[colon_pos + 1..].trim().to_string();
-
-                // Store the kind separately if it's the "kind" field
-                if key == "kind" {
-                    kind = Some(value.clone());
-                } else {
-                    fields_map.insert(key, value);
-                }
-            } else {
-                // In ctags, a standalone field without colon is typically the kind
-                // Only use the first such field as the kind
-                if kind.is_none() {
-                    kind = Some(field.to_string());
-                }
-            }
+    // Process extension fields (everything after the address)
+    for field in parts {
+        // Skip empty fields
+        if field.is_empty() {
+            continue;
         }
 
-        if !fields_map.is_empty() {
-            extension_fields = Some(fields_map);
+        // Handle both cases: with "key:value" format and standalone kind value
+        if let Some(colon_pos) = field.find(':') {
+            let key = field[..colon_pos].trim();
+            let value = field[colon_pos + 1..].trim();
+
+            // Store the kind separately if it's the "kind" field
+            if key == "kind" {
+                kind = Some(value.to_string());
+            } else {
+                fields_map.insert(key.to_string(), value.to_string());
+            }
+        } else if kind.is_none() {
+            // In ctags, a standalone field without colon is typically the kind
+            // Only use the first such field as the kind
+            kind = Some(field.to_string());
         }
     }
 
@@ -330,7 +349,11 @@ pub fn parse_tag_line(line: &str) -> Option<Tag> {
         file_name: file_name.to_string(),
         address: format!("{}\t", address), // Keep the tab as in the original code
         kind,
-        extension_fields,
+        extension_fields: if fields_map.is_empty() {
+            None
+        } else {
+            Some(fields_map)
+        },
     })
 }
 

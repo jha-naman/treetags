@@ -69,8 +69,11 @@ impl TagWriter {
         }
 
         // Write tags to file
+        let mut buf = Vec::new();
         for tag in tags {
-            if let Err(e) = writer.write_all(&tag.bytes()) {
+            buf.clear();
+            tag.write_into(&mut buf);
+            if let Err(e) = writer.write_all(&buf) {
                 eprintln!("Failed to write tag: {}", e);
             }
         }

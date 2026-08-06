@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Removed `IndexMap` dependency
+- Reduce allocations when writing and parsing tags file
 
 - [0.12.0]
 
