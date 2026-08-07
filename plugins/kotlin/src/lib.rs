@@ -41,6 +41,7 @@ enum ScopeKind {
     Interface,
     Object,
     Method,
+    PendingLambda,
 }
 
 impl ScopeKind {
@@ -49,7 +50,7 @@ impl ScopeKind {
             ScopeKind::Class => "class",
             ScopeKind::Interface => "interface",
             ScopeKind::Object => "object",
-            ScopeKind::Method => "method",
+            ScopeKind::Method | ScopeKind::PendingLambda => "method",
         }
     }
 }
@@ -261,6 +262,15 @@ fn process_node_inner(source: &[u8], cursor: &TreeCursor, walker: &mut KotlinWal
                     emit_binding_names(walker, source, binding, kind, &scope);
                 }
             }
+            if child_of_kind(node, &["lambda_literal", "anonymous_function"]).is_some() {
+                if let Some(binding) = child_of_kind(node, &["variable_declaration"]) {
+                    if let Some(id) = child_of_kind(binding, &["simple_identifier"]) {
+                        let name = node_text(id, source).to_string();
+                        walker.scope_stack.push((ScopeKind::PendingLambda, name));
+                        return true;
+                    }
+                }
+            }
             false
         }
         "class_parameter" => {
@@ -293,16 +303,29 @@ fn process_node_inner(source: &[u8], cursor: &TreeCursor, walker: &mut KotlinWal
             false
         }
         "lambda_literal" | "anonymous_function" => {
-            let scope = walker.current_scope();
-            if walker.kinds.is_enabled("m") {
+            let claimed = matches!(
+                walker.scope_stack.last(),
+                Some((ScopeKind::PendingLambda, _))
+            );
+
+            let pushed = if claimed {
+                if let Some(top) = walker.scope_stack.last_mut() {
+                    top.0 = ScopeKind::Method;
+                }
+                false
+            } else {
+                let scope = walker.current_scope();
+                if walker.kinds.is_enabled("m") {
+                    walker
+                        .tags
+                        .push(make_tag("<lambda>".to_string(), line, "m", scope));
+                }
                 walker
-                    .tags
-                    .push(make_tag("<lambda>".to_string(), line, "m", scope));
-            }
-            walker
-                .scope_stack
-                .push((ScopeKind::Method, "<lambda>".to_string()));
-            // Lambda parameters are scoped inside the lambda.
+                    .scope_stack
+                    .push((ScopeKind::Method, "<lambda>".to_string()));
+                true
+            };
+
             if let Some(params) = child_of_kind(node, &["lambda_parameters"]) {
                 if walker.kinds.is_enabled("m") {
                     let inner_scope = walker.current_scope();
@@ -323,7 +346,7 @@ fn process_node_inner(source: &[u8], cursor: &TreeCursor, walker: &mut KotlinWal
                     }
                 }
             }
-            true
+            pushed
         }
         "type_alias" => {
             if walker.kinds.is_enabled("T") {

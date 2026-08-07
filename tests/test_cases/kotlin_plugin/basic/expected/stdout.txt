@@ -4,7 +4,6 @@
 <lambda>	source.kt	/^                  .mapKeys {if (it.key) "even" else "odd"}$/;"	m	method:com.learnxinyminutes.kotlin.main
 <lambda>	source.kt	/^        return this.filter {it != c}$/;"	m	method:com.learnxinyminutes.kotlin.main.remove
 <lambda>	source.kt	/^        return {n -> !f.invoke(n)}$/;"	m	method:com.learnxinyminutes.kotlin.main.not
-<lambda>	source.kt	/^    val fooLambda: (Int) -> Int = {n -> n + 1}$/;"	m	method:com.learnxinyminutes.kotlin.main
 <lambda>	source.kt	/^    val fooSequence = generateSequence(1, { it + 1 })$/;"	m	method:com.learnxinyminutes.kotlin.main
 <lambda>	source.kt	/^    val notPositive = not {it > 0}$/;"	m	method:com.learnxinyminutes.kotlin.main
 <lambda>	source.kt	/^    val notZero = not {n -> n == 0}$/;"	m	method:com.learnxinyminutes.kotlin.main
@@ -67,7 +66,7 @@ mapData	source.kt	/^    val mapData = mapOf("a" to 1, "b" to 2)$/;"	C	method:com
 memberFunction	source.kt	/^        fun memberFunction(y: Int): Int {$/;"	m	class:com.learnxinyminutes.kotlin.main.ExampleClass
 message	source.kt	/^    val message = if (num % 2 == 0) "even" else "odd"$/;"	C	method:com.learnxinyminutes.kotlin.main
 n	source.kt	/^        return {n -> !f.invoke(n)}$/;"	m	method:com.learnxinyminutes.kotlin.main.not.<lambda>
-n	source.kt	/^    val fooLambda: (Int) -> Int = {n -> n + 1}$/;"	m	method:com.learnxinyminutes.kotlin.main.<lambda>
+n	source.kt	/^    val fooLambda: (Int) -> Int = {n -> n + 1}$/;"	m	method:com.learnxinyminutes.kotlin.main.fooLambda
 n	source.kt	/^    val notZero = not {n -> n == 0}$/;"	m	method:com.learnxinyminutes.kotlin.main.<lambda>
 next	source.kt	/^        fun next(): Long {$/;"	m	method:com.learnxinyminutes.kotlin.main.fibonacciSequence
 not	source.kt	/^    fun not(f: (Int) -> Boolean): (Int) -> Boolean {$/;"	m	method:com.learnxinyminutes.kotlin.main
