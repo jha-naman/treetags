@@ -68,6 +68,7 @@ Treetags has support for these languages via user installable WASM plugins.
 
 ### Full support with extension fields
 - [x] Java
+- [x] Kotlin
 
 
 ## Extending treetags language support via tree-sitter tag queries and grammars
@@ -99,7 +100,6 @@ need to provide the tree-sitter grammar in that case for treetags to be able to
 generate tags for that language. Leave the `query_file_path` empty for these
 languages  to use the tags queries provided with treetags.
 
- - [x] Kotlin
  - [x] Gleam
 
 ## Installation

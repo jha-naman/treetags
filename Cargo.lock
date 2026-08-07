@@ -2142,6 +2142,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tree-sitter-kotlin-sg"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c06ec43ae3c12165d4ac08afe4e1f5fc6757ffe274fa7bd5af9007ef11ba4319"
+dependencies = [
+ "cc",
+ "tree-sitter-language",
+]
+
+[[package]]
 name = "tree-sitter-language"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2310,6 +2320,16 @@ version = "0.1.0"
 dependencies = [
  "tree-sitter",
  "tree-sitter-java",
+ "treetags-plugin-common",
+ "wit-bindgen 0.58.0",
+]
+
+[[package]]
+name = "treetags-plugin-kotlin"
+version = "0.1.0"
+dependencies = [
+ "tree-sitter",
+ "tree-sitter-kotlin-sg",
  "treetags-plugin-common",
  "wit-bindgen 0.58.0",
 ]

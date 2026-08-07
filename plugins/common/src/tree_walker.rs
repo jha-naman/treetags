@@ -7,7 +7,7 @@ use tree_sitter::TreeCursor;
 /// call `pop_scope` when backtracking past that node. Return `false` if no
 /// scope was pushed.
 pub trait WalkContext {
-    fn process_node(&mut self, cursor: &TreeCursor) -> bool;
+    fn process_node(&mut self, cursor: &mut TreeCursor) -> bool;
     fn pop_scope(&mut self);
 }
 

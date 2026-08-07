@@ -288,6 +288,28 @@ impl Tag {
         out
     }
 
+    /// Builds a regex search-pattern address from a raw source line.
+    pub(crate) fn address_from_line(line: &[u8]) -> String {
+        let line = String::from_utf8_lossy(line);
+        let mut address = String::with_capacity(line.len() + 16);
+        address.push_str("/^");
+        let prefix_len = address.len();
+        Self::escape_address_into(&line, &mut address);
+
+        if address.len() - prefix_len > 96 {
+            let limit = prefix_len + 96;
+            let at = (prefix_len..=limit)
+                .rev()
+                .find(|&i| address.is_char_boundary(i))
+                .unwrap_or(prefix_len);
+            address.truncate(at);
+            address.push_str("/;\""); // No '$' anchor when truncated.
+        } else {
+            address.push_str("$/;\"");
+        }
+        address
+    }
+
     /// Appends `address` to `out`, escaping the characters that are significant
     /// in a regex search-pattern address: backslash, forward slash, and the
     /// regex anchors `^` and `$`.

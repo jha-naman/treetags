@@ -6,6 +6,14 @@ pub const ABI_VERSION: u32 = 3;
 pub mod tag_config;
 pub use tag_config::TagKindConfig;
 
+pub mod scope;
+pub use scope::{ScopeKey, ScopeStack};
+
+#[cfg(feature = "tree-walker")]
+pub mod cursor;
+#[cfg(feature = "tree-walker")]
+pub use cursor::{child_ident, has_child, line_of, node_text};
+
 #[cfg(feature = "tree-walker")]
 pub mod tree_walker;
 #[cfg(feature = "tree-walker")]

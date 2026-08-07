@@ -27,6 +27,8 @@ struct ExtPlugin {
     wasm_path: PathBuf,
     language: Option<String>,
     name: String,
+    /// The plugin's declared kind letters
+    kind_letters: HashSet<&'static str>,
 }
 
 /// Language name and file extensions for a detected plugin.
@@ -69,12 +71,18 @@ impl PluginRegistry {
             compiled
                 .entry(entry.wasm_path.clone())
                 .or_insert_with(OnceLock::new);
+            let kind_letters = entry
+                .kinds
+                .iter()
+                .map(|k| &*Box::leak(k.letter.clone().into_boxed_str()))
+                .collect();
             ext_plugins.insert(
                 ext.clone(),
                 ExtPlugin {
                     wasm_path: entry.wasm_path.clone(),
                     language: entry.language.clone(),
                     name: entry.name.clone(),
+                    kind_letters,
                 },
             );
         }
@@ -215,7 +223,12 @@ impl PluginRegistry {
             }
             Ok(Ok(plugin_tags)) => {
                 let source_lines = split_by_newlines(source);
-                Some(convert_tags(plugin_tags, &source_lines, file_path))
+                Some(convert_tags(
+                    plugin_tags,
+                    &source_lines,
+                    file_path,
+                    &ep.kind_letters,
+                ))
             }
         }
     }
@@ -421,34 +434,38 @@ fn convert_tags(
     plugin_tags: Vec<PluginTag>,
     source_lines: &[Vec<u8>],
     file_path: &str,
+    kind_letters: &HashSet<&'static str>,
 ) -> Vec<Tag> {
     let file_name: std::sync::Arc<str> = std::sync::Arc::from(file_path);
-    plugin_tags
-        .into_iter()
-        .map(|t| {
-            let address = format_address(source_lines, t.line);
-            let mut ext_fields = ExtensionFields::new();
-            if let Some(end) = t.end_line {
-                ext_fields.insert("end", end.to_string());
-            }
-            let mut extra: Vec<(String, String)> = t.extension_fields;
-            extra.sort_unstable_by_key(|(k, _)| k.clone());
-            for (k, v) in extra {
-                ext_fields.insert(k, v);
-            }
-            Tag {
-                name: t.name,
-                file_name: file_name.clone(),
-                address,
-                kind: Some(std::borrow::Cow::Owned(t.kind)),
-                extension_fields: if ext_fields.is_empty() {
-                    None
-                } else {
-                    Some(ext_fields)
-                },
-            }
-        })
-        .collect()
+    let mut tags = Vec::with_capacity(plugin_tags.len());
+    for t in plugin_tags {
+        let address = format_address(source_lines, t.line);
+        let mut ext_fields = ExtensionFields::new();
+        if let Some(end) = t.end_line {
+            ext_fields.insert("end", end.to_string());
+        }
+        let mut extra: Vec<(String, String)> = t.extension_fields;
+        extra.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        for (k, v) in extra {
+            ext_fields.insert(k, v);
+        }
+        let kind = match kind_letters.get(t.kind.as_str()) {
+            Some(&interned) => std::borrow::Cow::Borrowed(interned),
+            None => std::borrow::Cow::Owned(t.kind),
+        };
+        tags.push(Tag {
+            name: t.name,
+            file_name: file_name.clone(),
+            address,
+            kind: Some(kind),
+            extension_fields: if ext_fields.is_empty() {
+                None
+            } else {
+                Some(ext_fields)
+            },
+        });
+    }
+    tags
 }
 
 fn format_address(lines: &[Vec<u8>], line: u32) -> String {
@@ -456,18 +473,7 @@ fn format_address(lines: &[Vec<u8>], line: u32) -> String {
         .get(line.saturating_sub(1) as usize)
         .map(|v| v.as_slice())
         .unwrap_or(b"");
-    let line_str = String::from_utf8_lossy(line_bytes);
-    let mut escaped = line_str.replace('\\', "\\\\").replace('/', "\\/");
-    if escaped.len() > 96 {
-        let at = (0..=96)
-            .rev()
-            .find(|&i| escaped.is_char_boundary(i))
-            .unwrap_or(0);
-        escaped.truncate(at);
-        format!("/^{}/;\"", escaped)
-    } else {
-        format!("/^{}$/;\"", escaped)
-    }
+    Tag::address_from_line(line_bytes)
 }
 
 #[cfg(test)]

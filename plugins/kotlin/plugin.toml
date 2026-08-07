@@ -1,0 +1,45 @@
+name = "kotlin"
+version = "0.1.0"
+abi_version = 3
+extensions = ["kt", "kts"]
+language = "kotlin"
+
+[[kinds]]
+letter = "C"
+name = "constant"
+default = true
+
+[[kinds]]
+letter = "T"
+name = "typealias"
+default = true
+
+[[kinds]]
+letter = "c"
+name = "class"
+default = true
+
+[[kinds]]
+letter = "i"
+name = "interface"
+default = true
+
+[[kinds]]
+letter = "m"
+name = "method"
+default = true
+
+[[kinds]]
+letter = "o"
+name = "object"
+default = true
+
+[[kinds]]
+letter = "p"
+name = "package"
+default = true
+
+[[kinds]]
+letter = "v"
+name = "variable"
+default = true
