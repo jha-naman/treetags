@@ -49,7 +49,7 @@ fooRawString	source.kt	/^    val fooRawString = """$/;"	C	method:com.learnxinymi
 fooSequence	source.kt	/^    val fooSequence = generateSequence(1, { it + 1 })$/;"	C	method:com.learnxinyminutes.kotlin.main
 fooSet	source.kt	/^    val fooSet = setOf("a", "b", "c")$/;"	C	method:com.learnxinyminutes.kotlin.main
 fooString	source.kt	/^    val fooString = "My String Is Here!"$/;"	C	method:com.learnxinyminutes.kotlin.main
-fooTemplateString	source.kt	/^    val fooTemplateString = "$fooString has ${fooString.length} characters"$/;"	C	method:com.learnxinyminutes.kotlin.main
+fooTemplateString	source.kt	/^    val fooTemplateString = "\$fooString has \${fooString.length} characters"$/;"	C	method:com.learnxinyminutes.kotlin.main
 fooVal	source.kt	/^    val fooVal = 10 \/\/ we cannot later reassign fooVal to something else$/;"	C	method:com.learnxinyminutes.kotlin.main
 fooVar	source.kt	/^    var fooVar = 10$/;"	v	method:com.learnxinyminutes.kotlin.main
 hello	source.kt	/^    fun hello(): String {$/;"	m	object:com.learnxinyminutes.kotlin.ObjectExample
@@ -58,7 +58,7 @@ i	source.kt	/^    for (i in 0..4) {$/;"	m	method:com.learnxinyminutes.kotlin.mai
 i	source.kt	/^    val i = 10$/;"	C	method:com.learnxinyminutes.kotlin.main
 inc	source.kt	/^    operator fun inc() = Counter(value + 1)$/;"	m	class:com.learnxinyminutes.kotlin.Counter
 infixMemberFunction	source.kt	/^        infix fun infixMemberFunction(y: Int): Int {$/;"	m	class:com.learnxinyminutes.kotlin.main.ExampleClass
-invoke	source.kt	/^    operator fun invoke() = println("The value of the counter is $value")$/;"	m	class:com.learnxinyminutes.kotlin.Counter
+invoke	source.kt	/^    operator fun invoke() = println("The value of the counter is \$value")$/;"	m	class:com.learnxinyminutes.kotlin.Counter
 key	source.kt	/^    for ((key, value) in mapData) {$/;"	C	method:com.learnxinyminutes.kotlin.main
 l	source.kt	/^val l = b!!.length$/;"	C	package:com.learnxinyminutes.kotlin
 main	source.kt	/^fun main(args: Array<String>) {$/;"	m	package:com.learnxinyminutes.kotlin
