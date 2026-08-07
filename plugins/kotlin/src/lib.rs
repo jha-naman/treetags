@@ -22,6 +22,26 @@ impl Guest for KotlinPlugin {
 
 export!(KotlinPlugin);
 
+/// Iterate the direct children of the node the cursor is currently on. The
+/// cursor descends for the duration of the loop and is restored to the original
+/// node afterwards, so the whole walk runs on a single [`TreeCursor`]. Inside
+/// `$body` the cursor sits on each child in turn (`$cursor.node()`), and nested
+/// `for_each_child!` calls descend further and restore correctly. Use `break` to
+/// stop early; avoid `continue` (it would skip the sibling advance).
+macro_rules! for_each_child {
+    ($cursor:expr, $body:block) => {{
+        if $cursor.goto_first_child() {
+            loop {
+                $body
+                if !$cursor.goto_next_sibling() {
+                    break;
+                }
+            }
+            $cursor.goto_parent();
+        }
+    }};
+}
+
 const KOTLIN_DEFAULT_KINDS: &[(&[&str], &str)] = &[
     (&["C", "constant"], "C"),
     (&["T", "typealias"], "T"),
@@ -64,7 +84,7 @@ struct KotlinWalker<'src> {
 }
 
 impl WalkContext for KotlinWalker<'_> {
-    fn process_node(&mut self, cursor: &TreeCursor) -> bool {
+    fn process_node(&mut self, cursor: &mut TreeCursor) -> bool {
         let source = self.source;
         process_node_inner(source, cursor, self)
     }
@@ -101,44 +121,106 @@ fn line_of(node: Node) -> u32 {
     node.start_position().row as u32 + 1
 }
 
-/// First direct child whose kind matches one of `kinds`.
-fn child_of_kind<'a>(node: Node<'a>, kinds: &[&str]) -> Option<Node<'a>> {
-    for i in 0..node.child_count() as u32 {
-        if let Some(child) = node.child(i) {
-            if kinds.contains(&child.kind()) {
-                return Some(child);
-            }
+/// Text + 1-based line of the first direct child whose kind is in `kinds`.
+/// The cursor is restored to the node it started on.
+fn child_ident(cursor: &mut TreeCursor, source: &[u8], kinds: &[&str]) -> Option<(String, u32)> {
+    let mut result = None;
+    for_each_child!(cursor, {
+        let child = cursor.node();
+        if kinds.contains(&child.kind()) {
+            result = Some((node_text(child, source).to_string(), line_of(child)));
+            break;
         }
-    }
-    None
+    });
+    result
 }
 
-/// True if `node` has a direct child of the given kind.
-fn has_child_kind(node: Node, kind: &str) -> bool {
-    for i in 0..node.child_count() as u32 {
-        if let Some(child) = node.child(i) {
-            if child.kind() == kind {
-                return true;
-            }
+/// Whether the current node has a direct child of one of `kinds`. Cursor restored.
+fn has_child(cursor: &mut TreeCursor, kinds: &[&str]) -> bool {
+    let mut found = false;
+    for_each_child!(cursor, {
+        if kinds.contains(&cursor.node().kind()) {
+            found = true;
+            break;
         }
-    }
-    false
+    });
+    found
 }
 
-/// Name of a declaration: first `type_identifier`/`simple_identifier` child.
-fn decl_name(node: Node, source: &[u8]) -> Option<(String, u32)> {
-    let name_node = child_of_kind(node, &["type_identifier", "simple_identifier"])?;
-    Some((node_text(name_node, source).to_string(), line_of(name_node)))
+/// `"C"` for `val` / `"v"` for `var`, read from a `binding_pattern_kind` child.
+/// Cursor restored.
+fn binding_kind(cursor: &mut TreeCursor, source: &[u8]) -> Option<&'static str> {
+    let mut result = None;
+    for_each_child!(cursor, {
+        let child = cursor.node();
+        if child.kind() == "binding_pattern_kind" {
+            result = match node_text(child, source).trim() {
+                "val" => Some("C"),
+                "var" => Some("v"),
+                _ => None,
+            };
+            break;
+        }
+    });
+    result
 }
 
-/// "val"/"var" from a `binding_pattern_kind` child, if present.
-fn binding_kind<'a>(node: Node, source: &'a [u8]) -> Option<&'a str> {
-    let bpk = child_of_kind(node, &["binding_pattern_kind"])?;
-    match node_text(bpk, source).trim() {
-        "val" => Some("C"),
-        "var" => Some("v"),
-        _ => None,
-    }
+/// Collect `(name, line)` for every identifier bound by the first
+/// `variable_declaration`/`multi_variable_declaration` child of the current node,
+/// along with whether it was a destructuring (`multi_*`). Cursor restored.
+fn collect_bindings(cursor: &mut TreeCursor, source: &[u8]) -> Option<(bool, Vec<(String, u32)>)> {
+    let mut result = None;
+    for_each_child!(cursor, {
+        match cursor.node().kind() {
+            "variable_declaration" => {
+                let mut names = Vec::new();
+                if let Some(id) = child_ident(cursor, source, &["simple_identifier"]) {
+                    names.push(id);
+                }
+                result = Some((false, names));
+                break;
+            }
+            "multi_variable_declaration" => {
+                let mut names = Vec::new();
+                for_each_child!(cursor, {
+                    if cursor.node().kind() == "variable_declaration" {
+                        if let Some(id) = child_ident(cursor, source, &["simple_identifier"]) {
+                            names.push(id);
+                        }
+                    }
+                });
+                result = Some((true, names));
+                break;
+            }
+            _ => {}
+        }
+    });
+    result
+}
+
+/// Collect `(name, line)` for the parameters of the lambda the cursor is on.
+/// Cursor restored.
+fn collect_lambda_params(cursor: &mut TreeCursor, source: &[u8]) -> Vec<(String, u32)> {
+    let mut params = Vec::new();
+    for_each_child!(cursor, {
+        if cursor.node().kind() == "lambda_parameters" {
+            for_each_child!(cursor, {
+                if cursor.node().kind() == "variable_declaration" {
+                    if let Some(id) = child_ident(cursor, source, &["simple_identifier"]) {
+                        params.push(id);
+                    }
+                }
+            });
+            break;
+        }
+    });
+    params
+}
+
+/// Name + line of a declaration: its first `type_identifier`/`simple_identifier`
+/// direct child. Cursor restored.
+fn decl_name(cursor: &mut TreeCursor, source: &[u8]) -> Option<(String, u32)> {
+    child_ident(cursor, source, &["type_identifier", "simple_identifier"])
 }
 
 fn make_tag(name: String, line: u32, kind: &str, scope: Option<String>) -> Tag {
@@ -157,50 +239,17 @@ fn make_tag(name: String, line: u32, kind: &str, scope: Option<String>) -> Tag {
     }
 }
 
-/// Emit tags for the identifiers bound by a `variable_declaration` or
-/// `multi_variable_declaration` node, all with the given kind and scope.
-fn emit_binding_names(
-    walker: &mut KotlinWalker<'_>,
+fn process_node_inner(
     source: &[u8],
-    binding: Node,
-    kind: &str,
-    scope: &Option<String>,
-) {
-    match binding.kind() {
-        "variable_declaration" => {
-            if let Some(id) = child_of_kind(binding, &["simple_identifier"]) {
-                let name = node_text(id, source).to_string();
-                walker
-                    .tags
-                    .push(make_tag(name, line_of(id), kind, scope.clone()));
-            }
-        }
-        "multi_variable_declaration" => {
-            for i in 0..binding.child_count() as u32 {
-                if let Some(child) = binding.child(i) {
-                    if child.kind() == "variable_declaration" {
-                        if let Some(id) = child_of_kind(child, &["simple_identifier"]) {
-                            let name = node_text(id, source).to_string();
-                            walker
-                                .tags
-                                .push(make_tag(name, line_of(id), kind, scope.clone()));
-                        }
-                    }
-                }
-            }
-        }
-        _ => {}
-    }
-}
-
-fn process_node_inner(source: &[u8], cursor: &TreeCursor, walker: &mut KotlinWalker<'_>) -> bool {
+    cursor: &mut TreeCursor,
+    walker: &mut KotlinWalker<'_>,
+) -> bool {
     let node = cursor.node();
     let line = line_of(node);
 
     match node.kind() {
         "package_header" => {
-            if let Some(id) = child_of_kind(node, &["identifier"]) {
-                let name = node_text(id, source).to_string();
+            if let Some((name, _)) = child_ident(cursor, source, &["identifier"]) {
                 if !name.is_empty() {
                     walker.package = Some(name.clone());
                     if walker.kinds.is_enabled("p") {
@@ -211,10 +260,9 @@ fn process_node_inner(source: &[u8], cursor: &TreeCursor, walker: &mut KotlinWal
             false
         }
         "class_declaration" => {
-            if let Some((name, _)) = decl_name(node, source) {
+            if let Some((name, _)) = decl_name(cursor, source) {
                 let scope = walker.current_scope();
-                let is_interface = has_child_kind(node, "interface");
-                let (kind, scope_kind) = if is_interface {
+                let (kind, scope_kind) = if has_child(cursor, &["interface"]) {
                     ("i", ScopeKind::Interface)
                 } else {
                     ("c", ScopeKind::Class)
@@ -228,7 +276,7 @@ fn process_node_inner(source: &[u8], cursor: &TreeCursor, walker: &mut KotlinWal
             false
         }
         "object_declaration" => {
-            if let Some((name, _)) = decl_name(node, source) {
+            if let Some((name, _)) = decl_name(cursor, source) {
                 let scope = walker.current_scope();
                 if walker.kinds.is_enabled("o") {
                     walker.tags.push(make_tag(name.clone(), line, "o", scope));
@@ -239,7 +287,7 @@ fn process_node_inner(source: &[u8], cursor: &TreeCursor, walker: &mut KotlinWal
             false
         }
         "function_declaration" => {
-            if let Some((name, name_line)) = decl_name(node, source) {
+            if let Some((name, name_line)) = decl_name(cursor, source) {
                 let scope = walker.current_scope();
                 if walker.kinds.is_enabled("m") {
                     walker
@@ -252,21 +300,24 @@ fn process_node_inner(source: &[u8], cursor: &TreeCursor, walker: &mut KotlinWal
             false
         }
         "property_declaration" => {
-            let kind = binding_kind(node, source).unwrap_or("C");
+            let kind = binding_kind(cursor, source).unwrap_or("C");
+            let bindings = collect_bindings(cursor, source);
             if walker.kinds.is_enabled(kind) {
                 let scope = walker.current_scope();
-                if let Some(binding) = child_of_kind(
-                    node,
-                    &["variable_declaration", "multi_variable_declaration"],
-                ) {
-                    emit_binding_names(walker, source, binding, kind, &scope);
+                if let Some((_, names)) = &bindings {
+                    for (name, name_line) in names {
+                        walker
+                            .tags
+                            .push(make_tag(name.clone(), *name_line, kind, scope.clone()));
+                    }
                 }
             }
-            if child_of_kind(node, &["lambda_literal", "anonymous_function"]).is_some() {
-                if let Some(binding) = child_of_kind(node, &["variable_declaration"]) {
-                    if let Some(id) = child_of_kind(binding, &["simple_identifier"]) {
-                        let name = node_text(id, source).to_string();
-                        walker.scope_stack.push((ScopeKind::PendingLambda, name));
+            if has_child(cursor, &["lambda_literal", "anonymous_function"]) {
+                if let Some((_, names)) = &bindings {
+                    if let Some((name, _)) = names.first() {
+                        walker
+                            .scope_stack
+                            .push((ScopeKind::PendingLambda, name.clone()));
                         return true;
                     }
                 }
@@ -274,30 +325,28 @@ fn process_node_inner(source: &[u8], cursor: &TreeCursor, walker: &mut KotlinWal
             false
         }
         "class_parameter" => {
-            if let Some(kind) = binding_kind(node, source) {
+            if let Some(kind) = binding_kind(cursor, source) {
                 if walker.kinds.is_enabled(kind) {
-                    if let Some(id) = child_of_kind(node, &["simple_identifier"]) {
+                    if let Some((name, name_line)) =
+                        child_ident(cursor, source, &["simple_identifier"])
+                    {
                         let scope = walker.current_scope();
-                        let name = node_text(id, source).to_string();
-                        walker.tags.push(make_tag(name, line_of(id), kind, scope));
+                        walker.tags.push(make_tag(name, name_line, kind, scope));
                     }
                 }
             }
             false
         }
         "for_statement" => {
-            if let Some(binding) = child_of_kind(
-                node,
-                &["variable_declaration", "multi_variable_declaration"],
-            ) {
-                let scope = walker.current_scope();
-                let kind = if binding.kind() == "multi_variable_declaration" {
-                    "C"
-                } else {
-                    "m"
-                };
+            if let Some((is_multi, names)) = collect_bindings(cursor, source) {
+                let kind = if is_multi { "C" } else { "m" };
                 if walker.kinds.is_enabled(kind) {
-                    emit_binding_names(walker, source, binding, kind, &scope);
+                    let scope = walker.current_scope();
+                    for (name, name_line) in names {
+                        walker
+                            .tags
+                            .push(make_tag(name, name_line, kind, scope.clone()));
+                    }
                 }
             }
             false
@@ -326,31 +375,20 @@ fn process_node_inner(source: &[u8], cursor: &TreeCursor, walker: &mut KotlinWal
                 true
             };
 
-            if let Some(params) = child_of_kind(node, &["lambda_parameters"]) {
-                if walker.kinds.is_enabled("m") {
-                    let inner_scope = walker.current_scope();
-                    for i in 0..params.child_count() as u32 {
-                        if let Some(child) = params.child(i) {
-                            if child.kind() == "variable_declaration" {
-                                if let Some(id) = child_of_kind(child, &["simple_identifier"]) {
-                                    let name = node_text(id, source).to_string();
-                                    walker.tags.push(make_tag(
-                                        name,
-                                        line_of(id),
-                                        "m",
-                                        inner_scope.clone(),
-                                    ));
-                                }
-                            }
-                        }
-                    }
+            // Lambda parameters, scoped to the current (named or `<lambda>`) scope.
+            if walker.kinds.is_enabled("m") {
+                let inner_scope = walker.current_scope();
+                for (name, name_line) in collect_lambda_params(cursor, source) {
+                    walker
+                        .tags
+                        .push(make_tag(name, name_line, "m", inner_scope.clone()));
                 }
             }
             pushed
         }
         "type_alias" => {
             if walker.kinds.is_enabled("T") {
-                if let Some((name, name_line)) = decl_name(node, source) {
+                if let Some((name, name_line)) = decl_name(cursor, source) {
                     let scope = walker.current_scope();
                     walker.tags.push(make_tag(name, name_line, "T", scope));
                 }

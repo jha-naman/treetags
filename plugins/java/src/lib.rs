@@ -62,7 +62,7 @@ struct JavaWalker<'src> {
 }
 
 impl WalkContext for JavaWalker<'_> {
-    fn process_node(&mut self, cursor: &TreeCursor) -> bool {
+    fn process_node(&mut self, cursor: &mut TreeCursor) -> bool {
         let source = self.source;
         process_node_inner(source, cursor, self)
     }
