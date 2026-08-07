@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add Kotlin WASM plugin
+
+### Removed
+- Fallback tags query for Kotlin
+
 - [0.13.0]
 
 ### Changed

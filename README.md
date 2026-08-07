@@ -68,6 +68,7 @@ Treetags has support for these languages via user installable WASM plugins.
 
 ### Full support with extension fields
 - [x] Java
+- [x] Kotlin
 
 
 ## Extending treetags language support via tree-sitter tag queries and grammars
