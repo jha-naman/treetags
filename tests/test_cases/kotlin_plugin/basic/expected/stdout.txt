@@ -1,0 +1,112 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+<lambda>	source.kt	/^                  .filter {it < 20}$/;"	m	method:com.learnxinyminutes.kotlin.main
+<lambda>	source.kt	/^                  .groupBy {it % 2 == 0}$/;"	m	method:com.learnxinyminutes.kotlin.main
+<lambda>	source.kt	/^                  .mapKeys {if (it.key) "even" else "odd"}$/;"	m	method:com.learnxinyminutes.kotlin.main
+<lambda>	source.kt	/^        return this.filter {it != c}$/;"	m	method:com.learnxinyminutes.kotlin.main.remove
+<lambda>	source.kt	/^        return {n -> !f.invoke(n)}$/;"	m	method:com.learnxinyminutes.kotlin.main.not
+<lambda>	source.kt	/^    val fooLambda: (Int) -> Int = {n -> n + 1}$/;"	m	method:com.learnxinyminutes.kotlin.main
+<lambda>	source.kt	/^    val fooSequence = generateSequence(1, { it + 1 })$/;"	m	method:com.learnxinyminutes.kotlin.main
+<lambda>	source.kt	/^    val notPositive = not {it > 0}$/;"	m	method:com.learnxinyminutes.kotlin.main
+<lambda>	source.kt	/^    val notZero = not {n -> n == 0}$/;"	m	method:com.learnxinyminutes.kotlin.main
+<lambda>	source.kt	/^    val z = (1..9).map {it * 3}$/;"	m	method:com.learnxinyminutes.kotlin.main
+<lambda>	source.kt	/^    with (fooMutableData) {$/;"	m	method:com.learnxinyminutes.kotlin.main
+Counter	source.kt	/^data class Counter(var value: Int) {$/;"	c	package:com.learnxinyminutes.kotlin
+DataClassExample	source.kt	/^    data class DataClassExample (val x: Int, val y: Int, val z: Int)$/;"	c	method:com.learnxinyminutes.kotlin.main
+EnumExample	source.kt	/^enum class EnumExample {$/;"	c	package:com.learnxinyminutes.kotlin
+EnumExample	source.kt	/^enum class EnumExample(val value: Int) {$/;"	c	package:com.learnxinyminutes.kotlin
+ExampleClass	source.kt	/^    class ExampleClass(val x: Int) {$/;"	c	method:com.learnxinyminutes.kotlin.main
+MutableDataClassExample	source.kt	/^    data class MutableDataClassExample (var x: Int, var y: Int, var z: Int)$/;"	c	method:com.learnxinyminutes.kotlin.main
+ObjectExample	source.kt	/^object ObjectExample {$/;"	o	package:com.learnxinyminutes.kotlin
+a	source.kt	/^        var a = 0L$/;"	v	method:com.learnxinyminutes.kotlin.main.fibonacciSequence
+a	source.kt	/^    for ((a, b, c) in listOf(fooData)) {$/;"	C	method:com.learnxinyminutes.kotlin.main
+a	source.kt	/^    val (a, b, c) = fooCopy$/;"	C	method:com.learnxinyminutes.kotlin.main
+b	source.kt	/^        var b = 1L$/;"	v	method:com.learnxinyminutes.kotlin.main.fibonacciSequence
+b	source.kt	/^    for ((a, b, c) in listOf(fooData)) {$/;"	C	method:com.learnxinyminutes.kotlin.main
+b	source.kt	/^    val (a, b, c) = fooCopy$/;"	C	method:com.learnxinyminutes.kotlin.main
+b	source.kt	/^var b: String? = "abc"$/;"	v	package:com.learnxinyminutes.kotlin
+barString	source.kt	/^    val barString = "Printing on a new line?\\nNo Problem!"$/;"	C	method:com.learnxinyminutes.kotlin.main
+bazString	source.kt	/^    val bazString = "Do you want to add a tab?\\tNo Problem!"$/;"	C	method:com.learnxinyminutes.kotlin.main
+c	source.kt	/^    for ((a, b, c) in listOf(fooData)) {$/;"	C	method:com.learnxinyminutes.kotlin.main
+c	source.kt	/^    for (c in "hello") {$/;"	m	method:com.learnxinyminutes.kotlin.main
+c	source.kt	/^    val (a, b, c) = fooCopy$/;"	C	method:com.learnxinyminutes.kotlin.main
+com.learnxinyminutes.kotlin	source.kt	/^package com.learnxinyminutes.kotlin$/;"	p
+contains	source.kt	/^    operator fun contains(other: Counter) = other.value == this.value$/;"	m	class:com.learnxinyminutes.kotlin.Counter
+counter1	source.kt	/^    var counter1 = Counter(0)$/;"	v	method:com.learnxinyminutes.kotlin.operatorOverloadingDemo
+counter2	source.kt	/^    var counter2 = Counter(5)$/;"	v	method:com.learnxinyminutes.kotlin.operatorOverloadingDemo
+ctr	source.kt	/^    var ctr = 0$/;"	v	method:com.learnxinyminutes.kotlin.main
+even	source.kt	/^    fun even(x: Int) = x % 2 == 0$/;"	m	method:com.learnxinyminutes.kotlin.main
+fibonacciSequence	source.kt	/^    fun fibonacciSequence(): Sequence<Long> {$/;"	m	method:com.learnxinyminutes.kotlin.main
+foo	source.kt	/^    val foo: Int = 7$/;"	C	method:com.learnxinyminutes.kotlin.main
+fooCopy	source.kt	/^    val fooCopy = fooData.copy(y = 100)$/;"	C	method:com.learnxinyminutes.kotlin.main
+fooData	source.kt	/^    val fooData = DataClassExample(1, 2, 4)$/;"	C	method:com.learnxinyminutes.kotlin.main
+fooExampleClass	source.kt	/^    val fooExampleClass = ExampleClass(7)$/;"	C	method:com.learnxinyminutes.kotlin.main
+fooLambda	source.kt	/^    val fooLambda: (Int) -> Int = {n -> n + 1}$/;"	C	method:com.learnxinyminutes.kotlin.main
+fooList	source.kt	/^    val fooList = listOf("a", "b", "c")$/;"	C	method:com.learnxinyminutes.kotlin.main
+fooMap	source.kt	/^    val fooMap = mapOf("a" to 8, "b" to 7, "c" to 9)$/;"	C	method:com.learnxinyminutes.kotlin.main
+fooMutableData	source.kt	/^    val fooMutableData = MutableDataClassExample(7, 4, 9)$/;"	C	method:com.learnxinyminutes.kotlin.main
+fooMutableList	source.kt	/^    val fooMutableList = mutableListOf("a", "b", "c")$/;"	C	method:com.learnxinyminutes.kotlin.main
+fooNullable	source.kt	/^    var fooNullable: String? = "abc"$/;"	v	method:com.learnxinyminutes.kotlin.main
+fooRawString	source.kt	/^    val fooRawString = """$/;"	C	method:com.learnxinyminutes.kotlin.main
+fooSequence	source.kt	/^    val fooSequence = generateSequence(1, { it + 1 })$/;"	C	method:com.learnxinyminutes.kotlin.main
+fooSet	source.kt	/^    val fooSet = setOf("a", "b", "c")$/;"	C	method:com.learnxinyminutes.kotlin.main
+fooString	source.kt	/^    val fooString = "My String Is Here!"$/;"	C	method:com.learnxinyminutes.kotlin.main
+fooTemplateString	source.kt	/^    val fooTemplateString = "$fooString has ${fooString.length} characters"$/;"	C	method:com.learnxinyminutes.kotlin.main
+fooVal	source.kt	/^    val fooVal = 10 \/\/ we cannot later reassign fooVal to something else$/;"	C	method:com.learnxinyminutes.kotlin.main
+fooVar	source.kt	/^    var fooVar = 10$/;"	v	method:com.learnxinyminutes.kotlin.main
+hello	source.kt	/^    fun hello(): String {$/;"	m	object:com.learnxinyminutes.kotlin.ObjectExample
+hello	source.kt	/^    fun hello(name: String = "world"): String {$/;"	m	method:com.learnxinyminutes.kotlin.main
+i	source.kt	/^    for (i in 0..4) {$/;"	m	method:com.learnxinyminutes.kotlin.main
+i	source.kt	/^    val i = 10$/;"	C	method:com.learnxinyminutes.kotlin.main
+inc	source.kt	/^    operator fun inc() = Counter(value + 1)$/;"	m	class:com.learnxinyminutes.kotlin.Counter
+infixMemberFunction	source.kt	/^        infix fun infixMemberFunction(y: Int): Int {$/;"	m	class:com.learnxinyminutes.kotlin.main.ExampleClass
+invoke	source.kt	/^    operator fun invoke() = println("The value of the counter is $value")$/;"	m	class:com.learnxinyminutes.kotlin.Counter
+key	source.kt	/^    for ((key, value) in mapData) {$/;"	C	method:com.learnxinyminutes.kotlin.main
+l	source.kt	/^val l = b!!.length$/;"	C	package:com.learnxinyminutes.kotlin
+main	source.kt	/^fun main(args: Array<String>) {$/;"	m	package:com.learnxinyminutes.kotlin
+mapData	source.kt	/^    val mapData = mapOf("a" to 1, "b" to 2)$/;"	C	method:com.learnxinyminutes.kotlin.main
+memberFunction	source.kt	/^        fun memberFunction(y: Int): Int {$/;"	m	class:com.learnxinyminutes.kotlin.main.ExampleClass
+message	source.kt	/^    val message = if (num % 2 == 0) "even" else "odd"$/;"	C	method:com.learnxinyminutes.kotlin.main
+n	source.kt	/^        return {n -> !f.invoke(n)}$/;"	m	method:com.learnxinyminutes.kotlin.main.not.<lambda>
+n	source.kt	/^    val fooLambda: (Int) -> Int = {n -> n + 1}$/;"	m	method:com.learnxinyminutes.kotlin.main.<lambda>
+n	source.kt	/^    val notZero = not {n -> n == 0}$/;"	m	method:com.learnxinyminutes.kotlin.main.<lambda>
+next	source.kt	/^        fun next(): Long {$/;"	m	method:com.learnxinyminutes.kotlin.main.fibonacciSequence
+not	source.kt	/^    fun not(f: (Int) -> Boolean): (Int) -> Boolean {$/;"	m	method:com.learnxinyminutes.kotlin.main
+notEven	source.kt	/^    val notEven = not(::even)$/;"	C	method:com.learnxinyminutes.kotlin.main
+notOdd	source.kt	/^    val notOdd = not(::odd)$/;"	C	method:com.learnxinyminutes.kotlin.main
+notPositive	source.kt	/^    val notPositive = not {it > 0}$/;"	C	method:com.learnxinyminutes.kotlin.main
+notZero	source.kt	/^    val notZero = not {n -> n == 0}$/;"	C	method:com.learnxinyminutes.kotlin.main
+num	source.kt	/^    val num = 5$/;"	C	method:com.learnxinyminutes.kotlin.main
+odd	source.kt	/^    fun odd(x: Int): Boolean = x % 2 == 1$/;"	m	method:com.learnxinyminutes.kotlin.main
+operatorOverloadingDemo	source.kt	/^fun operatorOverloadingDemo() {$/;"	m	package:com.learnxinyminutes.kotlin
+plus	source.kt	/^    operator fun plus(other: Counter) = Counter(this.value + other.value)$/;"	m	class:com.learnxinyminutes.kotlin.Counter
+plusAssign	source.kt	/^    operator fun plusAssign(increment: Int) {$/;"	m	class:com.learnxinyminutes.kotlin.Counter
+printEnum	source.kt	/^fun printEnum() = println(EnumExample.A) \/\/ => A$/;"	m	package:com.learnxinyminutes.kotlin
+printName	source.kt	/^fun printName() = println(EnumExample.A.name) \/\/ => A$/;"	m	package:com.learnxinyminutes.kotlin
+printPosition	source.kt	/^fun printPosition() = println(EnumExample.A.ordinal) \/\/ => 0$/;"	m	package:com.learnxinyminutes.kotlin
+printProperty	source.kt	/^fun printProperty() = println(EnumExample.A.value) \/\/ => 1$/;"	m	package:com.learnxinyminutes.kotlin
+remove	source.kt	/^    fun String.remove(c: Char): String {$/;"	m	method:com.learnxinyminutes.kotlin.main
+result	source.kt	/^            val result = a + b$/;"	C	method:com.learnxinyminutes.kotlin.main.fibonacciSequence.next
+result	source.kt	/^    var result = when (i) {$/;"	v	method:com.learnxinyminutes.kotlin.main
+set	source.kt	/^    operator fun set(index: Int, value: Int) {$/;"	m	class:com.learnxinyminutes.kotlin.Counter
+smartCastExample	source.kt	/^    fun smartCastExample(x: Any) : Boolean {$/;"	m	method:com.learnxinyminutes.kotlin.main
+smartCastWhenExample	source.kt	/^    fun smartCastWhenExample(x: Any) = when (x) {$/;"	m	method:com.learnxinyminutes.kotlin.main
+someRef	source.kt	/^    val someRef: Any = ObjectExample$/;"	C	method:com.learnxinyminutes.kotlin.useSingletonObject
+times	source.kt	/^    operator fun times(other: Counter) = Counter(this.value * other.value)$/;"	m	class:com.learnxinyminutes.kotlin.Counter
+times	source.kt	/^    operator fun times(value: Int) = Counter(this.value * value)$/;"	m	class:com.learnxinyminutes.kotlin.Counter
+toString	source.kt	/^    override fun toString(): String {$/;"	m	object:com.learnxinyminutes.kotlin.ObjectExample
+unaryMinus	source.kt	/^operator fun Counter.unaryMinus() = Counter(-this.value)$/;"	m	package:com.learnxinyminutes.kotlin
+useSingletonObject	source.kt	/^fun useSingletonObject() {$/;"	m	package:com.learnxinyminutes.kotlin
+value	source.kt	/^    for ((key, value) in mapData) {$/;"	C	method:com.learnxinyminutes.kotlin.main
+value	source.kt	/^data class Counter(var value: Int) {$/;"	v	class:com.learnxinyminutes.kotlin.Counter
+value	source.kt	/^enum class EnumExample(val value: Int) {$/;"	C	class:com.learnxinyminutes.kotlin.EnumExample
+varargExample	source.kt	/^    fun varargExample(vararg names: Int) {$/;"	m	method:com.learnxinyminutes.kotlin.main
+x	source.kt	/^    class ExampleClass(val x: Int) {$/;"	C	class:com.learnxinyminutes.kotlin.main.ExampleClass
+x	source.kt	/^    data class DataClassExample (val x: Int, val y: Int, val z: Int)$/;"	C	class:com.learnxinyminutes.kotlin.main.DataClassExample
+x	source.kt	/^    data class MutableDataClassExample (var x: Int, var y: Int, var z: Int)$/;"	v	class:com.learnxinyminutes.kotlin.main.MutableDataClassExample
+x	source.kt	/^    val x = fooSequence.take(10).toList()$/;"	C	method:com.learnxinyminutes.kotlin.main
+y	source.kt	/^    data class DataClassExample (val x: Int, val y: Int, val z: Int)$/;"	C	class:com.learnxinyminutes.kotlin.main.DataClassExample
+y	source.kt	/^    data class MutableDataClassExample (var x: Int, var y: Int, var z: Int)$/;"	v	class:com.learnxinyminutes.kotlin.main.MutableDataClassExample
+y	source.kt	/^    val y = fibonacciSequence().take(10).toList()$/;"	C	method:com.learnxinyminutes.kotlin.main
+z	source.kt	/^    data class DataClassExample (val x: Int, val y: Int, val z: Int)$/;"	C	class:com.learnxinyminutes.kotlin.main.DataClassExample
+z	source.kt	/^    data class MutableDataClassExample (var x: Int, var y: Int, var z: Int)$/;"	v	class:com.learnxinyminutes.kotlin.main.MutableDataClassExample
+z	source.kt	/^    val z = (1..9).map {it * 3}$/;"	C	method:com.learnxinyminutes.kotlin.main
