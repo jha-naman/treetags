@@ -21,10 +21,6 @@ struct LanguageDefaults {
 
 fn get_language_defaults(lang_name: &str) -> Option<LanguageDefaults> {
     match lang_name {
-        "kotlin" => Some(LanguageDefaults {
-            query: queries::KOTLIN_TAGS_QUERY,
-            extensions: &["kt", "kts"],
-        }),
         "gleam" => Some(LanguageDefaults {
             query: queries::GLEAM_TAGS_QUERY,
             extensions: &["gleam"],
