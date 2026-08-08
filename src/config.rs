@@ -17,6 +17,14 @@ pub mod paths;
 mod plugin_config;
 mod user_grammars;
 
+/// Default worker-thread count: the machine's available parallelism, falling
+/// back to 4 if it cannot be determined. Overridable via `--workers`.
+fn default_workers() -> usize {
+    std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4)
+}
+
 /// Subcommands for the application
 #[derive(Subcommand, Clone, Debug)]
 pub enum Commands {
@@ -95,7 +103,7 @@ pub struct Config {
 
     /// List of file names to be processed when `--append` option is passed
     pub file_names: Vec<String>,
-    #[arg(long, default_value = "4")]
+    #[arg(long, default_value_t = default_workers())]
     /// Number of threads to use for parsing files
     pub workers: usize,
     /// Files/directories matching the pattern will not be used while generating tags

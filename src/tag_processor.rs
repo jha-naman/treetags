@@ -1,11 +1,12 @@
 use crate::config::Config;
 use crate::language_parser::{LangId, LanguageParserRegistry, NameResolution};
+use crate::parser::Parser;
 use crate::tag::Tag;
+use rayon::prelude::*;
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
-use std::path::Path;
-use std::sync::{mpsc, Arc};
-use std::thread;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// Bytes read from the head of a file to inspect its `#!` shebang line.
 const SHEBANG_PREFIX_BYTES: u64 = 256;
@@ -156,104 +157,85 @@ impl TagProcessor {
     }
 
     pub fn process_files(&self, file_names: Vec<String>) -> Vec<Tag> {
-        let mut threads = Vec::with_capacity(self.workers);
-        let mut senders = Vec::with_capacity(self.workers);
-
-        // Build registry once; share Arc across threads.
+        // Build registry once; share Arc across workers.
         // LanguageParserRegistry::new also JIT-compiles WASM plugins once.
         let lang_registry = Arc::new(LanguageParserRegistry::new(&self.config));
 
-        for _ in 0..self.workers {
-            let (sender, receiver) = mpsc::channel::<String>();
-            let tag_file_path = self.tag_file_path.clone();
-            let config = self.config.clone();
-            let registry = Arc::clone(&lang_registry);
-
-            let thread = thread::spawn(move || -> Vec<Tag> {
-                Self::worker(receiver, tag_file_path, config, registry)
-            });
-
-            threads.push(thread);
-            senders.push(sender);
-        }
-
-        for chunk in file_names.chunks(self.workers) {
-            for (index, file_name) in chunk.iter().enumerate() {
-                if let Err(e) = senders[index].send(file_name.clone()) {
-                    eprintln!("Failed to send file to worker: {}", e);
-                }
-            }
-        }
-
-        drop(senders);
-
-        let mut all_tags = Vec::new();
-        for thread in threads {
-            match thread.join() {
-                Ok(tags) => all_tags.extend(tags),
-                Err(e) => eprintln!("Worker thread panicked: {:?}", e),
-            }
-        }
-
-        all_tags
-    }
-
-    fn worker(
-        file_names_rx: mpsc::Receiver<String>,
-        tag_file_path: String,
-        config: Config,
-        registry: Arc<LanguageParserRegistry>,
-    ) -> Vec<Tag> {
-        // One Parser per thread — holds mutable parse state (ts_parser, tags_context, etc.)
-        let mut parser = registry.create_parser();
-
-        let tag_file_dir = if tag_file_path == "-" {
-            std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf())
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let tag_file_dir = if self.tag_file_path == "-" {
+            cwd.clone()
         } else {
-            let p = Path::new(&tag_file_path);
-            p.parent().unwrap_or(Path::new("")).to_path_buf()
+            Path::new(&self.tag_file_path)
+                .parent()
+                .unwrap_or(Path::new(""))
+                .to_path_buf()
         };
 
-        let mut local_tags = Vec::new();
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(self.workers)
+            .build()
+            .expect("failed to build rayon thread pool");
 
-        while let Ok(file_name) = file_names_rx.recv() {
-            let file_path = std::env::current_dir().unwrap().join(&file_name);
+        pool.install(|| {
+            file_names
+                .par_iter()
+                .map_init(
+                    || lang_registry.create_parser(),
+                    |parser, file_name| {
+                        Self::process_one(
+                            parser,
+                            file_name,
+                            &cwd,
+                            &tag_file_dir,
+                            &self.config,
+                            &lang_registry,
+                        )
+                    },
+                )
+                .flatten_iter()
+                .collect()
+        })
+    }
 
-            let file_path_relative = match file_path.strip_prefix(&tag_file_dir) {
-                Ok(path) => path.to_string_lossy().into_owned(),
-                Err(_) => file_name.clone(),
-            };
+    /// Parses a file and returns its tags
+    fn process_one(
+        parser: &mut Parser,
+        file_name: &str,
+        cwd: &Path,
+        tag_file_dir: &Path,
+        config: &Config,
+        registry: &LanguageParserRegistry,
+    ) -> Vec<Tag> {
+        let file_path = cwd.join(file_name);
 
-            let selection =
-                match select_language(&registry, &config, &file_path, Path::new(&file_name)) {
-                    Some(selection) => selection,
-                    None => continue,
-                };
-            let lp = registry.parser(selection.lang);
+        let file_path_relative = match file_path.strip_prefix(tag_file_dir) {
+            Ok(path) => path.to_string_lossy().into_owned(),
+            Err(_) => file_name.to_string(),
+        };
 
-            // Reuse content already read during resolution (ambiguous names)
-            // instead of reading the file a second time.
-            let code = match selection.content {
-                Some(content) => content,
-                None => match fs::read(&file_path) {
-                    Ok(b) => b,
-                    Err(e) => {
-                        eprintln!("{}", e);
-                        continue;
-                    }
-                },
-            };
+        let selection = match select_language(registry, config, &file_path, Path::new(file_name)) {
+            Some(selection) => selection,
+            None => return Vec::new(),
+        };
+        let lp = registry.parser(selection.lang);
 
-            let mut tags =
-                lp.generate_tags(&mut parser, &code, &file_path_relative, &config, &file_path);
+        let code = match selection.content {
+            Some(content) => content,
+            None => match fs::read(&file_path) {
+                Ok(b) => b,
+                Err(e) => {
+                    eprintln!("{}", e);
+                    return Vec::new();
+                }
+            },
+        };
 
-            if config.sort {
-                tags.sort_unstable_by(|a, b| a.sort_cmp(b));
-            }
+        let mut tags = lp.generate_tags(parser, &code, &file_path_relative, config, &file_path);
 
-            local_tags.append(&mut tags);
+        if config.sort {
+            tags.sort_unstable_by(|a, b| a.sort_cmp(b));
         }
 
-        local_tags
+        tags
     }
 }
