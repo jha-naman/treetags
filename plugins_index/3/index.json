@@ -1,6 +1,6 @@
 {
   "abi_version": 3,
-  "generated_at": "2026-08-04T08:52:00Z",
+  "generated_at": "2026-08-08T04:28:49Z",
   "plugins": [
     {
       "name": "java",
@@ -58,8 +58,63 @@
       ],
       "wasm_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/java.wasm",
       "manifest_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/java.toml",
-      "wasm_sha256": "0c08d8a42d7d7ad9023cc35f08c90d8cf953c8c1c5280bc040f5e6e85e6e2cf3",
-      "wasm_size": 686705
+      "wasm_sha256": "77b78061519fd94a2ba80ec66ef634baa0a09ae2182cb66f1815a038c5faa6b8",
+      "wasm_size": 682739
+    },
+    {
+      "name": "kotlin",
+      "version": "0.1.0",
+      "language": "kotlin",
+      "extensions": [
+        "kt",
+        "kts"
+      ],
+      "kinds": [
+        {
+          "letter": "C",
+          "name": "constant",
+          "default": true
+        },
+        {
+          "letter": "T",
+          "name": "typealias",
+          "default": true
+        },
+        {
+          "letter": "c",
+          "name": "class",
+          "default": true
+        },
+        {
+          "letter": "i",
+          "name": "interface",
+          "default": true
+        },
+        {
+          "letter": "m",
+          "name": "method",
+          "default": true
+        },
+        {
+          "letter": "o",
+          "name": "object",
+          "default": true
+        },
+        {
+          "letter": "p",
+          "name": "package",
+          "default": true
+        },
+        {
+          "letter": "v",
+          "name": "variable",
+          "default": true
+        }
+      ],
+      "wasm_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/kotlin.wasm",
+      "manifest_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/kotlin.toml",
+      "wasm_sha256": "cc0f5fab63228c0700d251ea87c710308dbdbf4b8b41dfcf4a541fc305cb64db",
+      "wasm_size": 6065813
     }
   ]
 }
