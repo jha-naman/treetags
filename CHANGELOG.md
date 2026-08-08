@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add Kotlin WASM plugin
 Adds several helper functions for other plugins to make use of
 
+### Changed
+- Refactor Java plugin to use updated conventions and helpers introduced with
+the Kotlin plugin
+
 ### Removed
 - Fallback tags query for Kotlin
 
