@@ -63,7 +63,7 @@ struct TypeScriptContext<'a> {
 impl<'a> TypeScriptContext<'a> {
     fn new(
         source_code: &'a str,
-        lines: Vec<Vec<u8>>,
+        lines: Vec<&'a [u8]>,
         file_name: &'a str,
         tags: &'a mut Vec<tag::Tag>,
         tag_config: &'a TagKindConfig,
