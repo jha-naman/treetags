@@ -17,13 +17,9 @@ pub mod paths;
 mod plugin_config;
 mod user_grammars;
 
-/// Default worker-thread count: the machine's available parallelism, falling
-/// back to 4 if it cannot be determined. Overridable via `--workers`.
-fn default_workers() -> usize {
-    std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(4)
-}
+/// Default worker-thread count. Overridable via `--workers`, or bumped up to the
+/// machine's available parallelism via `--max-parallelism`.
+const DEFAULT_WORKERS: usize = 4;
 
 /// Subcommands for the application
 #[derive(Subcommand, Clone, Debug)]
@@ -103,9 +99,14 @@ pub struct Config {
 
     /// List of file names to be processed when `--append` option is passed
     pub file_names: Vec<String>,
-    #[arg(long, default_value_t = default_workers())]
+    #[arg(long, default_value_t = DEFAULT_WORKERS)]
     /// Number of threads to use for parsing files
     pub workers: usize,
+
+    /// Use the machine's available parallelism for the worker count, falling back
+    /// to `--workers` (or the default) if it cannot be determined.
+    #[arg(long, alias = "computer-fans-go-burrr")]
+    pub max_parallelism: bool,
     /// Files/directories matching the pattern will not be used while generating tags
     #[arg(long)]
     pub exclude: Vec<String>,
@@ -290,6 +291,12 @@ impl Config {
 
         config.validate();
         config.parse_file_args();
+
+        if config.max_parallelism {
+            config.workers = std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(config.workers);
+        }
 
         // value_str is not a valid boolean string. Assume it's a filename.
         let mut filename_misinterpreted_by_raw_bool: Option<String> = None;
