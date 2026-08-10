@@ -432,7 +432,7 @@ fn load_manifest(manifest_path: &Path, entries: &mut HashMap<String, PluginEntry
 
 fn convert_tags(
     plugin_tags: Vec<PluginTag>,
-    source_lines: &[Vec<u8>],
+    source_lines: &[&[u8]],
     file_path: &str,
     kind_letters: &HashSet<&'static str>,
 ) -> Vec<Tag> {
@@ -468,10 +468,10 @@ fn convert_tags(
     tags
 }
 
-fn format_address(lines: &[Vec<u8>], line: u32) -> String {
+fn format_address(lines: &[&[u8]], line: u32) -> String {
     let line_bytes = lines
         .get(line.saturating_sub(1) as usize)
-        .map(|v| v.as_slice())
+        .copied()
         .unwrap_or(b"");
     Tag::address_from_line(line_bytes)
 }

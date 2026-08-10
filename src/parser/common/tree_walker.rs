@@ -16,7 +16,7 @@ pub trait LanguageContext {
 /// Stores context during traversal
 pub struct Context<'a> {
     pub source_code: &'a str,
-    pub lines: Vec<Vec<u8>>,
+    pub lines: Vec<&'a [u8]>,
     pub file_name: Arc<str>,
     pub tags: &'a mut Vec<tag::Tag>,
     pub tag_config: &'a TagKindConfig,
@@ -44,7 +44,7 @@ pub fn generate_tags_with_config(
     language: tree_sitter::Language,
     code: &[u8],
     file_path: &str,
-    action: impl for<'a> FnOnce(&'a str, Vec<Vec<u8>>, &mut TreeCursor<'a>, &mut Vec<tag::Tag>),
+    action: impl for<'a> FnOnce(&'a str, Vec<&'a [u8]>, &mut TreeCursor<'a>, &mut Vec<tag::Tag>),
 ) -> Option<Vec<tag::Tag>> {
     let source_code = match std::str::from_utf8(code) {
         Ok(s) => s,

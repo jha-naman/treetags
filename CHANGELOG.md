@@ -18,6 +18,7 @@ the Kotlin plugin
 - Use work stealing rayon threads for processing files in parallel
 Noticably faster than the earlier thread based implementation
 - Don't pre-sort tags of each individual file
+- Stop copying every line of source code, use slices which borrow from the source instead
 
 ### Removed
 - Fallback tags query for Kotlin
