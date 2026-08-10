@@ -10,10 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Add Kotlin WASM plugin
 Adds several helper functions for other plugins to make use of
+- Add `--max-parallelism` cli arg for making it easy to use all available cores
 
 ### Changed
 - Refactor Java plugin to use updated conventions and helpers introduced with
 the Kotlin plugin
+- Use work stealing rayon threads for processing files in parallel
+Noticably faster than the earlier thread based implementation
+- Don't pre-sort tags of each individual file
 
 ### Removed
 - Fallback tags query for Kotlin
