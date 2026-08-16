@@ -15,6 +15,15 @@ fn bool_true() -> bool {
     true
 }
 
+/// A content-disambiguation rule from a plugin's `plugin.toml`. Declares
+/// extensions the plugin shares with other languages (e.g. `h`) and the marker
+/// strings that, when found in a file's content, select this plugin for them.
+#[derive(Debug, Deserialize, Clone)]
+pub struct ManifestDisambiguation {
+    pub extensions: Vec<String>,
+    pub signals: Vec<String>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct PluginManifest {
     pub name: String,
@@ -43,6 +52,10 @@ pub struct PluginManifest {
     pub wasm_file: String,
     /// Optional list of tag kinds the plugin can generate, for `--list-kinds` output.
     pub kinds: Option<Vec<ManifestKind>>,
+    /// Content-disambiguation rules for extensions shared with other languages
+    /// (e.g. `h`). Empty when omitted. See [`ManifestDisambiguation`].
+    #[serde(default)]
+    pub disambiguation: Vec<ManifestDisambiguation>,
     /// Marks a dev/test-only plugin: it still loads and routes when explicitly
     /// pointed at (e.g. `--plugin-dir`), but is hidden from `--list-plugins` and
     /// excluded from the published distribution index so end users never see or

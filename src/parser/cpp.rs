@@ -13,6 +13,24 @@ pub(crate) const LANG_EXTENSIONS: &'static [&'static str] = &[
 pub(crate) const C_LANG_NAME: &'static str = "c";
 pub(crate) const C_LANG_EXTENSIONS: &'static [&'static str] = &["c", "h", "i"];
 
+/// High-precision C++-only markers used to disambiguate an ambiguous header
+/// (`.h`, owned by C by default) from C++. Chosen to rarely appear in plain C.
+pub(crate) const CPP_DISAMBIG_SIGNALS: &[&str] = &[
+    "::",
+    "namespace",
+    "template<",
+    "template <",
+    "class ",
+    "public:",
+    "private:",
+    "protected:",
+    "virtual ",
+    "nullptr",
+    "using namespace",
+    "extern \"C\"",
+    "std::",
+];
+
 pub(crate) const KIND_DEFAULTS: &[(&[&str], &str)] = &[
     (&["d", "macro"], "d"),
     (&["e", "enumerator"], "e"),

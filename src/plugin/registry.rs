@@ -18,6 +18,8 @@ struct PluginEntry {
     interpreters: Vec<String>,
     name: String,
     kinds: Vec<super::manifest::ManifestKind>,
+    /// Content-disambiguation rules for extensions shared with other languages.
+    disambiguation: Vec<super::manifest::ManifestDisambiguation>,
     /// true for Dev/test-only plugin: routes normally but is hidden from
     /// `list_plugins` and plugin build CI.
     internal: bool,
@@ -262,6 +264,7 @@ pub struct PluginExtInfo {
     pub patterns: Vec<String>,
     pub interpreters: Vec<String>,
     pub kinds: Vec<super::manifest::ManifestKind>,
+    pub disambiguation: Vec<super::manifest::ManifestDisambiguation>,
 }
 
 /// Scans plugin manifests (no WASM loading) and returns per-extension plugin info.
@@ -276,6 +279,7 @@ pub fn scan_ext_infos(dirs: &[PathBuf], plugins_dir: Option<&PathBuf>) -> Vec<Pl
             patterns: entry.patterns,
             interpreters: entry.interpreters,
             kinds: entry.kinds,
+            disambiguation: entry.disambiguation,
         })
         .collect()
 }
@@ -412,6 +416,7 @@ fn load_manifest(manifest_path: &Path, entries: &mut HashMap<String, PluginEntry
     let interpreters = manifest.interpreters.clone();
     let name = manifest.name.clone();
     let kinds = manifest.kinds.clone().unwrap_or_default();
+    let disambiguation = manifest.disambiguation.clone();
     let internal = manifest.internal;
     for ext in &manifest.extensions {
         entries.insert(
@@ -424,6 +429,7 @@ fn load_manifest(manifest_path: &Path, entries: &mut HashMap<String, PluginEntry
                 interpreters: interpreters.clone(),
                 name: name.clone(),
                 kinds: kinds.clone(),
+                disambiguation: disambiguation.clone(),
                 internal,
             },
         );

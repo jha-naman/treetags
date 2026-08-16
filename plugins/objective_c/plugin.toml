@@ -1,9 +1,26 @@
 name = "objective_c"
 version = "0.1.0"
 abi_version = 3
-extensions = ["m", "h"]
+extensions = ["m"]
 language = "objc"
 aliases = ["objectivec", "objective-c"]
+
+# `.h` is shared with C/C++. Claim it only when the content carries unambiguous
+# Objective-C markers; otherwise it falls through to C (base owner) / C++.
+[[disambiguation]]
+extensions = ["h"]
+signals = [
+    "@interface",
+    "@implementation",
+    "@protocol",
+    "@property",
+    "@end",
+    "@class",
+    "@import",
+    "@selector",
+    "@autoreleasepool",
+    "NS_ASSUME_NONNULL",
+]
 
 [[kinds]]
 letter = "C"
