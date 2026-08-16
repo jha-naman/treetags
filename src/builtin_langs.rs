@@ -28,6 +28,26 @@ pub(crate) struct BuiltinLangDesc {
     pub generate_fn: BuiltinGenerateFn,
 }
 
+/// A content-disambiguation rule for a builtin language: for the given shared
+/// `extensions`, this language is selected only when one of its `signals`
+/// appears in the file content. The mirror of a plugin manifest's
+/// `[[disambiguation]]` table, so builtins and plugins are resolved the same way.
+pub(crate) struct BuiltinDisambiguation {
+    pub lang: &'static str,
+    pub extensions: &'static [&'static str],
+    pub signals: &'static [&'static str],
+}
+
+/// Builtin disambiguation rules. A language declaring a shared extension here is
+/// a signal-gated candidate for it; the extension's plain owner (via
+/// `extensions`) remains the inconclusive-content default. `.h` is owned by C
+/// and offered to C++ on content evidence.
+pub(crate) static BUILTIN_DISAMBIGUATION: &[BuiltinDisambiguation] = &[BuiltinDisambiguation {
+    lang: cpp::LANG_NAME,
+    extensions: &["h"],
+    signals: cpp::CPP_DISAMBIG_SIGNALS,
+}];
+
 /// All builtin languages. Priority in tag generation follows array order.
 /// Adding a new builtin language requires exactly one new entry here.
 pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
