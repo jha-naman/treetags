@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "plugins/common", "plugins/echo", "plugins/java", "plugins/kotlin"]
+members = [".", "plugins/common", "plugins/echo", "plugins/java", "plugins/kotlin", "plugins/objective_c"]
 resolver = "2"
 
 [package]
