@@ -1,0 +1,15 @@
+[package]
+name = "treetags-plugin-objective_c"
+version = "0.1.0"
+edition = "2021"
+description = "Objective-C plugin for treetags"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+treetags-plugin-common = { path = "../common", features = ["tree-walker"] }
+tree-sitter = "0.26.5"
+tree-sitter-objc = "3.0.2"
+wit-bindgen = "0.58"

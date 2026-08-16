@@ -1,0 +1,76 @@
+name = "objective_c"
+version = "0.1.0"
+abi_version = 3
+extensions = ["m", "h"]
+language = "objc"
+aliases = ["objectivec", "objective-c"]
+
+[[kinds]]
+letter = "C"
+name = "category"
+default = true
+
+[[kinds]]
+letter = "E"
+name = "field"
+default = true
+
+[[kinds]]
+letter = "I"
+name = "implementation"
+default = true
+
+[[kinds]]
+letter = "M"
+name = "macro"
+default = true
+
+[[kinds]]
+letter = "P"
+name = "protocol"
+default = true
+
+[[kinds]]
+letter = "c"
+name = "class"
+default = true
+
+[[kinds]]
+letter = "e"
+name = "enum"
+default = true
+
+[[kinds]]
+letter = "f"
+name = "function"
+default = true
+
+[[kinds]]
+letter = "i"
+name = "interface"
+default = true
+
+[[kinds]]
+letter = "m"
+name = "method"
+default = true
+
+[[kinds]]
+letter = "p"
+name = "property"
+default = true
+
+[[kinds]]
+letter = "s"
+name = "struct"
+default = true
+
+[[kinds]]
+letter = "t"
+name = "typedef"
+default = true
+
+[[kinds]]
+letter = "v"
+name = "var"
+default = true

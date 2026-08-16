@@ -1,0 +1,52 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+FooProtocol	Klass.h	/^@protocol FooProtocol <NSObject>$/;"	P	protocols:NSObject
+KLASS_LOG_PREFIX	Klass.h	/^#define KLASS_LOG_PREFIX @"[Klass] "$/;"	M
+KLASS_MAX_COUNT	Klass.h	/^#define KLASS_MAX_COUNT 100$/;"	M
+KLASS_SQUARE	Klass.h	/^#define KLASS_SQUARE(x) ((x) * (x))$/;"	M
+KLASS_SWAP	Klass.h	/^#define KLASS_SWAP(a, b) \\$/;"	M
+Klass	Klass.h	/^@interface Klass (Networking)$/;"	i	category:Networking
+Klass	Klass.h	/^@interface Klass : NSObject <FooProtocol>$/;"	i	protocols:FooProtocol
+Klass	source.m	/^@implementation Klass (Networking)$/;"	I	category:Networking
+Klass	source.m	/^@implementation Klass$/;"	I
+KlassCompletionHandler	Klass.h	/^typedef void (*KlassCompletionHandler)(int status, NSString *message);$/;"	t
+KlassCoordinate	Klass.h	/^} KlassCoordinate;$/;"	t
+KlassCounter	Klass.h	/^typedef int KlassCounter;$/;"	t
+KlassDirection	Klass.h	/^enum KlassDirection {$/;"	e
+KlassErrorDomain	Klass.h	/^extern NSString *const KlassErrorDomain;$/;"	v
+KlassErrorDomain	source.m	/^NSString *const KlassErrorDomain = @"com.example.klass";$/;"	v
+KlassFromCount:	Klass.h	/^+ (Klass *)KlassFromCount:(NSNumber *)defaultCount;$/;"	c	interface:Klass
+KlassFromCount:	source.m	/^+ (Klass *)KlassFromCount:(NSNumber *)defaultCount$/;"	c	implementation:Klass
+KlassName	Klass.h	/^typedef NSString *KlassName;$/;"	t
+KlassPoint	Klass.h	/^struct KlassPoint {$/;"	s
+KlassState	Klass.h	/^typedef NS_ENUM(NSInteger, KlassState) {$/;"	e
+Networking	Klass.h	/^@interface Klass (Networking)$/;"	C	interface:Klass
+Networking	source.m	/^@implementation Klass (Networking)$/;"	C	implementation:Klass
+addNumbers	source.m	/^int addNumbers(int a, int b)$/;"	f
+anotherProperty	Klass.h	/^@property (getter=anotherPropertyGet, setter=anotherPropertySet:) int anotherProperty;$/;"	p	interface:Klass
+count	Klass.h	/^    int count;$/;"	E	interface:Klass
+describeState	source.m	/^static NSString *describeState(KlassState state)$/;"	f
+fetchWithURL:completion:	Klass.h	/^- (void)fetchWithURL:(NSString *)url completion:(KlassCompletionHandler)completion;$/;"	m	category:Networking	interface:Klass
+fetchWithURL:completion:	source.m	/^- (void)fetchWithURL:(NSString *)url completion:(KlassCompletionHandler)completion$/;"	m	category:Networking	implementation:Klass
+fileLocalCounter	source.m	/^static int fileLocalCounter = 42;$/;"	v
+fooString	Klass.h	/^    NSString *fooString;$/;"	E	interface:Klass
+identifier	Klass.h	/^@property (nonatomic, readonly) NSInteger identifier;$/;"	p	protocol:FooProtocol
+intProperty	Klass.h	/^@property int intProperty;$/;"	p	interface:Klass
+items	Klass.h	/^@property (nonatomic, strong) NSArray<NSString *> *items;$/;"	p	interface:Klass
+latitude	Klass.h	/^    double latitude;$/;"	E	struct:KlassCoordinate
+longitude	Klass.h	/^    double longitude;$/;"	E	struct:KlassCoordinate
+main	source.m	/^int main(int argc, const char *argv[])$/;"	f
+methodAParameterAsString:andAParameterAsNumber:	Klass.h	/^- (NSNumber *)methodAParameterAsString:(NSString*)string andAParameterAsNumber:(NSNumber *)numbe/;"	m	interface:Klass
+methodAParameterAsString:andAParameterAsNumber:	source.m	/^- (NSNumber *)methodAParameterAsString:(NSString *)string andAParameterAsNumber:(NSNumber *)numb/;"	m	implementation:Klass
+optionalDescription	Klass.h	/^- (NSString *)optionalDescription;$/;"	m	protocol:FooProtocol
+privateCount	Klass.h	/^    @private int privateCount;$/;"	E	interface:Klass
+readonlyString	Klass.h	/^@property (readonly) NSString *readonlyString;$/;"	p	interface:Klass
+requiredMethod	Klass.h	/^- (void)requiredMethod;$/;"	m	protocol:FooProtocol
+requiredMethod	source.m	/^- (void)requiredMethod$/;"	m	implementation:Klass
+reset	Klass.h	/^- (void)reset;$/;"	m	interface:Klass
+reset	source.m	/^- (void)reset$/;"	m	implementation:Klass
+sharedCounter	Klass.h	/^extern int sharedCounter;$/;"	v
+sharedCounter	source.m	/^int sharedCounter = 0;$/;"	v
+sharedInstance	Klass.h	/^+ (instancetype)sharedInstance;$/;"	c	interface:Klass
+sharedInstance	source.m	/^+ (instancetype)sharedInstance$/;"	c	implementation:Klass
+x	Klass.h	/^    int x;$/;"	E	struct:KlassPoint
+y	Klass.h	/^    int y;$/;"	E	struct:KlassPoint
