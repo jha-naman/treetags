@@ -1,0 +1,152 @@
+name = "objective_c"
+version = "0.1.0"
+abi_version = 3
+extensions = ["m", "h"]
+language = "objc"
+aliases = ["objectivec", "objective-c"]
+
+# `.h` is shared with C/C++. Claim it only when the content carries unambiguous
+# Objective-C markers; otherwise it falls through to C (base owner) / C++.
+[disambiguation]
+h = [
+    "@interface",
+    "@implementation",
+    "@protocol",
+    "@property",
+    "@end",
+    "@class",
+    "@import",
+    "@selector",
+    "@autoreleasepool",
+    "NS_ASSUME_NONNULL",
+]
+
+# Constructs shared with C use the C parser's exact kind letters; Objective-C-only
+# constructs use letters that do not clash with any C letter. This table needs
+# to be in sync with OBJC_DEFAULT_KINDS / OBJC_OPTIONAL_KINDS in src/lib.rs.
+
+# --- Shared with C (identical letters to the C parser) ---
+
+[[kinds]]
+letter = "d"
+name = "macro"
+default = true
+
+[[kinds]]
+letter = "e"
+name = "enumerator"
+default = true
+
+[[kinds]]
+letter = "f"
+name = "function"
+default = true
+
+[[kinds]]
+letter = "g"
+name = "enum"
+default = true
+
+[[kinds]]
+letter = "h"
+name = "header"
+default = true
+
+[[kinds]]
+letter = "m"
+name = "member"
+default = true
+
+[[kinds]]
+letter = "s"
+name = "struct"
+default = true
+
+[[kinds]]
+letter = "t"
+name = "typedef"
+default = true
+
+[[kinds]]
+letter = "u"
+name = "union"
+default = true
+
+[[kinds]]
+letter = "v"
+name = "variable"
+default = true
+
+# --- Objective-C-only (non-clashing letters) ---
+
+[[kinds]]
+letter = "A"
+name = "property"
+default = true
+
+[[kinds]]
+letter = "C"
+name = "category"
+default = true
+
+[[kinds]]
+letter = "E"
+name = "ivar"
+default = true
+
+[[kinds]]
+letter = "I"
+name = "implementation"
+default = true
+
+[[kinds]]
+letter = "M"
+name = "method"
+default = true
+
+[[kinds]]
+letter = "P"
+name = "protocol"
+default = true
+
+[[kinds]]
+letter = "c"
+name = "class"
+default = true
+
+[[kinds]]
+letter = "i"
+name = "interface"
+default = true
+
+# --- Optional, off by default (matching the C parser's optionals) ---
+
+[[kinds]]
+letter = "l"
+name = "local"
+default = false
+
+[[kinds]]
+letter = "p"
+name = "prototype"
+default = false
+
+[[kinds]]
+letter = "x"
+name = "externvar"
+default = false
+
+[[kinds]]
+letter = "z"
+name = "parameter"
+default = false
+
+[[kinds]]
+letter = "L"
+name = "label"
+default = false
+
+[[kinds]]
+letter = "D"
+name = "macroparam"
+default = false

@@ -199,6 +199,11 @@ pub struct LanguageParserRegistry {
     /// Interpreter name (lowercased) → candidate languages, for `#!` shebang
     /// resolution. Candidates are in tier/registration order.
     by_interpreter: HashMap<String, Vec<LangId>>,
+    /// Content-disambiguation signals per language. When an extension has
+    /// several candidates, `disambiguate` selects the first whose signals appear
+    /// in the file. Populated from plugin `[disambiguation]` maps and the
+    /// `disambiguation` field of builtin descriptors.
+    disambig_signals: HashMap<LangId, Vec<String>>,
     /// Language name / alias (lowercased) → language, for `--language-force` and
     /// editor-modeline resolution.
     aliases: HashMap<String, LangId>,
@@ -209,6 +214,24 @@ pub struct LanguageParserRegistry {
     /// Kept so `create_parser` can hand a shared compiled registry to each
     /// per-thread `Parser` for WASM execution.
     plugin_registry: Arc<PluginRegistry>,
+}
+
+/// Records a content-gated extension shared with other languages: `ext` is
+/// claimed only when one of `signals` appears in a file's content. The signals
+/// are attached to `id` and `ext` is noted as a signal-gated candidate. The
+/// extension is deliberately *not* claimed outright, so its base owner (whoever
+/// claims it via plain `extensions`, e.g. C for `.h`) remains the default when
+/// the content is inconclusive. Used for both plugin `[disambiguation]`
+/// maps and builtin descriptor disambiguation.
+fn register_gated_ext(
+    id: LangId,
+    ext: &str,
+    signals: impl IntoIterator<Item = String>,
+    disambig_exts: &mut Vec<(String, LangId)>,
+    disambig_signals: &mut HashMap<LangId, Vec<String>>,
+) {
+    disambig_signals.entry(id).or_default().extend(signals);
+    disambig_exts.push((ext.to_string(), id));
 }
 
 /// Resolves a `--language-force` value against the known language/alias map.
@@ -260,6 +283,10 @@ impl LanguageParserRegistry {
         let mut by_rexpr: Vec<(regex::Regex, LangId)> = Vec::new();
         // Interpreter names collected per source, in tier/registration order.
         let mut interp_specs: Vec<(LangId, String)> = Vec::new();
+        // Content-disambiguation: (shared extension, signal-gated candidate) in
+        // tier/registration order, plus per-language signal strings.
+        let mut disambig_exts: Vec<(String, LangId)> = Vec::new();
+        let mut disambig_signals: HashMap<LangId, Vec<String>> = HashMap::new();
 
         // Priorities are applied in order; the first tier to claim an extension
         // owns it (matching the historical `or_insert_with` behaviour). Storing
@@ -297,7 +324,20 @@ impl LanguageParserRegistry {
                 lang,
                 kind_infos,
             }));
-            by_extension.insert(info.ext, vec![id]);
+            // A shared extension listed under `[disambiguation]` is claimed only
+            // on content match (a signal-gated candidate); every other extension
+            // is claimed outright.
+            if let Some(signals) = info.disambiguation.get(&info.ext) {
+                register_gated_ext(
+                    id,
+                    &info.ext,
+                    signals.iter().cloned(),
+                    &mut disambig_exts,
+                    &mut disambig_signals,
+                );
+            } else {
+                by_extension.insert(info.ext, vec![id]);
+            }
         }
 
         // Priority 2: Builtin tree-walker parsers.
@@ -306,19 +346,24 @@ impl LanguageParserRegistry {
             let id = parsers.len();
             let mut claimed = false;
             for ext in desc.extensions {
-                if by_extension.contains_key(*ext) {
+                // A content-gated extension (e.g. C++ on `.h`) is registered as a
+                // signal candidate below, never claimed outright here.
+                if desc.disambiguation.iter().any(|(e, _)| e == ext)
+                    || by_extension.contains_key(*ext)
+                {
                     continue;
                 }
                 by_extension.insert((*ext).to_string(), vec![id]);
                 claimed = true;
             }
             // Register the language whenever it claims an extension or carries
-            // name metadata, so its patterns/interpreters/aliases survive even
-            // when a higher-priority source (e.g. a plugin) claims all of its
-            // extensions.
+            // name / disambiguation metadata, so its patterns/interpreters/
+            // aliases/signals survive even when a higher-priority source (e.g. a
+            // plugin) claims all of its extensions.
             let has_metadata = !desc.aliases.is_empty()
                 || !desc.patterns.is_empty()
-                || !desc.interpreters.is_empty();
+                || !desc.interpreters.is_empty()
+                || !desc.disambiguation.is_empty();
             if claimed || has_metadata {
                 for alias in desc.aliases {
                     alias_specs.push((id, (*alias).to_string()));
@@ -328,6 +373,17 @@ impl LanguageParserRegistry {
                 }
                 for interp in desc.interpreters {
                     interp_specs.push((id, (*interp).to_string()));
+                }
+                // Content-gated extensions (e.g. C++ on `.h`): the extension's
+                // outright owner (C) stays the inconclusive-content default.
+                for (ext, signals) in desc.disambiguation {
+                    register_gated_ext(
+                        id,
+                        ext,
+                        signals.iter().map(|s| s.to_string()),
+                        &mut disambig_exts,
+                        &mut disambig_signals,
+                    );
                 }
                 parsers.push(Box::new(BuiltinLanguageParser::from_desc(desc, config)));
             }
@@ -424,15 +480,27 @@ impl LanguageParserRegistry {
             }
         }
 
-        // Register `.h` as ambiguous between C and C++, resolved by content.
-        // Only when `.h` is owned solely by the builtin C parser (i.e. not
-        // claimed by a plugin or user grammar); C stays first so it remains the
-        // default when the selector is inconclusive.
-        let c_id = parsers.iter().position(|p| p.language_name() == "c");
-        let cpp_id = parsers.iter().position(|p| p.language_name() == "c++");
-        if let (Some(c_id), Some(cpp_id)) = (c_id, cpp_id) {
-            if by_extension.get("h").map(Vec::as_slice) == Some(&[c_id]) {
-                by_extension.insert("h".to_string(), vec![c_id, cpp_id]);
+        // Fold content-disambiguated extensions into `by_extension`. Each such
+        // extension keeps its base owner (claimed via `extensions`, signal-less)
+        // first — that is the inconclusive-content default (`ids[0]`) — followed
+        // by the signal-gated candidates in tier order (plugins before
+        // builtins). `disambiguate` picks a candidate by content per file.
+        {
+            let mut done: std::collections::HashSet<&str> = std::collections::HashSet::new();
+            for (ext, _) in &disambig_exts {
+                if !done.insert(ext.as_str()) {
+                    continue;
+                }
+                let mut cands: Vec<LangId> = by_extension.get(ext).cloned().unwrap_or_default();
+                for (e, id) in &disambig_exts {
+                    if e == ext {
+                        cands.push(*id);
+                    }
+                }
+                // Dedup by language name, preserving order (base owner first).
+                let mut seen = std::collections::HashSet::new();
+                cands.retain(|&id| seen.insert(parsers[id].language_name()));
+                by_extension.insert(ext.clone(), cands);
             }
         }
 
@@ -492,6 +560,7 @@ impl LanguageParserRegistry {
             by_pattern,
             by_rexpr,
             by_interpreter,
+            disambig_signals,
             aliases,
             forced,
             grammar_store,
@@ -589,26 +658,23 @@ impl LanguageParserRegistry {
         None
     }
 
-    /// Picks a single language from an ambiguous candidate set using a
-    /// content-based selector. Returns `None` when no selector applies to the
-    /// candidate group, leaving the caller to fall back to the highest-priority
-    /// candidate.
+    /// Picks a single language from an ambiguous candidate set by scanning the
+    /// content prefix for each candidate's declared disambiguation signals (from
+    /// plugin `[disambiguation]` maps / builtin descriptors). Candidates are
+    /// tried in order, so the first signal match wins. Returns `None` when no
+    /// candidate's signals appear, leaving the caller to fall back to `cands[0]`
+    /// (the extension's base owner — e.g. C for `.h`).
     ///
     /// `prefix` is a bounded head of the file's content.
     pub fn disambiguate(&self, cands: &[LangId], prefix: &[u8]) -> Option<LangId> {
-        let name_of = |id: LangId| self.parsers[id].language_name();
-        let has = |name: &str| cands.iter().any(|&id| name_of(id) == name);
-
-        // C vs C++ (e.g. a `.h` header): default to C, choose C++ on evidence.
-        if has("c") && has("c++") {
-            let want = if crate::lang_resolve::looks_like_cpp(prefix) {
-                "c++"
-            } else {
-                "c"
-            };
-            return cands.iter().copied().find(|&id| name_of(id) == want);
+        let text = String::from_utf8_lossy(prefix);
+        for &id in cands {
+            if let Some(signals) = self.disambig_signals.get(&id) {
+                if signals.iter().any(|s| text.contains(s.as_str())) {
+                    return Some(id);
+                }
+            }
         }
-
         None
     }
 
@@ -790,19 +856,16 @@ mod tests {
             NameResolution::Ambiguous(ids) => ids,
             _ => panic!("expected .h to resolve as ambiguous C/C++"),
         };
-        // Tie-break default (first candidate) is C.
+        // Base owner (first candidate) is C — the inconclusive-content default.
         assert_eq!(reg.parser(ids[0]).language_name(), "c");
-        // Content chooses the language.
+        // C++ signals in the content select C++.
         assert_eq!(
             reg.disambiguate(&ids, b"class Foo {\npublic:\n};")
                 .map(|id| reg.parser(id).language_name()),
             Some("c++")
         );
-        assert_eq!(
-            reg.disambiguate(&ids, b"int add(int a, int b);")
-                .map(|id| reg.parser(id).language_name()),
-            Some("c")
-        );
+        // No signal → inconclusive → None; the worker falls back to ids[0] (C).
+        assert_eq!(reg.disambiguate(&ids, b"int add(int a, int b);"), None);
     }
 
     #[test]

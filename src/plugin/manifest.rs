@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 /// A single tag kind entry from a plugin's `plugin.toml` manifest.
@@ -43,6 +44,12 @@ pub struct PluginManifest {
     pub wasm_file: String,
     /// Optional list of tag kinds the plugin can generate, for `--list-kinds` output.
     pub kinds: Option<Vec<ManifestKind>>,
+    /// Content-disambiguation signals, keyed by an extension the plugin shares
+    /// with other languages (e.g. `h`). Such an extension is claimed only when
+    /// one of its marker strings appears in the file's content; it must also be
+    /// listed in `extensions`. Empty when omitted.
+    #[serde(default)]
+    pub disambiguation: BTreeMap<String, Vec<String>>,
     /// Marks a dev/test-only plugin: it still loads and routes when explicitly
     /// pointed at (e.g. `--plugin-dir`), but is hidden from `--list-plugins` and
     /// excluded from the published distribution index so end users never see or

@@ -176,10 +176,13 @@ fn build_wasm_plugins(out_dir: &Path) {
             continue;
         }
 
+        // Prepend `wasm_file` as a top-level key. Appending it would fold the
+        // key into a trailing table section (e.g. `[[kinds]]` or
+        // `[disambiguation]`) and corrupt the manifest.
         let manifest = format!(
-            "{}\nwasm_file = \"{}\"\n",
-            manifest_template.trim_end(),
-            wasm_out_path.display()
+            "wasm_file = \"{}\"\n{}\n",
+            wasm_out_path.display(),
+            manifest_template.trim_start()
         );
         if let Err(e) = fs::write(plugin_out_dir.join("plugin.toml"), &manifest) {
             println!("cargo:warning=cannot write {plugin_name} plugin.toml: {e}");
