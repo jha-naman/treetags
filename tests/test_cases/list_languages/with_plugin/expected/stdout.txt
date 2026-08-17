@@ -1,0 +1,19 @@
+c
+c#
+c++
+elixir
+go
+java              [plugin]
+java              [native, overridden]
+javascript
+julia
+kotlin            [plugin]
+lua
+ocaml
+php
+python
+ruby
+rust
+scala
+shell
+typescript

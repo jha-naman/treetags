@@ -1,0 +1,17 @@
+c
+c#
+c++
+elixir
+go
+java
+javascript
+julia
+lua
+ocaml
+php
+python
+ruby
+rust
+scala
+shell
+typescript

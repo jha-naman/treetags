@@ -126,6 +126,10 @@ fn handle_early_exit_commands(config: &Config) -> bool {
         list_maps(config, lang);
         return true;
     }
+    if config.list_languages {
+        list_languages(config);
+        return true;
+    }
     false
 }
 
@@ -204,6 +208,39 @@ fn list_maps(config: &Config, only: &str) {
         let mut items: Vec<String> = exts.iter().map(|e| format!(".{e}")).collect();
         items.extend(patterns.iter().cloned());
         println!("{:<12} {}", lang, items.join(" "));
+    }
+}
+
+/// Print every supported language (native and plugin), one per line, sorted by
+/// name. Plugin-provided languages are tagged `[plugin]`; a source shadowed by a
+/// higher-priority one is tagged `[<kind>, overridden]`.
+fn list_languages(config: &Config) {
+    use language_parser::SourceKind;
+
+    let registry = language_parser::LanguageParserRegistry::new(config);
+    // Sort by name, then winners before overridden within the same name.
+    let mut rows: Vec<(&str, bool, SourceKind)> = registry
+        .language_sources()
+        .iter()
+        .map(|s| (s.name.as_str(), s.won, s.kind))
+        .collect();
+    rows.sort_by(|a, b| {
+        a.0.to_lowercase()
+            .cmp(&b.0.to_lowercase())
+            .then(b.1.cmp(&a.1))
+    });
+
+    for (name, won, kind) in rows {
+        let tag = match (won, kind) {
+            (true, SourceKind::Native) => String::new(),
+            (true, _) => format!("[{}]", kind.label()),
+            (false, _) => format!("[{}, overridden]", kind.label()),
+        };
+        if tag.is_empty() {
+            println!("{name}");
+        } else {
+            println!("{name:<18}{tag}");
+        }
     }
 }
 
