@@ -27,7 +27,7 @@ pub(crate) struct BuiltinLangDesc {
     pub kind_optionals: &'static [(&'static [&'static str], &'static str)],
     /// Content-disambiguation signals keyed by a shared extension: for each
     /// `(ext, signals)`, this language claims `ext` only when one of `signals`
-    /// appears in the file content. 
+    /// appears in the file content.
     /// eg `.h` is owned outright by C and available to C++ on content evidence.
     pub disambiguation: &'static [(&'static str, &'static [&'static str])],
     pub generate_fn: BuiltinGenerateFn,

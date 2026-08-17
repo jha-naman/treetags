@@ -25,24 +25,41 @@ impl Guest for ObjcPlugin {
 
 export!(ObjcPlugin);
 
+// Objective-C is a strict superset of C, so constructs shared with C use the
+// *exact* kind letters the C parser emits (`src/parser/cpp.rs` C_KIND_*), and
+// Objective-C-only constructs use letters that do not clash with any C letter.
 const OBJC_DEFAULT_KINDS: &[(&[&str], &str)] = &[
-    (&["C", "category"], "C"),
-    (&["E", "field"], "E"),
-    (&["I", "implementation"], "I"),
-    (&["M", "macro"], "M"),
-    (&["P", "protocol"], "P"),
-    (&["c", "class"], "c"),
-    (&["e", "enum"], "e"),
+    // Shared with C — identical letters to the C parser.
+    (&["d", "macro"], "d"),
+    (&["e", "enumerator"], "e"),
     (&["f", "function"], "f"),
-    (&["i", "interface"], "i"),
-    (&["m", "method"], "m"),
-    (&["p", "property"], "p"),
+    (&["g", "enum"], "g"),
+    (&["h", "header"], "h"),
+    (&["m", "member"], "m"),
     (&["s", "struct"], "s"),
     (&["t", "typedef"], "t"),
-    (&["v", "var"], "v"),
+    (&["u", "union"], "u"),
+    (&["v", "variable"], "v"),
+    // Objective-C-only — non-clashing letters.
+    (&["A", "property"], "A"),
+    (&["C", "category"], "C"),
+    (&["E", "ivar"], "E"),
+    (&["I", "implementation"], "I"),
+    (&["M", "method"], "M"),
+    (&["P", "protocol"], "P"),
+    (&["c", "class"], "c"),
+    (&["i", "interface"], "i"),
 ];
 
-const OBJC_OPTIONAL_KINDS: &[(&[&str], &str)] = &[];
+// Off by default, matching the C parser's optional kinds (C_KIND_OPTIONALS).
+const OBJC_OPTIONAL_KINDS: &[(&[&str], &str)] = &[
+    (&["l", "local"], "l"),
+    (&["p", "prototype"], "p"),
+    (&["x", "externvar"], "x"),
+    (&["z", "parameter"], "z"),
+    (&["L", "label"], "L"),
+    (&["D", "macroparam"], "D"),
+];
 
 #[derive(Clone, Copy)]
 enum ScopeKind {
@@ -50,6 +67,8 @@ enum ScopeKind {
     Implementation,
     Protocol,
     Struct,
+    Union,
+    Function,
 }
 
 impl ScopeKey for ScopeKind {
@@ -59,6 +78,8 @@ impl ScopeKey for ScopeKind {
             ScopeKind::Implementation => "implementation",
             ScopeKind::Protocol => "protocol",
             ScopeKind::Struct => "struct",
+            ScopeKind::Union => "union",
+            ScopeKind::Function => "function",
         }
     }
 }
@@ -299,15 +320,152 @@ fn handle_container(
     true
 }
 
+/// The first `function_declarator` at or below `node` (declarators may be
+/// wrapped, e.g. `pointer_declarator` -> `function_declarator`).
+fn find_function_declarator(node: Node) -> Option<Node> {
+    if node.kind() == "function_declarator" {
+        return Some(node);
+    }
+    let mut cursor = node.walk();
+    let mut found = None;
+    for_each_child!(cursor, {
+        if let Some(f) = find_function_declarator(cursor.node()) {
+            found = Some(f);
+            break;
+        }
+    });
+    found
+}
+
+/// Emit a `z` (parameter) tag for each named parameter of the function/prototype
+/// declarator `decl`, scoped under `function:fn_name` (matches the C parser).
+fn emit_function_params(decl: Node, source: &[u8], fn_name: &str, tags: &mut Vec<Tag>) {
+    let Some(func_decl) = find_function_declarator(decl) else {
+        return;
+    };
+    let Some(params) = func_decl.child_by_field_name("parameters") else {
+        return;
+    };
+    let mut cursor = params.walk();
+    for_each_child!(cursor, {
+        let param = cursor.node();
+        if param.kind() == "parameter_declaration" {
+            if let Some(d) = param.child_by_field_name("declarator") {
+                if let Some((name, _)) = declarator_name(d, source) {
+                    tags.push(make_tag(
+                        name,
+                        line_of(param),
+                        "z",
+                        Some(("function", fn_name)),
+                    ));
+                }
+            }
+        }
+    });
+}
+
+/// Emit a `D` (macroparam) tag for each parameter of a function-like macro,
+/// scoped under `macro:macro_name` (matches the C parser).
+fn emit_macro_params(
+    cursor: &mut TreeCursor,
+    source: &[u8],
+    macro_name: &str,
+    tags: &mut Vec<Tag>,
+) {
+    for_each_child!(cursor, {
+        if cursor.node().kind() == "preproc_params" {
+            for_each_child!(cursor, {
+                let p = cursor.node();
+                if p.kind() == "identifier" {
+                    let name = node_text(p, source).to_string();
+                    tags.push(make_tag(name, line_of(p), "D", Some(("macro", macro_name))));
+                }
+            });
+            break;
+        }
+    });
+}
+
+/// Whether a `declaration` node carries an `extern` storage-class specifier.
+fn has_extern_specifier(cursor: &mut TreeCursor, source: &[u8]) -> bool {
+    let mut found = false;
+    for_each_child!(cursor, {
+        let c = cursor.node();
+        if c.kind() == "storage_class_specifier" && node_text(c, source) == "extern" {
+            found = true;
+            break;
+        }
+    });
+    found
+}
+
+/// The first `enumerator_list` at or below `node`. For a plain `enum_specifier`
+/// it is a direct child; for `typedef NS_ENUM(...) { ... }` it sits inside the
+/// macro's expansion, so the search descends.
+fn find_enumerator_list(node: Node) -> Option<Node> {
+    if node.kind() == "enumerator_list" {
+        return Some(node);
+    }
+    let mut cursor = node.walk();
+    let mut found = None;
+    for_each_child!(cursor, {
+        if let Some(l) = find_enumerator_list(cursor.node()) {
+            found = Some(l);
+            break;
+        }
+    });
+    found
+}
+
+/// Emit an `e` (enumerator) tag for each constant of a `typedef NS_ENUM/NS_OPTIONS`.
+/// tree-sitter-objc cannot parse the macro body, so the constants surface as
+/// `type_identifier` nodes directly under the `type_definition` (wrapped by
+/// `ERROR` `{`/`}` siblings); the enum name lives inside the `macro_type_specifier`
+/// and is therefore not a direct child, so it is not picked up here.
+fn emit_nsenum_constants(
+    cursor: &mut TreeCursor,
+    source: &[u8],
+    enum_name: &str,
+    tags: &mut Vec<Tag>,
+) {
+    for_each_child!(cursor, {
+        let c = cursor.node();
+        if c.kind() == "type_identifier" {
+            let name = node_text(c, source).to_string();
+            tags.push(make_tag(name, line_of(c), "e", Some(("enum", enum_name))));
+        }
+    });
+}
+
+/// Emit an `e` (enumerator) tag for each constant in `node`'s enumerator list,
+/// scoped under `enum:enum_name` (matches the C parser).
+fn emit_enumerators(node: Node, source: &[u8], enum_name: &str, tags: &mut Vec<Tag>) {
+    let Some(list) = find_enumerator_list(node) else {
+        return;
+    };
+    let mut cursor = list.walk();
+    for_each_child!(cursor, {
+        let e = cursor.node();
+        if e.kind() == "enumerator" {
+            if let Some((name, _)) = child_ident(&mut cursor, source, &["identifier"]) {
+                tags.push(make_tag(name, line_of(e), "e", Some(("enum", enum_name))));
+            }
+        }
+    });
+}
+
 fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcWalker<'_>) -> bool {
     let node = cursor.node();
     let line = line_of(node);
 
     match node.kind() {
         "preproc_def" | "preproc_function_def" => {
-            if walker.kinds.is_enabled("M") {
-                if let Some((name, _)) = child_ident(cursor, source, &["identifier"]) {
-                    walker.tags.push(make_tag(name, line, "M", None));
+            if let Some((name, _)) = child_ident(cursor, source, &["identifier"]) {
+                if walker.kinds.is_enabled("d") {
+                    walker.tags.push(make_tag(name.clone(), line, "d", None));
+                }
+                if node.kind() == "preproc_function_def" && walker.kinds.is_enabled("D") {
+                    emit_macro_params(cursor, source, &name, &mut walker.tags);
                 }
             }
             false
@@ -338,7 +496,7 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcW
         }
         "method_declaration" | "method_definition" => {
             let is_class = node_text(node, source).trim_start().starts_with('+');
-            let kind = if is_class { "c" } else { "m" };
+            let kind = if is_class { "c" } else { "M" };
             if walker.kinds.is_enabled(kind) {
                 if let Some(name) = method_selector(cursor, source) {
                     let scope = walker.scopes.current_field();
@@ -353,9 +511,9 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcW
             false
         }
         "property_declaration" => {
-            if walker.kinds.is_enabled("p") {
+            if walker.kinds.is_enabled("A") {
                 let scope = walker.scopes.current_field();
-                emit_struct_declarators(cursor, source, line, "p", scope, &mut walker.tags);
+                emit_struct_declarators(cursor, source, line, "A", scope, &mut walker.tags);
             }
             false
         }
@@ -367,13 +525,13 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcW
             false
         }
         "field_declaration" => {
-            if walker.kinds.is_enabled("E") {
+            if walker.kinds.is_enabled("m") {
                 let scope = walker.scopes.current_field();
                 for_each_child!(cursor, {
                     if cursor.field_name() == Some("declarator") {
                         if let Some((name, is_func)) = declarator_name(cursor.node(), source) {
                             if !is_func {
-                                walker.tags.push(make_tag(name, line, "E", scope));
+                                walker.tags.push(make_tag(name, line, "m", scope));
                             }
                         }
                     }
@@ -382,15 +540,20 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcW
             false
         }
         "struct_specifier" | "union_specifier" => {
+            let (kind, scope_kind) = if node.kind() == "union_specifier" {
+                ("u", ScopeKind::Union)
+            } else {
+                ("s", ScopeKind::Struct)
+            };
             if let Some(nm) = node.child_by_field_name("name") {
                 if node.child_by_field_name("body").is_some() {
                     let name = node_text(nm, source).to_string();
-                    if walker.kinds.is_enabled("s") {
+                    if walker.kinds.is_enabled(kind) {
                         let scope = walker.scopes.current_field();
-                        walker.tags.push(make_tag(name.clone(), line, "s", scope));
+                        walker.tags.push(make_tag(name.clone(), line, kind, scope));
                     }
                     let prev_cat = walker.current_category.clone();
-                    walker.scopes.push(ScopeKind::Struct, &name);
+                    walker.scopes.push(scope_kind, &name);
                     walker.opens.push(Open::ScopeWithCategory(prev_cat));
                     return true;
                 }
@@ -398,15 +561,16 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcW
             false
         }
         "enum_specifier" => {
+            // A named enum matches C: the name is `g`, each constant is `e`
+            // scoped `enum:Name`. Anonymous enums emit nothing (as in C).
             if let Some(nm) = node.child_by_field_name("name") {
-                if walker.kinds.is_enabled("e") {
+                let name = node_text(nm, source).to_string();
+                if walker.kinds.is_enabled("g") {
                     let scope = walker.scopes.current_field();
-                    walker.tags.push(make_tag(
-                        node_text(nm, source).to_string(),
-                        line,
-                        "e",
-                        scope,
-                    ));
+                    walker.tags.push(make_tag(name.clone(), line, "g", scope));
+                }
+                if walker.kinds.is_enabled("e") {
+                    emit_enumerators(node, source, &name, &mut walker.tags);
                 }
             }
             false
@@ -421,12 +585,22 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcW
                         .map(|n| node_text(n, source))
                         .unwrap_or_default();
                     if macro_name == "NS_ENUM" || macro_name == "NS_OPTIONS" {
-                        if walker.kinds.is_enabled("e") {
-                            if let Some(ty) = tn.child_by_field_name("type") {
-                                let enum_name = node_text(ty, source).trim().to_string();
-                                if !enum_name.is_empty() {
+                        if let Some(ty) = tn.child_by_field_name("type") {
+                            let enum_name = node_text(ty, source).trim().to_string();
+                            if !enum_name.is_empty() {
+                                if walker.kinds.is_enabled("g") {
                                     let scope = walker.scopes.current_field();
-                                    walker.tags.push(make_tag(enum_name, line, "e", scope));
+                                    walker
+                                        .tags
+                                        .push(make_tag(enum_name.clone(), line, "g", scope));
+                                }
+                                if walker.kinds.is_enabled("e") {
+                                    emit_nsenum_constants(
+                                        cursor,
+                                        source,
+                                        &enum_name,
+                                        &mut walker.tags,
+                                    );
                                 }
                             }
                         }
@@ -465,30 +639,83 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcW
             false
         }
         "function_definition" => {
-            if walker.in_body == 0 && walker.kinds.is_enabled("f") {
+            if walker.in_body == 0 {
                 if let Some(decl) = node.child_by_field_name("declarator") {
                     if let Some((name, _)) = declarator_name(decl, source) {
-                        let scope = walker.scopes.current_field();
-                        walker.tags.push(make_tag(name, line, "f", scope));
+                        if walker.kinds.is_enabled("f") {
+                            let scope = walker.scopes.current_field();
+                            walker.tags.push(make_tag(name.clone(), line, "f", scope));
+                        }
+                        if walker.kinds.is_enabled("z") {
+                            emit_function_params(decl, source, &name, &mut walker.tags);
+                        }
+                        // Open a function scope so body locals/labels get a
+                        // `function:name` field, as the C parser does.
+                        let prev_cat = walker.current_category.clone();
+                        walker.scopes.push(ScopeKind::Function, &name);
+                        walker.opens.push(Open::ScopeWithCategory(prev_cat));
+                        return true;
                     }
                 }
             }
             false
         }
         "declaration" => {
-            if walker.in_body == 0
-                && walker.scopes.current_field().is_none()
-                && walker.kinds.is_enabled("v")
-            {
-                for_each_child!(cursor, {
-                    if cursor.field_name() == Some("declarator") {
-                        if let Some((name, is_func)) = declarator_name(cursor.node(), source) {
-                            if !is_func {
-                                walker.tags.push(make_tag(name, line, "v", None));
+            // Mirror the C parser's classification: function declarators are
+            // prototypes (`p`); variables are `x` (extern), `l` (inside a body)
+            // or `v` (file-scope global).
+            let is_extern = has_extern_specifier(cursor, source);
+            let in_body = walker.in_body > 0;
+            let at_file_scope = !in_body && walker.scopes.current_field().is_none();
+            for_each_child!(cursor, {
+                if cursor.field_name() == Some("declarator") {
+                    let child = cursor.node();
+                    if let Some((name, is_func)) = declarator_name(child, source) {
+                        if is_func {
+                            if walker.kinds.is_enabled("p") {
+                                let scope = walker.scopes.current_field();
+                                walker.tags.push(make_tag(name.clone(), line, "p", scope));
+                            }
+                            if walker.kinds.is_enabled("z") {
+                                emit_function_params(child, source, &name, &mut walker.tags);
+                            }
+                        } else {
+                            let (kind, emit) = if is_extern {
+                                ("x", !in_body)
+                            } else if in_body {
+                                ("l", true)
+                            } else {
+                                ("v", at_file_scope)
+                            };
+                            if emit && walker.kinds.is_enabled(kind) {
+                                let scope = walker.scopes.current_field();
+                                walker.tags.push(make_tag(name, line, kind, scope));
                             }
                         }
                     }
-                });
+                }
+            });
+            false
+        }
+        "preproc_include" | "preproc_import" => {
+            if walker.kinds.is_enabled("h") {
+                if let Some((path, _)) =
+                    child_ident(cursor, source, &["string_literal", "system_lib_string"])
+                {
+                    let trimmed = path
+                        .trim_matches(|c| c == '"' || c == '<' || c == '>')
+                        .to_string();
+                    walker.tags.push(make_tag(trimmed, line, "h", None));
+                }
+            }
+            false
+        }
+        "labeled_statement" => {
+            if walker.kinds.is_enabled("L") {
+                if let Some((name, _)) = child_ident(cursor, source, &["statement_identifier"]) {
+                    let scope = walker.scopes.current_field();
+                    walker.tags.push(make_tag(name, line, "L", scope));
+                }
             }
             false
         }
