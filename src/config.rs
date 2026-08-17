@@ -179,6 +179,12 @@ pub struct Config {
     #[arg(long = "list-maps", value_name = "LANG", num_args = 0..=1, default_missing_value = "")]
     pub list_maps: Option<String>,
 
+    /// List all supported languages (native and plugin), one per line, and exit.
+    /// Plugin-provided languages are tagged `[plugin]`; a source shadowed by a
+    /// higher-priority one is tagged `[..., overridden]`.
+    #[arg(long = "list-languages", verbatim_doc_comment)]
+    pub list_languages: bool,
+
     /// Language map edits parsed from `--map-<LANG>` and `--langmap`, applied
     /// when the registry is built.
     #[clap(skip)]

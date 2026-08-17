@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add `--list-languages` cli arg to list supported languages
+Lists all installed languages. Will not list uninstalled plugins
+
 - [0.14.0]
 
 ### Added

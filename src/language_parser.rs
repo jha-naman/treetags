@@ -10,6 +10,37 @@ use crate::plugin::registry::{scan_ext_infos, PluginRegistry};
 use crate::tag::Tag;
 
 // ---------------------------------------------------------------------------
+// Source records (for `--list-languages`)
+// ---------------------------------------------------------------------------
+
+/// Which tier a language source comes from.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SourceKind {
+    Plugin,
+    Native,
+    User,
+}
+
+impl SourceKind {
+    /// Lowercase label used in `--list-languages` tags.
+    pub fn label(self) -> &'static str {
+        match self {
+            SourceKind::Plugin => "plugin",
+            SourceKind::Native => "native",
+            SourceKind::User => "user provided grammar",
+        }
+    }
+}
+
+/// Candidate language source recorded while building the registry
+pub struct LangSource {
+    pub kind: SourceKind,
+    pub name: String,
+    pub extensions: Vec<String>,
+    pub won: bool,
+}
+
+// ---------------------------------------------------------------------------
 // Core trait
 // ---------------------------------------------------------------------------
 
@@ -188,6 +219,9 @@ pub enum NameResolution {
 /// candidate languages (highest-priority first).
 pub struct LanguageParserRegistry {
     parsers: Vec<Box<dyn LanguageParser>>,
+    /// Every candidate language source in tier order, including shadowed ones.
+    /// Read only by `--list-languages`; routing uses the maps below.
+    sources: Vec<LangSource>,
     by_extension: HashMap<String, Vec<LangId>>,
     /// Filename glob patterns in registration (priority) order. Matched against
     /// the basename before extensions.
@@ -251,6 +285,7 @@ impl LanguageParserRegistry {
 
         let mut parsers: Vec<Box<dyn LanguageParser>> = Vec::new();
         let mut by_extension: HashMap<String, Vec<LangId>> = HashMap::new();
+        let mut sources: Vec<LangSource> = Vec::new();
         // Force aliases collected per source, applied after canonical names so
         // that a canonical name always wins over an alias on collision.
         let mut alias_specs: Vec<(LangId, String)> = Vec::new();
@@ -268,11 +303,30 @@ impl LanguageParserRegistry {
 
         // Priority 1: WASM plugins
         let plugin_infos = scan_ext_infos(&config.plugin_dirs, Some(&config.plugins_dir));
+        let mut plugin_src_idx: HashMap<String, usize> = HashMap::new();
         for info in plugin_infos {
-            if by_extension.contains_key(&info.ext) {
+            let lang = info.lang.clone().unwrap_or_else(|| info.ext.clone());
+            let claimed = !by_extension.contains_key(&info.ext);
+            if !info.internal {
+                match plugin_src_idx.get(&lang) {
+                    Some(&si) => {
+                        sources[si].extensions.push(info.ext.clone());
+                        sources[si].won |= claimed;
+                    }
+                    None => {
+                        plugin_src_idx.insert(lang.clone(), sources.len());
+                        sources.push(LangSource {
+                            kind: SourceKind::Plugin,
+                            name: lang.clone(),
+                            extensions: vec![info.ext.clone()],
+                            won: claimed,
+                        });
+                    }
+                }
+            }
+            if !claimed {
                 continue;
             }
-            let lang = info.lang.clone().unwrap_or_else(|| info.ext.clone());
             let kind_infos: Vec<KindInfo> = info
                 .kinds
                 .into_iter()
@@ -312,6 +366,12 @@ impl LanguageParserRegistry {
                 by_extension.insert((*ext).to_string(), vec![id]);
                 claimed = true;
             }
+            sources.push(LangSource {
+                kind: SourceKind::Native,
+                name: desc.lang.to_string(),
+                extensions: desc.extensions.iter().map(|e| e.to_string()).collect(),
+                won: claimed,
+            });
             // Register the language whenever it claims an extension or carries
             // name metadata, so its patterns/interpreters/aliases survive even
             // when a higher-priority source (e.g. a plugin) claims all of its
@@ -341,6 +401,7 @@ impl LanguageParserRegistry {
             // A grammar spans several extensions; its aliases and patterns attach
             // to the first (representative) parser created for it.
             let mut rep_id: Option<LangId> = None;
+            let mut claimed = false;
             for ext in grammar.extensions {
                 if by_extension.contains_key(*ext) {
                     continue;
@@ -352,7 +413,14 @@ impl LanguageParserRegistry {
                     lang: grammar.lang.to_string(),
                 }));
                 by_extension.insert((*ext).to_string(), vec![id]);
+                claimed = true;
             }
+            sources.push(LangSource {
+                kind: SourceKind::Native,
+                name: grammar.lang.to_string(),
+                extensions: grammar.extensions.iter().map(|e| e.to_string()).collect(),
+                won: claimed,
+            });
             // If every extension was already claimed, still register the
             // grammar's metadata against a representative parser so its
             // aliases/patterns/interpreters are not lost. The parser's
@@ -391,10 +459,11 @@ impl LanguageParserRegistry {
         // lifetimes are held by the shared GrammarStore.
         for ug in &config.user_grammars {
             let mut rep_id: Option<LangId> = None;
-            for ext in
-                crate::user_grammars::resolve_extensions(&ug.language_name, ug.extensions.as_ref())
-            {
-                if by_extension.contains_key(&ext) {
+            let mut claimed = false;
+            let ug_exts: Vec<String> =
+                crate::user_grammars::resolve_extensions(&ug.language_name, ug.extensions.as_ref());
+            for ext in &ug_exts {
+                if by_extension.contains_key(ext) {
                     continue;
                 }
                 let id = parsers.len();
@@ -403,8 +472,15 @@ impl LanguageParserRegistry {
                     extension: ext.clone(),
                     lang: ug.language_name.clone(),
                 }));
-                by_extension.insert(ext, vec![id]);
+                by_extension.insert(ext.clone(), vec![id]);
+                claimed = true;
             }
+            sources.push(LangSource {
+                kind: SourceKind::User,
+                name: ug.language_name.clone(),
+                extensions: ug_exts,
+                won: claimed,
+            });
             // Patterns attach to the grammar's representative parser. A grammar
             // needs at least one extension so its compiled config is reachable in
             // GrammarStore (which is keyed by extension); pattern-only user
@@ -488,6 +564,7 @@ impl LanguageParserRegistry {
 
         Self {
             parsers,
+            sources,
             by_extension,
             by_pattern,
             by_rexpr,
@@ -674,6 +751,12 @@ impl LanguageParserRegistry {
             .iter()
             .map(|b| b.as_ref())
             .find(|lp| lp.language_name() == lang)
+    }
+
+    /// Every candidate language source in tier order, including sources shadowed
+    /// by a higher priority one (`won == false`)
+    pub fn language_sources(&self) -> &[LangSource] {
+        &self.sources
     }
 
     /// Iterates all registered parsers, deduplicated by language name.

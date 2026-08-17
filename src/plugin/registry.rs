@@ -262,6 +262,9 @@ pub struct PluginExtInfo {
     pub patterns: Vec<String>,
     pub interpreters: Vec<String>,
     pub kinds: Vec<super::manifest::ManifestKind>,
+    /// Dev/test-only plugin: routes normally but is hidden from listings
+    /// (`--list-plugins`, `--list-languages`).
+    pub internal: bool,
 }
 
 /// Scans plugin manifests (no WASM loading) and returns per-extension plugin info.
@@ -276,6 +279,7 @@ pub fn scan_ext_infos(dirs: &[PathBuf], plugins_dir: Option<&PathBuf>) -> Vec<Pl
             patterns: entry.patterns,
             interpreters: entry.interpreters,
             kinds: entry.kinds,
+            internal: entry.internal,
         })
         .collect()
 }
