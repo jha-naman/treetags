@@ -25,28 +25,13 @@ pub(crate) struct BuiltinLangDesc {
     pub interpreters: &'static [&'static str],
     pub kind_defaults: &'static [(&'static [&'static str], &'static str)],
     pub kind_optionals: &'static [(&'static [&'static str], &'static str)],
+    /// Content-disambiguation signals keyed by a shared extension: for each
+    /// `(ext, signals)`, this language claims `ext` only when one of `signals`
+    /// appears in the file content. 
+    /// eg `.h` is owned outright by C and available to C++ on content evidence.
+    pub disambiguation: &'static [(&'static str, &'static [&'static str])],
     pub generate_fn: BuiltinGenerateFn,
 }
-
-/// A content-disambiguation rule for a builtin language: for the given shared
-/// `extensions`, this language is selected only when one of its `signals`
-/// appears in the file content. The mirror of a plugin manifest's
-/// `[[disambiguation]]` table, so builtins and plugins are resolved the same way.
-pub(crate) struct BuiltinDisambiguation {
-    pub lang: &'static str,
-    pub extensions: &'static [&'static str],
-    pub signals: &'static [&'static str],
-}
-
-/// Builtin disambiguation rules. A language declaring a shared extension here is
-/// a signal-gated candidate for it; the extension's plain owner (via
-/// `extensions`) remains the inconclusive-content default. `.h` is owned by C
-/// and offered to C++ on content evidence.
-pub(crate) static BUILTIN_DISAMBIGUATION: &[BuiltinDisambiguation] = &[BuiltinDisambiguation {
-    lang: cpp::LANG_NAME,
-    extensions: &["h"],
-    signals: cpp::CPP_DISAMBIG_SIGNALS,
-}];
 
 /// All builtin languages. Priority in tag generation follows array order.
 /// Adding a new builtin language requires exactly one new entry here.
@@ -59,6 +44,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         interpreters: &[],
         kind_defaults: rust::KIND_DEFAULTS,
         kind_optionals: rust::KIND_OPTIONALS,
+        disambiguation: &[],
         generate_fn: rust::generate,
     },
     BuiltinLangDesc {
@@ -69,6 +55,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         interpreters: &[],
         kind_defaults: go::KIND_DEFAULTS,
         kind_optionals: go::KIND_OPTIONALS,
+        disambiguation: &[],
         generate_fn: go::generate,
     },
     BuiltinLangDesc {
@@ -79,6 +66,8 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         interpreters: &[],
         kind_defaults: cpp::KIND_DEFAULTS,
         kind_optionals: cpp::KIND_OPTIONALS,
+        // `.h` is owned outright by C; C++ claims it only on C++ markers.
+        disambiguation: &[("h", cpp::CPP_DISAMBIG_SIGNALS)],
         generate_fn: cpp::generate,
     },
     // C reuses the C++ parser but is a distinct language with its own kind table.
@@ -90,6 +79,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         interpreters: &[],
         kind_defaults: cpp::C_KIND_DEFAULTS,
         kind_optionals: cpp::C_KIND_OPTIONALS,
+        disambiguation: &[],
         generate_fn: cpp::generate,
     },
     BuiltinLangDesc {
@@ -100,6 +90,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         interpreters: &["node", "nodejs"],
         kind_defaults: js::KIND_DEFAULTS,
         kind_optionals: js::KIND_OPTIONALS,
+        disambiguation: &[],
         generate_fn: js::generate,
     },
     BuiltinLangDesc {
@@ -110,6 +101,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         interpreters: &["python", "python2", "python3"],
         kind_defaults: python::KIND_DEFAULTS,
         kind_optionals: python::KIND_OPTIONALS,
+        disambiguation: &[],
         generate_fn: python::generate,
     },
     BuiltinLangDesc {
@@ -120,6 +112,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         interpreters: &[],
         kind_defaults: typescript::KIND_DEFAULTS,
         kind_optionals: typescript::KIND_OPTIONALS,
+        disambiguation: &[],
         generate_fn: typescript::generate,
     },
 ];

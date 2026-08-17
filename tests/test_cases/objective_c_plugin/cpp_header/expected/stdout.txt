@@ -1,0 +1,2 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+Widget	widget.h	/^class Widget {$/;"	c	namespace:app

@@ -177,8 +177,8 @@ fn build_wasm_plugins(out_dir: &Path) {
         }
 
         // Prepend `wasm_file` as a top-level key. Appending it would fold the
-        // key into a trailing array-of-tables section (e.g. `[[kinds]]` or
-        // `[[disambiguation]]`) and corrupt the manifest.
+        // key into a trailing table section (e.g. `[[kinds]]` or
+        // `[disambiguation]`) and corrupt the manifest.
         let manifest = format!(
             "wasm_file = \"{}\"\n{}\n",
             wasm_out_path.display(),

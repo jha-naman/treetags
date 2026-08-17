@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::builtin_langs::{BuiltinLangDesc, BUILTIN_DISAMBIGUATION, BUILTIN_LANG_DESCRIPTORS};
+use crate::builtin_langs::{BuiltinLangDesc, BUILTIN_LANG_DESCRIPTORS};
 use crate::config::Config;
 use crate::parser::{kinds_from_mappings, KindInfo, TagKindConfig};
 use crate::parser::{GrammarStore, Parser};
@@ -235,8 +235,8 @@ pub struct LanguageParserRegistry {
     by_interpreter: HashMap<String, Vec<LangId>>,
     /// Content-disambiguation signals per language. When an extension has
     /// several candidates, `disambiguate` selects the first whose signals appear
-    /// in the file. Populated from plugin `[[disambiguation]]` tables and the
-    /// builtin `BUILTIN_DISAMBIGUATION` rules.
+    /// in the file. Populated from plugin `[disambiguation]` maps and the
+    /// `disambiguation` field of builtin descriptors.
     disambig_signals: HashMap<LangId, Vec<String>>,
     /// Language name / alias (lowercased) → language, for `--language-force` and
     /// editor-modeline resolution.
@@ -248,6 +248,24 @@ pub struct LanguageParserRegistry {
     /// Kept so `create_parser` can hand a shared compiled registry to each
     /// per-thread `Parser` for WASM execution.
     plugin_registry: Arc<PluginRegistry>,
+}
+
+/// Records a content-gated extension shared with other languages: `ext` is
+/// claimed only when one of `signals` appears in a file's content. The signals
+/// are attached to `id` and `ext` is noted as a signal-gated candidate. The
+/// extension is deliberately *not* claimed outright, so its base owner (whoever
+/// claims it via plain `extensions`, e.g. C for `.h`) remains the default when
+/// the content is inconclusive. Used for both plugin `[disambiguation]`
+/// maps and builtin descriptor disambiguation.
+fn register_gated_ext(
+    id: LangId,
+    ext: &str,
+    signals: impl IntoIterator<Item = String>,
+    disambig_exts: &mut Vec<(String, LangId)>,
+    disambig_signals: &mut HashMap<LangId, Vec<String>>,
+) {
+    disambig_signals.entry(id).or_default().extend(signals);
+    disambig_exts.push((ext.to_string(), id));
 }
 
 /// Resolves a `--language-force` value against the known language/alias map.
@@ -360,18 +378,20 @@ impl LanguageParserRegistry {
                 lang,
                 kind_infos,
             }));
-            // Register content-disambiguation rules for extensions this plugin
-            // shares with other languages (routed to this parser's LangId).
-            for rule in &info.disambiguation {
-                disambig_signals
-                    .entry(id)
-                    .or_default()
-                    .extend(rule.signals.iter().cloned());
-                for ext in &rule.extensions {
-                    disambig_exts.push((ext.clone(), id));
-                }
+            // A shared extension listed under `[disambiguation]` is claimed only
+            // on content match (a signal-gated candidate); every other extension
+            // is claimed outright.
+            if let Some(signals) = info.disambiguation.get(&info.ext) {
+                register_gated_ext(
+                    id,
+                    &info.ext,
+                    signals.iter().cloned(),
+                    &mut disambig_exts,
+                    &mut disambig_signals,
+                );
+            } else {
+                by_extension.insert(info.ext, vec![id]);
             }
-            by_extension.insert(info.ext, vec![id]);
         }
 
         // Priority 2: Builtin tree-walker parsers.
@@ -380,7 +400,11 @@ impl LanguageParserRegistry {
             let id = parsers.len();
             let mut claimed = false;
             for ext in desc.extensions {
-                if by_extension.contains_key(*ext) {
+                // A content-gated extension (e.g. C++ on `.h`) is registered as a
+                // signal candidate below, never claimed outright here.
+                if desc.disambiguation.iter().any(|(e, _)| e == ext)
+                    || by_extension.contains_key(*ext)
+                {
                     continue;
                 }
                 by_extension.insert((*ext).to_string(), vec![id]);
@@ -393,12 +417,13 @@ impl LanguageParserRegistry {
                 won: claimed,
             });
             // Register the language whenever it claims an extension or carries
-            // name metadata, so its patterns/interpreters/aliases survive even
-            // when a higher-priority source (e.g. a plugin) claims all of its
-            // extensions.
+            // name / disambiguation metadata, so its patterns/interpreters/
+            // aliases/signals survive even when a higher-priority source (e.g. a
+            // plugin) claims all of its extensions.
             let has_metadata = !desc.aliases.is_empty()
                 || !desc.patterns.is_empty()
-                || !desc.interpreters.is_empty();
+                || !desc.interpreters.is_empty()
+                || !desc.disambiguation.is_empty();
             if claimed || has_metadata {
                 for alias in desc.aliases {
                     alias_specs.push((id, (*alias).to_string()));
@@ -409,21 +434,18 @@ impl LanguageParserRegistry {
                 for interp in desc.interpreters {
                     interp_specs.push((id, (*interp).to_string()));
                 }
-                parsers.push(Box::new(BuiltinLanguageParser::from_desc(desc, config)));
-            }
-        }
-
-        // Builtin content-disambiguation rules (e.g. C++ on `.h`), resolved to
-        // the LangId of the already-registered builtin parser.
-        for rule in BUILTIN_DISAMBIGUATION {
-            if let Some(id) = parsers.iter().position(|p| p.language_name() == rule.lang) {
-                disambig_signals
-                    .entry(id)
-                    .or_default()
-                    .extend(rule.signals.iter().map(|s| s.to_string()));
-                for ext in rule.extensions {
-                    disambig_exts.push(((*ext).to_string(), id));
+                // Content-gated extensions (e.g. C++ on `.h`): the extension's
+                // outright owner (C) stays the inconclusive-content default.
+                for (ext, signals) in desc.disambiguation {
+                    register_gated_ext(
+                        id,
+                        ext,
+                        signals.iter().map(|s| s.to_string()),
+                        &mut disambig_exts,
+                        &mut disambig_signals,
+                    );
                 }
+                parsers.push(Box::new(BuiltinLanguageParser::from_desc(desc, config)));
             }
         }
 
@@ -715,7 +737,7 @@ impl LanguageParserRegistry {
 
     /// Picks a single language from an ambiguous candidate set by scanning the
     /// content prefix for each candidate's declared disambiguation signals (from
-    /// `[[disambiguation]]` tables / `BUILTIN_DISAMBIGUATION`). Candidates are
+    /// plugin `[disambiguation]` maps / builtin descriptors). Candidates are
     /// tried in order, so the first signal match wins. Returns `None` when no
     /// candidate's signals appear, leaving the caller to fall back to `cands[0]`
     /// (the extension's base owner — e.g. C for `.h`).

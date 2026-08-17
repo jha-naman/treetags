@@ -1,0 +1,7 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+PLAIN_H	plain.h	/^#define PLAIN_H$/;"	d
+PLAIN_MAX	plain.h	/^#define PLAIN_MAX 100$/;"	d
+PlainCounter	plain.h	/^typedef int PlainCounter;$/;"	t	typeref:typename:int
+PlainPoint	plain.h	/^struct PlainPoint {$/;"	s
+x	plain.h	/^    int x;$/;"	m	struct:PlainPoint	typeref:typename:int
+y	plain.h	/^    int y;$/;"	m	struct:PlainPoint	typeref:typename:int
