@@ -5,7 +5,7 @@ use crate::config::Config;
 use crate::split_by_newlines::split_by_newlines;
 use crate::tag::{ExtensionFields, Tag};
 use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use wasmtime::Engine;
@@ -18,8 +18,8 @@ struct PluginEntry {
     interpreters: Vec<String>,
     name: String,
     kinds: Vec<super::manifest::ManifestKind>,
-    /// Content-disambiguation rules for extensions shared with other languages.
-    disambiguation: Vec<super::manifest::ManifestDisambiguation>,
+    /// Content-disambiguation signals, keyed by a shared extension (e.g. `h`).
+    disambiguation: BTreeMap<String, Vec<String>>,
     /// true for Dev/test-only plugin: routes normally but is hidden from
     /// `list_plugins` and plugin build CI.
     internal: bool,
@@ -264,7 +264,7 @@ pub struct PluginExtInfo {
     pub patterns: Vec<String>,
     pub interpreters: Vec<String>,
     pub kinds: Vec<super::manifest::ManifestKind>,
-    pub disambiguation: Vec<super::manifest::ManifestDisambiguation>,
+    pub disambiguation: BTreeMap<String, Vec<String>>,
 }
 
 /// Scans plugin manifests (no WASM loading) and returns per-extension plugin info.
