@@ -106,7 +106,8 @@ impl LanguageParser for BuiltinLanguageParser {
         config: &Config,
         _absolute_path: &Path,
     ) -> Vec<Tag> {
-        (self.generate_fn)(&mut parser.ts_parser, code, path, &self.kind_config, config)
+        self.generate_fn
+            .generate(&mut parser.ts_parser, code, path, &self.kind_config, config)
             .unwrap_or_default()
     }
 

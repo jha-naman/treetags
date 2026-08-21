@@ -1,0 +1,15 @@
+[
+  {"node":"preproc_def","variants":[{"name":"macro","id":1,"letter":"d","display_name":"macro","default":true}]},
+  {"node":"enumerator","variants":[{"name":"enumerator","id":2,"letter":"e","display_name":"enumerator","default":true}]},
+  {"node":"function_definition","variants":[{"name":"function","id":3,"letter":"f","display_name":"function","default":true}]},
+  {"node":"enum_specifier","variants":[{"name":"enum","id":4,"letter":"g","display_name":"enum","default":true}]},
+  {"node":"preproc_include","variants":[{"name":"header","id":5,"letter":"h","display_name":"header","default":true}]},
+  {"node":"field_declaration","variants":[{"name":"member","id":6,"letter":"m","display_name":"member","default":true}]},
+  {"node":"struct_specifier","variants":[{"name":"struct","id":8,"letter":"s","display_name":"struct","default":true}]},
+  {"node":"type_definition","variants":[{"name":"typedef","id":9,"letter":"t","display_name":"typedef","default":true}]},
+  {"node":"union_specifier","variants":[{"name":"union","id":10,"letter":"u","display_name":"union","default":true}]},
+  {"node":"declaration","variants":[{"name":"variable","id":11,"letter":"v","display_name":"variable","default":true},{"name":"local","id":13,"letter":"l","display_name":"local","default":false},{"name":"prototype","id":15,"letter":"p","display_name":"prototype","default":false},{"name":"extern","id":14,"letter":"x","display_name":"externvar","default":false}]},
+  {"node":"parameter_declaration","variants":[{"name":"parameter","id":17,"letter":"z","display_name":"parameter","default":false}]},
+  {"node":"labeled_statement","variants":[{"name":"label","id":18,"letter":"L","display_name":"label","default":false}]},
+  {"node":"preproc_function_def","variants":[{"name":"macro","id":19,"letter":"d","display_name":"macro","default":true},{"name":"parameter","id":20,"letter":"D","display_name":"macroparam","default":false}]}
+]

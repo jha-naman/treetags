@@ -1,14 +1,38 @@
-use crate::parser::{cpp, go, js, python, rust, typescript, TagKindConfig};
+use crate::parser::{cpp, generated, go, js, python, rust, typescript, TagKindConfig};
 use crate::tag::Tag;
 
 /// Function pointer type for builtin language tag generators.
-pub(crate) type BuiltinGenerateFn = fn(
+pub(crate) type TreeSitterGenerateFn = fn(
     &mut tree_sitter::Parser,
     &[u8],
     &str,
     &TagKindConfig,
     &crate::config::Config,
 ) -> Option<Vec<Tag>>;
+pub(crate) type NativeGenerateFn =
+    fn(&[u8], &str, &TagKindConfig, &crate::config::Config) -> Option<Vec<Tag>>;
+
+#[derive(Clone, Copy)]
+pub(crate) enum BuiltinGenerateFn {
+    TreeSitter(TreeSitterGenerateFn),
+    Native(NativeGenerateFn),
+}
+
+impl BuiltinGenerateFn {
+    pub(crate) fn generate(
+        self,
+        parser: &mut tree_sitter::Parser,
+        code: &[u8],
+        path: &str,
+        kinds: &TagKindConfig,
+        config: &crate::config::Config,
+    ) -> Option<Vec<Tag>> {
+        match self {
+            Self::TreeSitter(generate) => generate(parser, code, path, kinds, config),
+            Self::Native(generate) => generate(code, path, kinds, config),
+        }
+    }
+}
 
 /// Full descriptor for a builtin language: name, extensions, kind mappings, generate fn.
 pub(crate) struct BuiltinLangDesc {
@@ -39,7 +63,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         interpreters: &[],
         kind_defaults: rust::KIND_DEFAULTS,
         kind_optionals: rust::KIND_OPTIONALS,
-        generate_fn: rust::generate,
+        generate_fn: BuiltinGenerateFn::TreeSitter(rust::generate),
     },
     BuiltinLangDesc {
         lang: go::LANG_NAME,
@@ -49,7 +73,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         interpreters: &[],
         kind_defaults: go::KIND_DEFAULTS,
         kind_optionals: go::KIND_OPTIONALS,
-        generate_fn: go::generate,
+        generate_fn: BuiltinGenerateFn::TreeSitter(go::generate),
     },
     BuiltinLangDesc {
         lang: cpp::LANG_NAME,
@@ -57,9 +81,9 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         extensions: cpp::LANG_EXTENSIONS,
         patterns: &[],
         interpreters: &[],
-        kind_defaults: cpp::KIND_DEFAULTS,
-        kind_optionals: cpp::KIND_OPTIONALS,
-        generate_fn: cpp::generate,
+        kind_defaults: generated::cpp::KIND_DEFAULTS,
+        kind_optionals: generated::cpp::KIND_OPTIONALS,
+        generate_fn: BuiltinGenerateFn::Native(generated::cpp::generate),
     },
     // C reuses the C++ parser but is a distinct language with its own kind table.
     BuiltinLangDesc {
@@ -68,9 +92,9 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         extensions: cpp::C_LANG_EXTENSIONS,
         patterns: &[],
         interpreters: &[],
-        kind_defaults: cpp::C_KIND_DEFAULTS,
-        kind_optionals: cpp::C_KIND_OPTIONALS,
-        generate_fn: cpp::generate,
+        kind_defaults: generated::c::KIND_DEFAULTS,
+        kind_optionals: generated::c::KIND_OPTIONALS,
+        generate_fn: BuiltinGenerateFn::Native(generated::c::generate),
     },
     BuiltinLangDesc {
         lang: js::LANG_NAME,
@@ -80,7 +104,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         interpreters: &["node", "nodejs"],
         kind_defaults: js::KIND_DEFAULTS,
         kind_optionals: js::KIND_OPTIONALS,
-        generate_fn: js::generate,
+        generate_fn: BuiltinGenerateFn::TreeSitter(js::generate),
     },
     BuiltinLangDesc {
         lang: python::LANG_NAME,
@@ -90,7 +114,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         interpreters: &["python", "python2", "python3"],
         kind_defaults: python::KIND_DEFAULTS,
         kind_optionals: python::KIND_OPTIONALS,
-        generate_fn: python::generate,
+        generate_fn: BuiltinGenerateFn::TreeSitter(python::generate),
     },
     BuiltinLangDesc {
         lang: typescript::LANG_NAME,
@@ -100,6 +124,6 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         interpreters: &[],
         kind_defaults: typescript::KIND_DEFAULTS,
         kind_optionals: typescript::KIND_OPTIONALS,
-        generate_fn: typescript::generate,
+        generate_fn: BuiltinGenerateFn::TreeSitter(typescript::generate),
     },
 ];
