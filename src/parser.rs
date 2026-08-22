@@ -24,9 +24,11 @@ use tree_sitter_tags::{TagsConfiguration, TagsContext};
 
 pub(crate) mod common;
 pub(crate) mod cpp;
+pub(crate) mod generated;
 pub(crate) mod go;
 mod helper;
 pub(crate) mod js;
+pub(crate) mod objective_c;
 pub(crate) mod python;
 pub(crate) mod rust;
 pub(crate) mod typescript;
@@ -243,14 +245,16 @@ impl Parser {
                     desc.kind_defaults,
                     desc.kind_optionals,
                 );
-                return Ok((desc.generate_fn)(
-                    &mut self.ts_parser,
-                    &code,
-                    file_path_relative_to_tag_file,
-                    &kind_config,
-                    config,
-                )
-                .unwrap_or_default());
+                return Ok(desc
+                    .generate_fn
+                    .generate(
+                        &mut self.ts_parser,
+                        &code,
+                        file_path_relative_to_tag_file,
+                        &kind_config,
+                        config,
+                    )
+                    .unwrap_or_default());
             }
         }
 

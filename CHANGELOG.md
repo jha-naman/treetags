@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add data driven custom parsers for C and C++
+Parser is generated from grammar.json + tags.scm + kinds.json + parse.json input files
 - Add `--list-languages` cli arg to list supported languages
 Lists all installed languages. Will not list uninstalled plugins
 

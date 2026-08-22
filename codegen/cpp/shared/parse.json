@@ -1,0 +1,64 @@
+{
+  "_comment": "C-family parsing facts not derivable from grammar.json/tags.scm/kinds.json. Consumed by treetags-codegen and emitted verbatim into the shared parser; never hand-coded in the runtime.",
+  "string_prefixes": ["L", "u", "U", "u8"],
+  "ctype_strip_keywords": [
+    "const", "static", "virtual", "inline", "extern", "constexpr", "explicit"
+  ],
+  "typeref_prefixes": { "struct": "struct", "union": "union", "enum": "enum" },
+  "anon": { "prefix": "__anon", "hash": "djb2", "seed": 5381 },
+  "expression_skip": { "scope_op": "::", "operators": [">>", "."] },
+  "declarator": {
+    "pointer_prefixes": ["*", "&", "&&"],
+    "cv_prefixes": ["const", "volatile", "__restrict", "__restrict__", "restrict", "_Atomic"],
+    "scope_op": "::",
+    "destructor": "~",
+    "operator_kw": "operator"
+  },
+  "specifier_prefixes": [
+    "static", "extern", "register", "inline", "virtual", "explicit", "constexpr",
+    "friend", "mutable", "const", "volatile", "thread_local"
+  ],
+  "access_specifiers": ["public", "private", "protected"],
+  "template_kw": "template",
+  "template_param_keywords": ["class", "typename"],
+  "control_keywords": ["if", "for", "while", "switch", "return", "sizeof"],
+  "dispatch": {
+    "class_specifier": "aggregate",
+    "struct_specifier": "aggregate",
+    "union_specifier": "aggregate",
+    "enum_specifier": "enum",
+    "namespace_definition": "namespace",
+    "namespace_alias_definition": "alias",
+    "using_declaration": "using",
+    "type_definition": "typedef",
+    "template_declaration": "template"
+  },
+  "roles": {
+    "function": "function_definition.function",
+    "prototype": "declaration.prototype",
+    "variable": "declaration.variable",
+    "local": "declaration.local",
+    "extern": "declaration.extern",
+    "member": "field_declaration.member",
+    "enumerator": "enumerator.enumerator",
+    "typedef": "type_definition.typedef",
+    "parameter": "parameter_declaration.parameter",
+    "label": "labeled_statement.label",
+    "template_param": "template_declaration.parameter",
+    "header": "preproc_include.header",
+    "macro": "preproc_def.macro",
+    "macro_param": "preproc_function_def.parameter"
+  },
+  "preproc": {
+    "include": "include",
+    "define": "define",
+    "macro_param_field": "macro"
+  },
+  "fields": {
+    "typeref_key": "typeref",
+    "typeref_default": "typename",
+    "function_qualifier": "class",
+    "param_function": "function"
+  },
+  "storage_roles": { "extern": "extern" }
+}

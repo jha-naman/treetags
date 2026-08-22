@@ -163,6 +163,24 @@ pub fn looks_like_cpp(prefix: &[u8]) -> bool {
     SIGNALS.iter().any(|sig| text.contains(sig))
 }
 
+/// High-precision Objective-C markers used to distinguish shared `.h` files.
+pub fn looks_like_objective_c(prefix: &[u8]) -> bool {
+    const SIGNALS: &[&str] = &[
+        "@interface",
+        "@implementation",
+        "@protocol",
+        "@property",
+        "@end",
+        "@class",
+        "@import",
+        "@selector",
+        "@autoreleasepool",
+        "NS_ASSUME_NONNULL",
+    ];
+    let text = String::from_utf8_lossy(prefix);
+    SIGNALS.iter().any(|signal| text.contains(signal))
+}
+
 /// Extracts a language/mode name from an editor modeline in the file's head or
 /// tail. Recognizes Vim modelines (`vim: set ft=…:`, `vim: ft=…`) and Emacs
 /// modelines (first-line `-*- mode: … -*-` / `-*- … -*-`, and a trailing
@@ -318,7 +336,9 @@ fn parse_emacs_local_vars(tail: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{glob_match, looks_like_cpp, parse_modeline, parse_shebang};
+    use super::{
+        glob_match, looks_like_cpp, looks_like_objective_c, parse_modeline, parse_shebang,
+    };
 
     #[test]
     fn exact_and_literal() {
@@ -456,6 +476,17 @@ mod tests {
             b"#ifndef FOO_H\n#define FOO_H\nint add(int a, int b);\n#endif\n"
         ));
         assert!(!looks_like_cpp(b"typedef struct { int x; } Point;"));
+    }
+
+    #[test]
+    fn objective_c_detection() {
+        assert!(looks_like_objective_c(
+            b"@interface Widget : NSObject\n@end"
+        ));
+        assert!(looks_like_objective_c(b"@protocol WidgetDelegate\n@end"));
+        assert!(!looks_like_objective_c(
+            b"typedef struct { int x; } Widget;"
+        ));
     }
 
     #[test]

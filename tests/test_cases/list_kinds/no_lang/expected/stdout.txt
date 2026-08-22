@@ -63,6 +63,31 @@ javascript
     G  getters
     S  setters
     M  fields
+objc
+    d  macro
+    e  enumerator
+    f  function
+    g  enum
+    h  header
+    m  member
+    s  struct
+    t  typedef
+    u  union
+    v  variable
+    A  property
+    C  category
+    i  interface
+    E  ivar
+    I  implementation
+    M  method
+    c  class
+    P  protocol
+    l  local [off]
+    p  prototype [off]
+    x  externvar [off]
+    z  parameter [off]
+    L  label [off]
+    D  macroparam [off]
 python
     c  classes
     f  function

@@ -1,0 +1,22 @@
+{
+  "_comment": "Objective-C structural facts. The C-family fields are shared with the C parser; objective_c supplies the dialect-specific island tokens.",
+  "string_prefixes": ["L", "u", "U", "u8", "@"],
+  "ctype_strip_keywords": ["const", "static", "inline", "extern", "constexpr"],
+  "typeref_prefixes": {"struct":"struct", "union":"union", "enum":"enum"},
+  "anon": {"prefix":"__anon", "hash":"djb2", "seed":5381},
+  "expression_skip": {"scope_op":"::", "operators":[">>", "."]},
+  "declarator": {"pointer_prefixes":["*", "&", "&&"], "cv_prefixes":["const", "volatile", "restrict", "_Atomic"], "scope_op":"::", "destructor":"~", "operator_kw":"operator"},
+  "specifier_prefixes": ["static", "extern", "register", "inline", "const", "volatile"],
+  "access_specifiers": ["public", "private", "protected"],
+  "template_kw": "template",
+  "template_param_keywords": ["class", "typename"],
+  "control_keywords": ["if", "for", "while", "switch", "return", "sizeof"],
+  "dispatch": {"struct_specifier":"aggregate", "union_specifier":"aggregate", "enum_specifier":"enum", "type_definition":"typedef"},
+  "roles": {
+    "function":"function_definition.function", "prototype":"declaration.prototype", "variable":"declaration.variable", "local":"declaration.local", "extern":"declaration.extern", "member":"field_declaration.member", "enum":"enum_specifier.enum", "enumerator":"enumerator.enumerator", "typedef":"type_definition.typedef", "parameter":"parameter_declaration.parameter", "label":"labeled_statement.label", "header":"preproc_include.header", "macro":"preproc_def.macro", "macro_param":"preproc_function_def.parameter",
+    "objc_interface":"class_interface.interface", "objc_implementation":"class_implementation.implementation", "objc_protocol":"protocol_declaration.protocol", "objc_category":"class_interface.category", "objc_property":"property_declaration.property", "objc_ivar":"instance_variable.ivar", "objc_method":"method_declaration.method", "objc_class_method":"method_declaration.class_method"
+  },
+  "preproc": {"include":"include", "define":"define", "macro_param_field":"macro"},
+  "fields": {"typeref_key":"typeref", "typeref_default":"typename", "function_qualifier":"class", "param_function":"function"},
+  "storage_roles": {"extern":"extern"}
+}

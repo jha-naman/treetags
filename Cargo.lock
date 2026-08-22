@@ -2300,6 +2300,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "treetags-codegen"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "regex",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "treetags-plugin-common"
 version = "0.2.0"
 dependencies = [
