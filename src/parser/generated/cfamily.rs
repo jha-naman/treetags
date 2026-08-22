@@ -211,12 +211,7 @@ pub(crate) static PUNCTUATORS: &[&str] = &[
 ];
 
 // Parsing facts (from parse.json).
-pub(crate) static STRING_PREFIXES: &[&str] = &[
-    "L",
-    "u",
-    "U",
-    "u8",
-];
+pub(crate) static STRING_PREFIXES: &[&str] = &["L", "u", "U", "u8"];
 pub(crate) static CTYPE_STRIP: &[&str] = &[
     "const",
     "static",
@@ -226,23 +221,13 @@ pub(crate) static CTYPE_STRIP: &[&str] = &[
     "constexpr",
     "explicit",
 ];
-pub(crate) static TYPEREF_PREFIXES: &[(&str, &str)] = &[
-    ("enum", "enum"),
-    ("struct", "struct"),
-    ("union", "union"),
-];
+pub(crate) static TYPEREF_PREFIXES: &[(&str, &str)] =
+    &[("enum", "enum"), ("struct", "struct"), ("union", "union")];
 pub(crate) static ANON_PREFIX: &str = "__anon";
 pub(crate) static ANON_SEED: u32 = 5381;
 pub(crate) static EXPR_SKIP_SCOPE_OP: &str = "::";
-pub(crate) static EXPR_SKIP_OPS: &[&str] = &[
-    ">>",
-    ".",
-];
-pub(crate) static DECL_POINTER_PREFIXES: &[&str] = &[
-    "*",
-    "&",
-    "&&",
-];
+pub(crate) static EXPR_SKIP_OPS: &[&str] = &[">>", "."];
+pub(crate) static DECL_POINTER_PREFIXES: &[&str] = &["*", "&", "&&"];
 pub(crate) static DECL_CV_PREFIXES: &[&str] = &[
     "const",
     "volatile",
@@ -268,24 +253,10 @@ pub(crate) static SPECIFIER_PREFIXES: &[&str] = &[
     "volatile",
     "thread_local",
 ];
-pub(crate) static ACCESS_SPECIFIERS: &[&str] = &[
-    "public",
-    "private",
-    "protected",
-];
+pub(crate) static ACCESS_SPECIFIERS: &[&str] = &["public", "private", "protected"];
 pub(crate) static TEMPLATE_KW: &str = "template";
-pub(crate) static TEMPLATE_PARAM_KEYWORDS: &[&str] = &[
-    "class",
-    "typename",
-];
-pub(crate) static CONTROL_KEYWORDS: &[&str] = &[
-    "if",
-    "for",
-    "while",
-    "switch",
-    "return",
-    "sizeof",
-];
+pub(crate) static TEMPLATE_PARAM_KEYWORDS: &[&str] = &["class", "typename"];
+pub(crate) static CONTROL_KEYWORDS: &[&str] = &["if", "for", "while", "switch", "return", "sizeof"];
 pub(crate) static PREPROC_INCLUDE: &str = "include";
 pub(crate) static PREPROC_DEFINE: &str = "define";
 pub(crate) static PREPROC_MACRO_PARAM_FIELD: &str = "macro";

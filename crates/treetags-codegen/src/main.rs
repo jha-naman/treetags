@@ -48,10 +48,7 @@ fn run() -> Result<(), String> {
     let nodes = read(&args.node_types)?;
     let query = read(&args.query)?;
     let kinds = read(&args.kinds)?;
-    let parse_path = args
-        .parse
-        .as_ref()
-        .ok_or("--parse is required")?;
+    let parse_path = args.parse.as_ref().ok_or("--parse is required")?;
     let parse = read(parse_path)?;
     let output = generate(
         NamedSource::new(&args.grammar.display().to_string(), &grammar),

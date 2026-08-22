@@ -154,7 +154,6 @@ pub(crate) struct Candidate {
     pub fields: Vec<(&'static str, String)>,
 }
 
-
 pub(crate) fn render(
     candidates: Vec<Candidate>,
     source: &str,

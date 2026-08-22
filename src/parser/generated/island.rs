@@ -160,10 +160,7 @@ pub(crate) fn lex(src: &str) -> Vec<Token<'_>> {
             }
             let text = &src[start..i];
             // `L"..."`, `u8'c'`, raw-string prefixes, etc.
-            if i < n
-                && (bytes[i] == b'"' || bytes[i] == b'\'')
-                && STRING_PREFIXES.contains(&text)
-            {
+            if i < n && (bytes[i] == b'"' || bytes[i] == b'\'') && STRING_PREFIXES.contains(&text) {
                 let quote = bytes[i];
                 i += 1;
                 while i < n {
@@ -357,7 +354,9 @@ pub(crate) fn parse_declarator(toks: &[Token]) -> Option<Declarator> {
         if t.text == DECL_DESTRUCTOR {
             seg.push_str(DECL_DESTRUCTOR);
             i += 1;
-            if let Some(id) = toks.get(i).filter(|t| t.kind == Tok::Ident || t.kind == Tok::Keyword)
+            if let Some(id) = toks
+                .get(i)
+                .filter(|t| t.kind == Tok::Ident || t.kind == Tok::Keyword)
             {
                 seg.push_str(id.text);
                 i += 1;
@@ -597,7 +596,12 @@ fn scan_objective_c(
             blank(&mut sanitized, offset, raw.len());
             if let Some(name) = objc_enum_name(trimmed) {
                 if let Some(letter) = role("enum") {
-                    objc.push(Candidate { name: name.clone(), kind: letter, row, fields: vec![] });
+                    objc.push(Candidate {
+                        name: name.clone(),
+                        kind: letter,
+                        row,
+                        fields: vec![],
+                    });
                 }
                 ns_enum = Some(name);
             }
@@ -626,7 +630,12 @@ fn scan_objective_c(
                     } else if let Some(protocols) = protocols {
                         fields.push(("protocols", protocols));
                     }
-                    objc.push(Candidate { name: name.to_owned(), kind: letter, row, fields });
+                    objc.push(Candidate {
+                        name: name.to_owned(),
+                        kind: letter,
+                        row,
+                        fields,
+                    });
                 }
                 if let (Some(cat), Some(letter)) = (&category, role("objc_category")) {
                     objc.push(Candidate {
@@ -636,7 +645,11 @@ fn scan_objective_c(
                         fields: vec![(scope, name.to_owned())],
                     });
                 }
-                container = Some(ObjcContainer { scope, name: name.to_owned(), category });
+                container = Some(ObjcContainer {
+                    scope,
+                    name: name.to_owned(),
+                    category,
+                });
             }
             offset += raw.len();
             continue;
@@ -665,9 +678,11 @@ fn scan_objective_c(
                     .trim_start_matches(|c: char| c == '@' || c.is_ascii_alphabetic())
                     .trim();
                 let source_decl = if decl.is_empty() { trimmed } else { decl };
-                if let (Some(name), Some(letter), Some(owner)) =
-                    (last_identifier(source_decl), role("objc_ivar"), container.as_ref())
-                {
+                if let (Some(name), Some(letter), Some(owner)) = (
+                    last_identifier(source_decl),
+                    role("objc_ivar"),
+                    container.as_ref(),
+                ) {
                     objc.push(Candidate {
                         name: name.to_owned(),
                         kind: letter,
@@ -682,10 +697,13 @@ fn scan_objective_c(
 
         if trimmed.starts_with("@property") {
             blank(&mut sanitized, offset, raw.len());
-            let without_attrs = strip_property_attributes(trimmed.trim_start_matches("@property").trim());
-            if let (Some(name), Some(letter), Some(owner)) =
-                (last_identifier(without_attrs), role("objc_property"), container.as_ref())
-            {
+            let without_attrs =
+                strip_property_attributes(trimmed.trim_start_matches("@property").trim());
+            if let (Some(name), Some(letter), Some(owner)) = (
+                last_identifier(without_attrs),
+                role("objc_property"),
+                container.as_ref(),
+            ) {
                 objc.push(Candidate {
                     name: name.to_owned(),
                     kind: letter,
@@ -700,18 +718,28 @@ fn scan_objective_c(
         if (trimmed.starts_with('+') || trimmed.starts_with('-')) && container.is_some() {
             blank(&mut sanitized, offset, raw.len());
             if let (Some(name), Some(owner)) = (objc_selector(trimmed), container.as_ref()) {
-                let role_name = if trimmed.starts_with('+') { "objc_class_method" } else { "objc_method" };
+                let role_name = if trimmed.starts_with('+') {
+                    "objc_class_method"
+                } else {
+                    "objc_method"
+                };
                 if let Some(letter) = role(role_name) {
                     let mut fields = Vec::new();
                     if let Some(category) = &owner.category {
                         fields.push(("category", category.clone()));
                     }
                     fields.push((owner.scope, owner.name.clone()));
-                    objc.push(Candidate { name, kind: letter, row, fields });
+                    objc.push(Candidate {
+                        name,
+                        kind: letter,
+                        row,
+                        fields,
+                    });
                 }
             }
             if !trimmed.ends_with(';') {
-                method_depth = trimmed.matches('{').count() as i32 - trimmed.matches('}').count() as i32;
+                method_depth =
+                    trimmed.matches('{').count() as i32 - trimmed.matches('}').count() as i32;
                 method_waiting_for_body = method_depth <= 0;
             }
             offset += raw.len();
@@ -734,12 +762,20 @@ fn scan_objective_c(
             .any(|(key, value)| *key == "typeref" && value.contains(ANON_PREFIX));
         if anonymous_typedef {
             let closing = format!("}} {};", candidate.name);
-            if let Some(row) = original_lines.iter().position(|line| line.trim() == closing) {
+            if let Some(row) = original_lines
+                .iter()
+                .position(|line| line.trim() == closing)
+            {
                 candidate.row = row;
             }
         }
     }
-    base.retain(|candidate| !candidate.fields.iter().any(|(key, value)| *key == "enum" && value.is_empty()));
+    base.retain(|candidate| {
+        !candidate
+            .fields
+            .iter()
+            .any(|(key, value)| *key == "enum" && value.is_empty())
+    });
     for candidate in &mut base {
         candidate.fields.retain(|(key, _)| *key != "typeref");
     }
@@ -762,7 +798,9 @@ fn objc_container_start(line: &str) -> Option<(&'static str, &'static str, &str)
 
 fn leading_identifier(s: &str) -> Option<&str> {
     let s = s.trim_start();
-    let end = s.find(|c: char| !(c == '_' || c.is_ascii_alphanumeric())).unwrap_or(s.len());
+    let end = s
+        .find(|c: char| !(c == '_' || c.is_ascii_alphanumeric()))
+        .unwrap_or(s.len());
     (end > 0).then_some(&s[..end])
 }
 
@@ -785,14 +823,18 @@ fn angle_list(s: &str) -> Option<String> {
 }
 
 fn strip_property_attributes(s: &str) -> &str {
-    if !s.starts_with('(') { return s; }
+    if !s.starts_with('(') {
+        return s;
+    }
     let mut depth = 0;
     for (i, ch) in s.char_indices() {
         match ch {
             '(' => depth += 1,
             ')' => {
                 depth -= 1;
-                if depth == 0 { return s[i + 1..].trim_start(); }
+                if depth == 0 {
+                    return s[i + 1..].trim_start();
+                }
             }
             _ => {}
         }
@@ -809,7 +851,10 @@ fn objc_selector(line: &str) -> Option<String> {
                 '(' => depth += 1,
                 ')' => {
                     depth -= 1;
-                    if depth == 0 { rest = rest[i + 1..].trim_start(); break; }
+                    if depth == 0 {
+                        rest = rest[i + 1..].trim_start();
+                        break;
+                    }
                 }
                 _ => {}
             }
@@ -819,7 +864,9 @@ fn objc_selector(line: &str) -> Option<String> {
         let mut labels = Vec::new();
         for (i, _) in rest.match_indices(':') {
             let before = &rest[..i];
-            if let Some(label) = last_identifier(before) { labels.push(label); }
+            if let Some(label) = last_identifier(before) {
+                labels.push(label);
+            }
         }
         (!labels.is_empty()).then(|| labels.into_iter().map(|s| format!("{s}:")).collect())
     } else {
@@ -840,7 +887,8 @@ fn objc_enum_name(line: &str) -> Option<String> {
 
 fn is_ident_word(s: &str) -> bool {
     let mut c = s.chars();
-    c.next().is_some_and(|c| c == '_' || c.is_ascii_alphabetic())
+    c.next()
+        .is_some_and(|c| c == '_' || c.is_ascii_alphabetic())
         && c.all(|c| c == '_' || c.is_ascii_alphanumeric())
 }
 
@@ -911,7 +959,13 @@ impl<'a> Scanner<'a> {
             .map(|f| f.name.clone())
     }
 
-    fn emit(&mut self, name: &str, kind: &'static str, row: usize, vals: Vec<(&'static str, String)>) {
+    fn emit(
+        &mut self,
+        name: &str,
+        kind: &'static str,
+        row: usize,
+        vals: Vec<(&'static str, String)>,
+    ) {
         if !self.kinds.is_kind_enabled(kind) || name.is_empty() || name == "_" {
             return;
         }
@@ -934,10 +988,11 @@ impl<'a> Scanner<'a> {
 
     fn preproc(&mut self, t: Token) {
         let line = t.text.trim_start().trim_start_matches('#').trim_start();
-        if let Some(rest) = line
-            .strip_prefix(PREPROC_INCLUDE)
-            .or_else(|| (self.t.name == "objective_c").then(|| line.strip_prefix("import")).flatten())
-        {
+        if let Some(rest) = line.strip_prefix(PREPROC_INCLUDE).or_else(|| {
+            (self.t.name == "objective_c")
+                .then(|| line.strip_prefix("import"))
+                .flatten()
+        }) {
             let path = rest.trim();
             let name = path.trim_matches(|c| c == '<' || c == '>' || c == '"');
             if let Some(letter) = self.role("header") {
@@ -1052,7 +1107,10 @@ impl<'a> Scanner<'a> {
             }
         }
         // Strip a leading access specifier (`public:` / `private:` / …).
-        if head.get(p).is_some_and(|t| ACCESS_SPECIFIERS.contains(&t.text)) {
+        if head
+            .get(p)
+            .is_some_and(|t| ACCESS_SPECIFIERS.contains(&t.text))
+        {
             p += 1;
             if head.get(p).is_some_and(|t| t.text == ":") {
                 p += 1;
@@ -1074,7 +1132,8 @@ impl<'a> Scanner<'a> {
         if let Some(spec) = self.spec(kw, None) {
             match spec.category {
                 "aggregate" | "enum" => {
-                    let descend = self.type_specifier(head, ti, spec, is_typedef, terminator, brace);
+                    let descend =
+                        self.type_specifier(head, ti, spec, is_typedef, terminator, brace);
                     if terminator != "{" {
                         self.declaration(head, is_typedef, terminator, brace);
                     }
@@ -1150,7 +1209,10 @@ impl<'a> Scanner<'a> {
         };
         // Skip an optional `namespace` sub-keyword before the target name.
         let mut start = ti + 1;
-        if self.spec(head.get(start).map(|t| t.text).unwrap_or(""), None).is_some() {
+        if self
+            .spec(head.get(start).map(|t| t.text).unwrap_or(""), None)
+            .is_some()
+        {
             start += 1;
         }
         if let (Some(first), Some(last)) = (head.get(start), head.last()) {
@@ -1192,9 +1254,12 @@ impl<'a> Scanner<'a> {
             self.emit(name.text, letter, name.row, base_field);
             // `typedef struct Name { … }` also introduces the alias `Name`.
             if is_typedef && !is_enum && terminator == "{" {
-                if let (Some(t_letter), Some((_, label))) =
-                    (self.role("typedef"), TYPEREF_PREFIXES.iter().find(|(k, _)| *k == spec.scope.unwrap_or("")))
-                {
+                if let (Some(t_letter), Some((_, label))) = (
+                    self.role("typedef"),
+                    TYPEREF_PREFIXES
+                        .iter()
+                        .find(|(k, _)| *k == spec.scope.unwrap_or("")),
+                ) {
                     self.emit(
                         name.text,
                         t_letter,
@@ -1234,7 +1299,9 @@ impl<'a> Scanner<'a> {
                 if let (Some(alias), Some(t_letter), Some((_, label))) = (
                     self.toks.get(close).filter(|t| t.kind == Tok::Ident),
                     self.role("typedef"),
-                    TYPEREF_PREFIXES.iter().find(|(k, _)| *k == spec.scope.unwrap_or("")),
+                    TYPEREF_PREFIXES
+                        .iter()
+                        .find(|(k, _)| *k == spec.scope.unwrap_or("")),
                 ) {
                     typedef_alias = Some(alias.text.to_owned());
                     self.emit(
@@ -1367,7 +1434,13 @@ impl<'a> Scanner<'a> {
         (i + 1).min(self.toks.len())
     }
 
-    fn declaration(&mut self, head: &[Token<'a>], is_typedef: bool, terminator: &str, brace: usize) {
+    fn declaration(
+        &mut self,
+        head: &[Token<'a>],
+        is_typedef: bool,
+        terminator: &str,
+        brace: usize,
+    ) {
         if head.is_empty() {
             return;
         }
@@ -1516,7 +1589,12 @@ impl<'a> Scanner<'a> {
             i += 1;
         }
         for (name, row) in emits {
-            self.emit(&name, letter, row, vec![(FIELD_PARAM_FUNCTION, function.clone())]);
+            self.emit(
+                &name,
+                letter,
+                row,
+                vec![(FIELD_PARAM_FUNCTION, function.clone())],
+            );
         }
     }
 
@@ -1632,14 +1710,22 @@ impl<'a> Scanner<'a> {
             .unwrap_or("")
             .trim();
         let typeref = self.typeref_of(type_str, false);
-        self.emit(&decl.name, letter, toks[ds].row, vec![(FIELD_TYPEREF_KEY, typeref)]);
+        self.emit(
+            &decl.name,
+            letter,
+            toks[ds].row,
+            vec![(FIELD_TYPEREF_KEY, typeref)],
+        );
     }
 
     /// Recognize `<type> (*NAME)(params)` → (name, row, typeref value).
     fn function_pointer(&self, body: &[Token<'a>]) -> Option<(String, usize, String)> {
         let lp = self.first_top_level(body, "(")?;
         // Must be `( <ptr> name )` immediately.
-        if !body.get(lp + 1).is_some_and(|t| DECL_POINTER_PREFIXES.contains(&t.text)) {
+        if !body
+            .get(lp + 1)
+            .is_some_and(|t| DECL_POINTER_PREFIXES.contains(&t.text))
+        {
             return None;
         }
         let name = body.get(lp + 2).filter(|t| t.kind == Tok::Ident)?;
@@ -1652,7 +1738,8 @@ impl<'a> Scanner<'a> {
             return None;
         }
         let params_close = skip_balanced(body, params_open);
-        let params = self.src[body[params_open].start..self.tok_end(&body[params_close - 1])].trim();
+        let params =
+            self.src[body[params_open].start..self.tok_end(&body[params_close - 1])].trim();
         Some((
             name.text.to_owned(),
             name.row,
@@ -1766,11 +1853,7 @@ mod tests {
     fn maximal_munch_operators() {
         assert_eq!(
             kinds("a >>= b"),
-            vec![
-                (Tok::Ident, "a"),
-                (Tok::Punct, ">>="),
-                (Tok::Ident, "b")
-            ]
+            vec![(Tok::Ident, "a"), (Tok::Punct, ">>="), (Tok::Ident, "b")]
         );
         assert_eq!(
             kinds("x->y"),
@@ -1849,11 +1932,14 @@ mod tests {
 
     #[test]
     fn numbers_with_suffixes_and_exponents() {
-        assert_eq!(kinds("0x1F 3.14e-10 1'000"), vec![
-            (Tok::Num, "0x1F"),
-            (Tok::Num, "3.14e-10"),
-            (Tok::Num, "1'000"),
-        ]);
+        assert_eq!(
+            kinds("0x1F 3.14e-10 1'000"),
+            vec![
+                (Tok::Num, "0x1F"),
+                (Tok::Num, "3.14e-10"),
+                (Tok::Num, "1'000"),
+            ]
+        );
     }
 
     #[test]

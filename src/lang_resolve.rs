@@ -166,8 +166,16 @@ pub fn looks_like_cpp(prefix: &[u8]) -> bool {
 /// High-precision Objective-C markers used to distinguish shared `.h` files.
 pub fn looks_like_objective_c(prefix: &[u8]) -> bool {
     const SIGNALS: &[&str] = &[
-        "@interface", "@implementation", "@protocol", "@property", "@end", "@class",
-        "@import", "@selector", "@autoreleasepool", "NS_ASSUME_NONNULL",
+        "@interface",
+        "@implementation",
+        "@protocol",
+        "@property",
+        "@end",
+        "@class",
+        "@import",
+        "@selector",
+        "@autoreleasepool",
+        "NS_ASSUME_NONNULL",
     ];
     let text = String::from_utf8_lossy(prefix);
     SIGNALS.iter().any(|signal| text.contains(signal))
@@ -472,9 +480,13 @@ mod tests {
 
     #[test]
     fn objective_c_detection() {
-        assert!(looks_like_objective_c(b"@interface Widget : NSObject\n@end"));
+        assert!(looks_like_objective_c(
+            b"@interface Widget : NSObject\n@end"
+        ));
         assert!(looks_like_objective_c(b"@protocol WidgetDelegate\n@end"));
-        assert!(!looks_like_objective_c(b"typedef struct { int x; } Widget;"));
+        assert!(!looks_like_objective_c(
+            b"typedef struct { int x; } Widget;"
+        ));
     }
 
     #[test]

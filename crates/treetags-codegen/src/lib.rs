@@ -594,9 +594,9 @@ pub fn generate(
                 _ => None,
             });
             let base_format = pattern.actions.iter().find_map(|a| match a {
-                CompiledAction::Field { capture, format, .. } if capture == "base" => {
-                    Some(format.clone())
-                }
+                CompiledAction::Field {
+                    capture, format, ..
+                } if capture == "base" => Some(format.clone()),
                 _ => None,
             });
             let anon_id = pattern.actions.iter().find_map(|a| match a {
@@ -796,7 +796,10 @@ fn is_optional_expr(e: &Value) -> bool {
         Some("CHOICE") => e
             .get("members")
             .and_then(Value::as_array)
-            .is_some_and(|ms| ms.iter().any(|m| m.get("type").and_then(Value::as_str) == Some("BLANK"))),
+            .is_some_and(|ms| {
+                ms.iter()
+                    .any(|m| m.get("type").and_then(Value::as_str) == Some("BLANK"))
+            }),
         _ => false,
     }
 }
@@ -832,9 +835,7 @@ fn first_keyword(rules: &serde_json::Map<String, Value>, node: &str) -> Option<S
                 .iter()
                 .find_map(|m| walk(m, rules, depth + 1)),
             "PREC" | "PREC_LEFT" | "PREC_RIGHT" | "PREC_DYNAMIC" | "FIELD" | "ALIAS" | "TOKEN"
-            | "IMMEDIATE_TOKEN" | "REPEAT" | "REPEAT1" => {
-                walk(e.get("content")?, rules, depth + 1)
-            }
+            | "IMMEDIATE_TOKEN" | "REPEAT" | "REPEAT1" => walk(e.get("content")?, rules, depth + 1),
             _ => None,
         }
     }
@@ -958,12 +959,21 @@ pub fn generate_shared(
     writeln!(out, "// Parsing facts (from parse.json).").unwrap();
     slice(&mut out, "STRING_PREFIXES", &cfg.string_prefixes);
     slice(&mut out, "CTYPE_STRIP", &cfg.ctype_strip_keywords);
-    writeln!(out, "pub(crate) static TYPEREF_PREFIXES: &[(&str, &str)] = &[").unwrap();
+    writeln!(
+        out,
+        "pub(crate) static TYPEREF_PREFIXES: &[(&str, &str)] = &["
+    )
+    .unwrap();
     for (keyword, label) in &cfg.typeref_prefixes {
         writeln!(out, "    ({keyword:?}, {label:?}),").unwrap();
     }
     writeln!(out, "];").unwrap();
-    writeln!(out, "pub(crate) static ANON_PREFIX: &str = {:?};", cfg.anon.prefix).unwrap();
+    writeln!(
+        out,
+        "pub(crate) static ANON_PREFIX: &str = {:?};",
+        cfg.anon.prefix
+    )
+    .unwrap();
     writeln!(out, "pub(crate) static ANON_SEED: u32 = {};", cfg.anon.seed).unwrap();
     writeln!(
         out,
@@ -972,18 +982,56 @@ pub fn generate_shared(
     )
     .unwrap();
     slice(&mut out, "EXPR_SKIP_OPS", &cfg.expression_skip.operators);
-    slice(&mut out, "DECL_POINTER_PREFIXES", &cfg.declarator.pointer_prefixes);
+    slice(
+        &mut out,
+        "DECL_POINTER_PREFIXES",
+        &cfg.declarator.pointer_prefixes,
+    );
     slice(&mut out, "DECL_CV_PREFIXES", &cfg.declarator.cv_prefixes);
-    writeln!(out, "pub(crate) static DECL_SCOPE_OP: &str = {:?};", cfg.declarator.scope_op).unwrap();
-    writeln!(out, "pub(crate) static DECL_DESTRUCTOR: &str = {:?};", cfg.declarator.destructor).unwrap();
-    writeln!(out, "pub(crate) static DECL_OPERATOR_KW: &str = {:?};", cfg.declarator.operator_kw).unwrap();
+    writeln!(
+        out,
+        "pub(crate) static DECL_SCOPE_OP: &str = {:?};",
+        cfg.declarator.scope_op
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "pub(crate) static DECL_DESTRUCTOR: &str = {:?};",
+        cfg.declarator.destructor
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "pub(crate) static DECL_OPERATOR_KW: &str = {:?};",
+        cfg.declarator.operator_kw
+    )
+    .unwrap();
     slice(&mut out, "SPECIFIER_PREFIXES", &cfg.specifier_prefixes);
     slice(&mut out, "ACCESS_SPECIFIERS", &cfg.access_specifiers);
-    writeln!(out, "pub(crate) static TEMPLATE_KW: &str = {:?};", cfg.template_kw).unwrap();
-    slice(&mut out, "TEMPLATE_PARAM_KEYWORDS", &cfg.template_param_keywords);
+    writeln!(
+        out,
+        "pub(crate) static TEMPLATE_KW: &str = {:?};",
+        cfg.template_kw
+    )
+    .unwrap();
+    slice(
+        &mut out,
+        "TEMPLATE_PARAM_KEYWORDS",
+        &cfg.template_param_keywords,
+    );
     slice(&mut out, "CONTROL_KEYWORDS", &cfg.control_keywords);
-    writeln!(out, "pub(crate) static PREPROC_INCLUDE: &str = {:?};", cfg.preproc.include).unwrap();
-    writeln!(out, "pub(crate) static PREPROC_DEFINE: &str = {:?};", cfg.preproc.define).unwrap();
+    writeln!(
+        out,
+        "pub(crate) static PREPROC_INCLUDE: &str = {:?};",
+        cfg.preproc.include
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "pub(crate) static PREPROC_DEFINE: &str = {:?};",
+        cfg.preproc.define
+    )
+    .unwrap();
     writeln!(
         out,
         "pub(crate) static PREPROC_MACRO_PARAM_FIELD: &str = {:?};",
