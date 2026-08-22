@@ -1,9 +1,8 @@
 # C-family tag definitions
 
-`shared/grammar.json` and `shared/node-types.json` are copied verbatim from
-`tree-sitter-cpp` 0.23.4. C intentionally uses this grammar too. The two
-language directories remain separate because their queries and advertised
-kinds are different.
+`shared/grammar.json` and `shared/node-types.json` are copied as is from
+`tree-sitter-cpp` 0.23.4. C uses this grammar too. The two language directories
+remain separate because their queries and tag kinds are different.
 
 Regenerate or verify the checked-in files with `./scripts/codegen-cpp.sh` and
 `./scripts/codegen-cpp.sh --check` respectively. Normal builds never invoke the
