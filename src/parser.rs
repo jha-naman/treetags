@@ -28,6 +28,7 @@ pub(crate) mod generated;
 pub(crate) mod go;
 mod helper;
 pub(crate) mod js;
+pub(crate) mod objective_c;
 pub(crate) mod python;
 pub(crate) mod rust;
 pub(crate) mod typescript;

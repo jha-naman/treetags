@@ -1464,4 +1464,39 @@ mod tests {
             .unwrap()
         );
     }
+
+    #[test]
+    fn objective_c_inputs_generate_native_dialect_tables() {
+        let output = generate(
+            NamedSource::new(
+                "grammar.json",
+                include_str!("../../../codegen/objective_c/grammar.json"),
+            ),
+            NamedSource::new(
+                "node-types.json",
+                include_str!("../../../codegen/objective_c/node-types.json"),
+            ),
+            NamedSource::new(
+                "tags.scm",
+                include_str!("../../../codegen/objective_c/tags.scm"),
+            ),
+            NamedSource::new(
+                "kinds.json",
+                include_str!("../../../codegen/objective_c/kinds.json"),
+            ),
+            NamedSource::new(
+                "parse.json",
+                include_str!("../../../codegen/objective_c/parse.json"),
+            ),
+            &GenerationOptions {
+                module_name: "objective_c",
+            },
+        )
+        .unwrap()
+        .rust_source;
+        assert!(output.contains("name: \"objective_c\""));
+        assert!(output.contains("(\"objc_interface\", \"i\")"));
+        assert!(output.contains("(\"objc_method\", \"M\")"));
+        assert!(output.contains("name: \"protocol\""));
+    }
 }

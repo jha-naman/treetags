@@ -501,15 +501,17 @@ impl LanguageParserRegistry {
             }
         }
 
-        // Register `.h` as ambiguous between C and C++, resolved by content.
+        // Register `.h` as ambiguous between C, C++, and Objective-C, resolved
+        // by content. C remains the inconclusive default.
         // Only when `.h` is owned solely by the builtin C parser (i.e. not
         // claimed by a plugin or user grammar); C stays first so it remains the
         // default when the selector is inconclusive.
         let c_id = parsers.iter().position(|p| p.language_name() == "c");
         let cpp_id = parsers.iter().position(|p| p.language_name() == "c++");
-        if let (Some(c_id), Some(cpp_id)) = (c_id, cpp_id) {
+        let objc_id = parsers.iter().position(|p| p.language_name() == "objc");
+        if let (Some(c_id), Some(cpp_id), Some(objc_id)) = (c_id, cpp_id, objc_id) {
             if by_extension.get("h").map(Vec::as_slice) == Some(&[c_id]) {
-                by_extension.insert("h".to_string(), vec![c_id, cpp_id]);
+                by_extension.insert("h".to_string(), vec![c_id, cpp_id, objc_id]);
             }
         }
 
@@ -677,6 +679,12 @@ impl LanguageParserRegistry {
         let name_of = |id: LangId| self.parsers[id].language_name();
         let has = |name: &str| cands.iter().any(|&id| name_of(id) == name);
 
+        // Objective-C wins when its unambiguous markers are present, including
+        // mixed Objective-C++ headers (C++-specific tags are handled later).
+        if has("objc") && crate::lang_resolve::looks_like_objective_c(prefix) {
+            return cands.iter().copied().find(|&id| name_of(id) == "objc");
+        }
+
         // C vs C++ (e.g. a `.h` header): default to C, choose C++ on evidence.
         if has("c") && has("c++") {
             let want = if crate::lang_resolve::looks_like_cpp(prefix) {
@@ -812,6 +820,8 @@ mod tests {
         let reg = registry();
         assert_eq!(lang_for(&reg, "src/main.rs").as_deref(), Some("rust"));
         assert_eq!(lang_for(&reg, "app.go").as_deref(), Some("go"));
+        assert_eq!(lang_for(&reg, "Klass.m").as_deref(), Some("objc"));
+        assert_eq!(lang_for(&reg, "Klass.mm").as_deref(), Some("objc"));
     }
 
     #[test]
@@ -872,7 +882,7 @@ mod tests {
         let reg = registry();
         let ids = match reg.resolve_by_name(Path::new("include/foo.h")) {
             NameResolution::Ambiguous(ids) => ids,
-            _ => panic!("expected .h to resolve as ambiguous C/C++"),
+            _ => panic!("expected .h to resolve as ambiguous C-family languages"),
         };
         // Tie-break default (first candidate) is C.
         assert_eq!(reg.parser(ids[0]).language_name(), "c");
@@ -886,6 +896,16 @@ mod tests {
             reg.disambiguate(&ids, b"int add(int a, int b);")
                 .map(|id| reg.parser(id).language_name()),
             Some("c")
+        );
+        assert_eq!(
+            reg.disambiguate(&ids, b"@interface Foo : NSObject\n@end")
+                .map(|id| reg.parser(id).language_name()),
+            Some("objc")
+        );
+        assert_eq!(
+            reg.disambiguate(&ids, b"namespace app {}\n@interface Foo\n@end")
+                .map(|id| reg.parser(id).language_name()),
+            Some("objc")
         );
     }
 

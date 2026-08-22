@@ -1,4 +1,4 @@
-use crate::parser::{cpp, generated, go, js, python, rust, typescript, TagKindConfig};
+use crate::parser::{cpp, generated, go, js, objective_c, python, rust, typescript, TagKindConfig};
 use crate::tag::Tag;
 
 /// Function pointer type for builtin language tag generators.
@@ -95,6 +95,16 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_defaults: generated::c::KIND_DEFAULTS,
         kind_optionals: generated::c::KIND_OPTIONALS,
         generate_fn: BuiltinGenerateFn::Native(generated::c::generate),
+    },
+    BuiltinLangDesc {
+        lang: objective_c::LANG_NAME,
+        aliases: objective_c::LANG_ALIASES,
+        extensions: objective_c::LANG_EXTENSIONS,
+        patterns: &[],
+        interpreters: &[],
+        kind_defaults: generated::objective_c::KIND_DEFAULTS,
+        kind_optionals: generated::objective_c::KIND_OPTIONALS,
+        generate_fn: BuiltinGenerateFn::Native(generated::objective_c::generate),
     },
     BuiltinLangDesc {
         lang: js::LANG_NAME,

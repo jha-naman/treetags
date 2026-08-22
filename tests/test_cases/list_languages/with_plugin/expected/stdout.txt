@@ -9,6 +9,7 @@ javascript
 julia
 kotlin            [plugin]
 lua
+objc
 ocaml
 php
 python

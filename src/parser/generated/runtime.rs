@@ -170,11 +170,22 @@ pub(crate) fn render(
             continue;
         }
         let mut address = "/^".to_owned();
+        let prefix_len = address.len();
         Tag::escape_address_into(
             lines.get(candidate.row).copied().unwrap_or(""),
             &mut address,
         );
-        address.push_str("$/;\"");
+        if address.len() - prefix_len > 96 {
+            let limit = prefix_len + 96;
+            let at = (prefix_len..=limit)
+                .rev()
+                .find(|&i| address.is_char_boundary(i))
+                .unwrap_or(prefix_len);
+            address.truncate(at);
+            address.push_str("/;\"");
+        } else {
+            address.push_str("$/;\"");
+        }
         let mut fields = ExtensionFields::new();
         if config.fields_config.is_field_enabled("kind") {
             fields.insert("kind", candidate.kind)

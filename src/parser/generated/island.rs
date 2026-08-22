@@ -92,13 +92,22 @@ pub(crate) fn lex(src: &str) -> Vec<Token<'_>> {
             i = (i + 2).min(n);
             continue;
         }
-        // Preprocessor directive: `#` as the first token on a line. Consumes the
-        // physical line only (matching the previous line-oriented behavior).
+        // Preprocessor directive: `#` as the first token on a line. Consume the
+        // complete logical directive so continuation bodies cannot be mistaken
+        // for declarations by the structural scanner.
         if b == b'#' && at_line_start {
             let start = i;
             let line_start_row = row;
-            while i < n && bytes[i] != b'\n' {
+            loop {
+                while i < n && bytes[i] != b'\n' {
+                    i += 1;
+                }
+                let continued = i > start && bytes[i.saturating_sub(1)] == b'\\';
+                if i >= n || !continued {
+                    break;
+                }
                 i += 1;
+                row += 1;
             }
             tokens.push(Token {
                 kind: Tok::Preproc,
@@ -478,6 +487,18 @@ pub(crate) fn scan(
     path: &str,
     kinds: &TagKindConfig,
 ) -> Vec<Candidate> {
+    if t.name == "objective_c" {
+        return scan_objective_c(t, src, path, kinds);
+    }
+    scan_cfamily(t, src, path, kinds)
+}
+
+fn scan_cfamily(
+    t: &'static LanguageTables,
+    src: &str,
+    path: &str,
+    kinds: &TagKindConfig,
+) -> Vec<Candidate> {
     let mut hash = ANON_SEED;
     for b in path.bytes() {
         hash = hash.wrapping_mul(33).wrapping_add(b as u32);
@@ -496,6 +517,325 @@ pub(crate) fn scan(
     };
     scanner.run();
     scanner.out
+}
+
+#[derive(Clone)]
+struct ObjcContainer {
+    scope: &'static str,
+    name: String,
+    category: Option<String>,
+}
+
+/// Objective-C dialect pass. It extracts Objective-C islands and blanks them
+/// from an equal-length copy before handing the remaining source to the normal
+/// C-family scanner. Offsets and line numbers therefore stay identical.
+fn scan_objective_c(
+    t: &'static LanguageTables,
+    src: &str,
+    path: &str,
+    kinds: &TagKindConfig,
+) -> Vec<Candidate> {
+    let role = |name: &str| {
+        t.roles
+            .iter()
+            .find(|(r, _)| *r == name)
+            .map(|(_, letter)| *letter)
+    };
+    let mut objc = Vec::new();
+    let mut sanitized = src.as_bytes().to_vec();
+    let mut container: Option<ObjcContainer> = None;
+    let mut in_ivars = false;
+    let mut method_depth = 0i32;
+    let mut method_waiting_for_body = false;
+    let mut ns_enum: Option<String> = None;
+    let mut offset = 0usize;
+
+    for (row, raw) in src.split_inclusive('\n').enumerate() {
+        let line = raw.strip_suffix('\n').unwrap_or(raw);
+        let trimmed = line.trim();
+        let blank = |buf: &mut [u8], start: usize, len: usize| {
+            for b in &mut buf[start..start + len] {
+                if *b != b'\n' && *b != b'\r' {
+                    *b = b' ';
+                }
+            }
+        };
+
+        if method_depth > 0 || method_waiting_for_body {
+            blank(&mut sanitized, offset, raw.len());
+            method_depth += trimmed.matches('{').count() as i32;
+            method_depth -= trimmed.matches('}').count() as i32;
+            if method_depth > 0 {
+                method_waiting_for_body = false;
+            } else if trimmed.contains('{') {
+                method_waiting_for_body = false;
+                method_depth = 0;
+            }
+            offset += raw.len();
+            continue;
+        }
+
+        if let Some(enum_name) = ns_enum.clone() {
+            blank(&mut sanitized, offset, raw.len());
+            if trimmed.starts_with("};") || trimmed == "}" {
+                ns_enum = None;
+            } else if let Some(name) = leading_identifier(trimmed) {
+                if let Some(letter) = role("enumerator") {
+                    objc.push(Candidate {
+                        name: name.to_owned(),
+                        kind: letter,
+                        row,
+                        fields: vec![("enum", enum_name)],
+                    });
+                }
+            }
+            offset += raw.len();
+            continue;
+        }
+
+        if trimmed.starts_with("typedef NS_ENUM(") || trimmed.starts_with("typedef NS_OPTIONS(") {
+            blank(&mut sanitized, offset, raw.len());
+            if let Some(name) = objc_enum_name(trimmed) {
+                if let Some(letter) = role("enum") {
+                    objc.push(Candidate { name: name.clone(), kind: letter, row, fields: vec![] });
+                }
+                ns_enum = Some(name);
+            }
+            offset += raw.len();
+            continue;
+        }
+
+        if let Some((scope, role_name, rest)) = objc_container_start(trimmed) {
+            blank(&mut sanitized, offset, raw.len());
+            if let Some(name) = leading_identifier(rest) {
+                let after_name = rest[name.len()..].trim_start();
+                let category = after_name
+                    .strip_prefix('(')
+                    .and_then(|s| s.split_once(')'))
+                    .map(|(s, _)| s.trim().to_owned())
+                    .filter(|s| !s.is_empty());
+                let protocols = if category.is_none() {
+                    angle_list(after_name)
+                } else {
+                    None
+                };
+                if let Some(letter) = role(role_name) {
+                    let mut fields = Vec::new();
+                    if let Some(cat) = &category {
+                        fields.push(("category", cat.clone()));
+                    } else if let Some(protocols) = protocols {
+                        fields.push(("protocols", protocols));
+                    }
+                    objc.push(Candidate { name: name.to_owned(), kind: letter, row, fields });
+                }
+                if let (Some(cat), Some(letter)) = (&category, role("objc_category")) {
+                    objc.push(Candidate {
+                        name: cat.clone(),
+                        kind: letter,
+                        row,
+                        fields: vec![(scope, name.to_owned())],
+                    });
+                }
+                container = Some(ObjcContainer { scope, name: name.to_owned(), category });
+            }
+            offset += raw.len();
+            continue;
+        }
+
+        if trimmed.starts_with("@end") {
+            blank(&mut sanitized, offset, raw.len());
+            container = None;
+            in_ivars = false;
+            offset += raw.len();
+            continue;
+        }
+
+        if container.is_some() && trimmed == "{" {
+            blank(&mut sanitized, offset, raw.len());
+            in_ivars = true;
+            offset += raw.len();
+            continue;
+        }
+        if in_ivars {
+            blank(&mut sanitized, offset, raw.len());
+            if trimmed == "}" {
+                in_ivars = false;
+            } else if trimmed.ends_with(';') {
+                let decl = trimmed
+                    .trim_start_matches(|c: char| c == '@' || c.is_ascii_alphabetic())
+                    .trim();
+                let source_decl = if decl.is_empty() { trimmed } else { decl };
+                if let (Some(name), Some(letter), Some(owner)) =
+                    (last_identifier(source_decl), role("objc_ivar"), container.as_ref())
+                {
+                    objc.push(Candidate {
+                        name: name.to_owned(),
+                        kind: letter,
+                        row,
+                        fields: vec![(owner.scope, owner.name.clone())],
+                    });
+                }
+            }
+            offset += raw.len();
+            continue;
+        }
+
+        if trimmed.starts_with("@property") {
+            blank(&mut sanitized, offset, raw.len());
+            let without_attrs = strip_property_attributes(trimmed.trim_start_matches("@property").trim());
+            if let (Some(name), Some(letter), Some(owner)) =
+                (last_identifier(without_attrs), role("objc_property"), container.as_ref())
+            {
+                objc.push(Candidate {
+                    name: name.to_owned(),
+                    kind: letter,
+                    row,
+                    fields: vec![(owner.scope, owner.name.clone())],
+                });
+            }
+            offset += raw.len();
+            continue;
+        }
+
+        if (trimmed.starts_with('+') || trimmed.starts_with('-')) && container.is_some() {
+            blank(&mut sanitized, offset, raw.len());
+            if let (Some(name), Some(owner)) = (objc_selector(trimmed), container.as_ref()) {
+                let role_name = if trimmed.starts_with('+') { "objc_class_method" } else { "objc_method" };
+                if let Some(letter) = role(role_name) {
+                    let mut fields = Vec::new();
+                    if let Some(category) = &owner.category {
+                        fields.push(("category", category.clone()));
+                    }
+                    fields.push((owner.scope, owner.name.clone()));
+                    objc.push(Candidate { name, kind: letter, row, fields });
+                }
+            }
+            if !trimmed.ends_with(';') {
+                method_depth = trimmed.matches('{').count() as i32 - trimmed.matches('}').count() as i32;
+                method_waiting_for_body = method_depth <= 0;
+            }
+            offset += raw.len();
+            continue;
+        }
+
+        if trimmed.starts_with('@') {
+            blank(&mut sanitized, offset, raw.len());
+        }
+        offset += raw.len();
+    }
+
+    let clean = String::from_utf8(sanitized).expect("blanking preserves UTF-8");
+    let mut base = scan_cfamily(t, &clean, path, kinds);
+    let original_lines: Vec<_> = src.lines().collect();
+    for candidate in &mut base {
+        let anonymous_typedef = candidate
+            .fields
+            .iter()
+            .any(|(key, value)| *key == "typeref" && value.contains(ANON_PREFIX));
+        if anonymous_typedef {
+            let closing = format!("}} {};", candidate.name);
+            if let Some(row) = original_lines.iter().position(|line| line.trim() == closing) {
+                candidate.row = row;
+            }
+        }
+    }
+    base.retain(|candidate| !candidate.fields.iter().any(|(key, value)| *key == "enum" && value.is_empty()));
+    for candidate in &mut base {
+        candidate.fields.retain(|(key, _)| *key != "typeref");
+    }
+    base.extend(objc);
+    base
+}
+
+fn objc_container_start(line: &str) -> Option<(&'static str, &'static str, &str)> {
+    for (token, scope, role) in [
+        ("@interface", "interface", "objc_interface"),
+        ("@implementation", "implementation", "objc_implementation"),
+        ("@protocol", "protocol", "objc_protocol"),
+    ] {
+        if let Some(rest) = line.strip_prefix(token) {
+            return Some((scope, role, rest.trim_start()));
+        }
+    }
+    None
+}
+
+fn leading_identifier(s: &str) -> Option<&str> {
+    let s = s.trim_start();
+    let end = s.find(|c: char| !(c == '_' || c.is_ascii_alphanumeric())).unwrap_or(s.len());
+    (end > 0).then_some(&s[..end])
+}
+
+fn last_identifier(s: &str) -> Option<&str> {
+    s.trim_end_matches([';', ' ', '\t'])
+        .split(|c: char| !(c == '_' || c.is_ascii_alphanumeric()))
+        .filter(|p| !p.is_empty())
+        .next_back()
+}
+
+fn angle_list(s: &str) -> Option<String> {
+    let start = s.find('<')?;
+    let end = s[start + 1..].find('>')? + start + 1;
+    let names = s[start + 1..end]
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>();
+    (!names.is_empty()).then(|| names.join(","))
+}
+
+fn strip_property_attributes(s: &str) -> &str {
+    if !s.starts_with('(') { return s; }
+    let mut depth = 0;
+    for (i, ch) in s.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 { return s[i + 1..].trim_start(); }
+            }
+            _ => {}
+        }
+    }
+    s
+}
+
+fn objc_selector(line: &str) -> Option<String> {
+    let mut rest = line[1..].trim_start();
+    if rest.starts_with('(') {
+        let mut depth = 0;
+        for (i, ch) in rest.char_indices() {
+            match ch {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 { rest = rest[i + 1..].trim_start(); break; }
+                }
+                _ => {}
+            }
+        }
+    }
+    if rest.contains(':') {
+        let mut labels = Vec::new();
+        for (i, _) in rest.match_indices(':') {
+            let before = &rest[..i];
+            if let Some(label) = last_identifier(before) { labels.push(label); }
+        }
+        (!labels.is_empty()).then(|| labels.into_iter().map(|s| format!("{s}:")).collect())
+    } else {
+        leading_identifier(rest).map(str::to_owned)
+    }
+}
+
+fn objc_enum_name(line: &str) -> Option<String> {
+    let open = line.find('(')?;
+    let close = line[open + 1..].find(')')? + open + 1;
+    line[open + 1..close]
+        .split(',')
+        .nth(1)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned)
 }
 
 fn is_ident_word(s: &str) -> bool {
@@ -594,7 +934,10 @@ impl<'a> Scanner<'a> {
 
     fn preproc(&mut self, t: Token) {
         let line = t.text.trim_start().trim_start_matches('#').trim_start();
-        if let Some(rest) = line.strip_prefix(PREPROC_INCLUDE) {
+        if let Some(rest) = line
+            .strip_prefix(PREPROC_INCLUDE)
+            .or_else(|| (self.t.name == "objective_c").then(|| line.strip_prefix("import")).flatten())
+        {
             let path = rest.trim();
             let name = path.trim_matches(|c| c == '<' || c == '>' || c == '"');
             if let Some(letter) = self.role("header") {
@@ -883,6 +1226,7 @@ impl<'a> Scanner<'a> {
             }
             // The typedef alias's typeref uses the first anon counter; the tag
             // uses the next; the member scope name uses the `seq` counter.
+            let mut typedef_alias = None;
             if is_typedef {
                 let typeref_name = self.anon_name(self.anon, id);
                 self.anon += 1;
@@ -892,12 +1236,24 @@ impl<'a> Scanner<'a> {
                     self.role("typedef"),
                     TYPEREF_PREFIXES.iter().find(|(k, _)| *k == spec.scope.unwrap_or("")),
                 ) {
+                    typedef_alias = Some(alias.text.to_owned());
                     self.emit(
                         alias.text,
                         t_letter,
                         head[ti].row,
                         vec![("typeref", format!("{label}:{typeref_name}"))],
                     );
+                }
+            }
+            // Objective-C follows its historical tagger here: an anonymous
+            // typedef aggregate has no synthetic struct/union tag and its
+            // members are scoped under the written typedef alias.
+            if self.t.name == "objective_c" && is_typedef {
+                if let (Some(scope), Some(alias)) = (spec.scope, typedef_alias) {
+                    let mut frame = Frame::scope(scope, alias, self.depth);
+                    frame.typedef = true;
+                    self.scopes.push(frame);
+                    return true;
                 }
             }
             let tag_name = self.anon_name(self.anon, id);
@@ -1480,6 +1836,15 @@ mod tests {
         // A `#` mid-line is not a directive.
         let mid = lex("a # b");
         assert!(mid.iter().all(|t| t.kind != Tok::Preproc));
+    }
+
+    #[test]
+    fn preprocessor_continuations_stay_in_the_directive() {
+        let toks = lex("#define SWAP(a, b) \\\n+  do { int tmp = (a); } while (0)\nint value;");
+        assert_eq!(toks[0].kind, Tok::Preproc);
+        assert!(toks[0].text.contains("while (0)"));
+        assert_eq!(toks[1].text, "int");
+        assert_eq!(toks[1].row, 2);
     }
 
     #[test]
