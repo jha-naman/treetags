@@ -5,7 +5,7 @@ use crate::config::Config;
 use crate::split_by_newlines::split_by_newlines;
 use crate::tag::{ExtensionFields, Tag};
 use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use wasmtime::Engine;
@@ -18,6 +18,8 @@ struct PluginEntry {
     interpreters: Vec<String>,
     name: String,
     kinds: Vec<super::manifest::ManifestKind>,
+    /// Content-disambiguation signals, keyed by a shared extension (e.g. `h`).
+    disambiguation: BTreeMap<String, Vec<String>>,
     /// true for Dev/test-only plugin: routes normally but is hidden from
     /// `list_plugins` and plugin build CI.
     internal: bool,
@@ -262,6 +264,7 @@ pub struct PluginExtInfo {
     pub patterns: Vec<String>,
     pub interpreters: Vec<String>,
     pub kinds: Vec<super::manifest::ManifestKind>,
+    pub disambiguation: BTreeMap<String, Vec<String>>,
     /// Dev/test-only plugin: routes normally but is hidden from listings
     /// (`--list-plugins`, `--list-languages`).
     pub internal: bool,
@@ -280,6 +283,7 @@ pub fn scan_ext_infos(dirs: &[PathBuf], plugins_dir: Option<&PathBuf>) -> Vec<Pl
             interpreters: entry.interpreters,
             kinds: entry.kinds,
             internal: entry.internal,
+            disambiguation: entry.disambiguation,
         })
         .collect()
 }
@@ -416,6 +420,7 @@ fn load_manifest(manifest_path: &Path, entries: &mut HashMap<String, PluginEntry
     let interpreters = manifest.interpreters.clone();
     let name = manifest.name.clone();
     let kinds = manifest.kinds.clone().unwrap_or_default();
+    let disambiguation = manifest.disambiguation.clone();
     let internal = manifest.internal;
     for ext in &manifest.extensions {
         entries.insert(
@@ -428,6 +433,7 @@ fn load_manifest(manifest_path: &Path, entries: &mut HashMap<String, PluginEntry
                 interpreters: interpreters.clone(),
                 name: name.clone(),
                 kinds: kinds.clone(),
+                disambiguation: disambiguation.clone(),
                 internal,
             },
         );

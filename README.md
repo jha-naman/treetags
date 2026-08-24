@@ -50,7 +50,29 @@ Treetags functionality can be extended via WASM plugins. WASM plugins are
 functionally equivalent to native tag generators, except they are not installed
 by default and they can be updated independently of treetags releases.
 
-Plugins can be managed using the treetags cli
+Treetags has support for these languages via user installable WASM plugins.
+
+### Full support with extension fields
+- [x] Java
+- [x] Kotlin
+- [x] Objective C
+
+
+### Plugin Management
+
+Use `--suggest-plugins` CLI arg to find plugin that may be of interest to you
+
+```sh
+treetags --suggest-plugins
+Plugins available for file types in your tree:
+
+PLUGIN    HANDLES    TYPE            INSTALL WITH
+kotlin    *.kt       adds support    treetags plugin install kotlin
+
+No plugin available for unsupported types: *.0, *.1, *.2, *.a, *.bin, *.cache, *.d, *.db, *.db-shm, *.db-wal, *.dylib, *.echo, *.gleam, *.history, *.idx, *.isle, *.json, *.ll, *.lock, *.md, *.o, *.pack, *.plist, *.qc, *.rev, *.rlib, *.rmeta, *.scm, *.timestamp, *.tmp, *.toml, *.txt, *.wasm, *.wit, *.yml
+```
+
+List of all plugin management commands
 
 ```sh
 treetags plugin available # List all known compatible plugins
@@ -63,13 +85,6 @@ treetags plugin help # Print `treetags plugin` usage help
 
 See [here](WASM_PLUGINS.md) for more information on plugin implementation
 details.
-
-Treetags has support for these languages via user installable WASM plugins.
-
-### Full support with extension fields
-- [x] Java
-- [x] Kotlin
-
 
 ## Extending treetags language support via tree-sitter tag queries and grammars
 
