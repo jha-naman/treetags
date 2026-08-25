@@ -43,10 +43,8 @@ const SWIFT_DEFAULT_KINDS: &[(&[&str], &str)] = &[
     (&["o", "operator"], "o"),
 ];
 
-const SWIFT_OPTIONAL_KINDS: &[(&[&str], &str)] = &[
-    (&["l", "local"], "l"),
-    (&["z", "parameter"], "z"),
-];
+const SWIFT_OPTIONAL_KINDS: &[(&[&str], &str)] =
+    &[(&["l", "local"], "l"), (&["z", "parameter"], "z")];
 
 #[derive(Clone, Copy, PartialEq)]
 enum ScopeKind {
@@ -191,7 +189,9 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, w: &mut SwiftWalke
     match cursor.node().kind() {
         "class_declaration" => emit_type(cursor, source, w),
         "protocol_declaration" => emit_protocol(cursor, source, w),
-        "function_declaration" | "protocol_function_declaration" => emit_function(cursor, source, w),
+        "function_declaration" | "protocol_function_declaration" => {
+            emit_function(cursor, source, w)
+        }
         "init_declaration" => emit_named_method(cursor, source, w, "init", true),
         "deinit_declaration" => emit_named_method(cursor, source, w, "deinit", false),
         "subscript_declaration" => emit_subscript(cursor, source, w),
@@ -311,7 +311,12 @@ fn emit_named_method(
 ) -> bool {
     let node = cursor.node();
     if w.kinds.is_enabled("m") {
-        let mut tag = make_tag(name.to_string(), line_of(node), "m", w.scopes.current_field());
+        let mut tag = make_tag(
+            name.to_string(),
+            line_of(node),
+            "m",
+            w.scopes.current_field(),
+        );
         add_field(&mut tag, "access", access_of(cursor, source));
         if with_signature {
             tag.extension_fields
