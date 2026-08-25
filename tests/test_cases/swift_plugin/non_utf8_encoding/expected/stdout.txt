@@ -1,0 +1,5 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+Carré	source.swift	/^struct Carré {$/;"	s	end:8
+côté	source.swift	/^    let côté: Double$/;"	p	struct:Carré	typeref:typename:Double
+devise	source.swift	/^let devise = "prix élevé"$/;"	v
+périmètre	source.swift	/^    func périmètre() -> Double {$/;"	m	end:7	signature:()	struct:Carré	typeref:typename:Double

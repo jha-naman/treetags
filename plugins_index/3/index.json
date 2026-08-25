@@ -1,6 +1,6 @@
 {
   "abi_version": 3,
-  "generated_at": "2026-08-08T04:28:49Z",
+  "generated_at": "2026-08-25T09:25:56Z",
   "plugins": [
     {
       "name": "java",
@@ -115,6 +115,239 @@
       "manifest_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/kotlin.toml",
       "wasm_sha256": "cc0f5fab63228c0700d251ea87c710308dbdbf4b8b41dfcf4a541fc305cb64db",
       "wasm_size": 6065813
+    },
+    {
+      "name": "objective_c",
+      "version": "0.1.0",
+      "language": "objc",
+      "extensions": [
+        "m",
+        "h"
+      ],
+      "aliases": [
+        "objectivec",
+        "objective-c"
+      ],
+      "kinds": [
+        {
+          "letter": "d",
+          "name": "macro",
+          "default": true
+        },
+        {
+          "letter": "e",
+          "name": "enumerator",
+          "default": true
+        },
+        {
+          "letter": "f",
+          "name": "function",
+          "default": true
+        },
+        {
+          "letter": "g",
+          "name": "enum",
+          "default": true
+        },
+        {
+          "letter": "h",
+          "name": "header",
+          "default": true
+        },
+        {
+          "letter": "m",
+          "name": "member",
+          "default": true
+        },
+        {
+          "letter": "s",
+          "name": "struct",
+          "default": true
+        },
+        {
+          "letter": "t",
+          "name": "typedef",
+          "default": true
+        },
+        {
+          "letter": "u",
+          "name": "union",
+          "default": true
+        },
+        {
+          "letter": "v",
+          "name": "variable",
+          "default": true
+        },
+        {
+          "letter": "A",
+          "name": "property",
+          "default": true
+        },
+        {
+          "letter": "C",
+          "name": "category",
+          "default": true
+        },
+        {
+          "letter": "E",
+          "name": "ivar",
+          "default": true
+        },
+        {
+          "letter": "I",
+          "name": "implementation",
+          "default": true
+        },
+        {
+          "letter": "M",
+          "name": "method",
+          "default": true
+        },
+        {
+          "letter": "P",
+          "name": "protocol",
+          "default": true
+        },
+        {
+          "letter": "c",
+          "name": "class",
+          "default": true
+        },
+        {
+          "letter": "i",
+          "name": "interface",
+          "default": true
+        },
+        {
+          "letter": "l",
+          "name": "local",
+          "default": false
+        },
+        {
+          "letter": "p",
+          "name": "prototype",
+          "default": false
+        },
+        {
+          "letter": "x",
+          "name": "externvar",
+          "default": false
+        },
+        {
+          "letter": "z",
+          "name": "parameter",
+          "default": false
+        },
+        {
+          "letter": "L",
+          "name": "label",
+          "default": false
+        },
+        {
+          "letter": "D",
+          "name": "macroparam",
+          "default": false
+        }
+      ],
+      "wasm_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/objective_c.wasm",
+      "manifest_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/objective_c.toml",
+      "wasm_sha256": "067dbc08750cb3ed9b051edf5811c6528ffd9f211998cfdad38a42658b792db2",
+      "wasm_size": 5627862
+    },
+    {
+      "name": "swift",
+      "version": "0.1.0",
+      "language": "swift",
+      "extensions": [
+        "swift"
+      ],
+      "kinds": [
+        {
+          "letter": "c",
+          "name": "class",
+          "default": true
+        },
+        {
+          "letter": "s",
+          "name": "struct",
+          "default": true
+        },
+        {
+          "letter": "P",
+          "name": "protocol",
+          "default": true
+        },
+        {
+          "letter": "g",
+          "name": "enum",
+          "default": true
+        },
+        {
+          "letter": "e",
+          "name": "enumerator",
+          "default": true
+        },
+        {
+          "letter": "x",
+          "name": "extension",
+          "default": true
+        },
+        {
+          "letter": "a",
+          "name": "actor",
+          "default": true
+        },
+        {
+          "letter": "f",
+          "name": "function",
+          "default": true
+        },
+        {
+          "letter": "m",
+          "name": "method",
+          "default": true
+        },
+        {
+          "letter": "p",
+          "name": "property",
+          "default": true
+        },
+        {
+          "letter": "v",
+          "name": "variable",
+          "default": true
+        },
+        {
+          "letter": "t",
+          "name": "typealias",
+          "default": true
+        },
+        {
+          "letter": "A",
+          "name": "associatedtype",
+          "default": true
+        },
+        {
+          "letter": "o",
+          "name": "operator",
+          "default": true
+        },
+        {
+          "letter": "l",
+          "name": "local",
+          "default": false
+        },
+        {
+          "letter": "z",
+          "name": "parameter",
+          "default": false
+        }
+      ],
+      "wasm_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/swift.wasm",
+      "manifest_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/swift.toml",
+      "wasm_sha256": "d47f654370b97664d507f3940739f66fda706a214b52fa3f4bcc58001f44035c",
+      "wasm_size": 4079974
     }
   ]
 }

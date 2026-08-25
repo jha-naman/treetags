@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- [0.16.0]
+
+### Added
+- Add support for files with encodings other than UTF-8 (@abougouffa)
+
+- [0.15.0]
+
 ### Added
 - Add Swift support via plugin
 - Add Objective C support via plugin
