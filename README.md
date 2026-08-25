@@ -56,6 +56,7 @@ Treetags has support for these languages via user installable WASM plugins.
 - [x] Java
 - [x] Kotlin
 - [x] Objective C
+- [x] Swift
 
 
 ### Plugin Management

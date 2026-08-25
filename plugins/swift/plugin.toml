@@ -1,0 +1,92 @@
+name = "swift"
+version = "0.1.0"
+abi_version = 3
+extensions = ["swift"]
+language = "swift"
+
+# Swift is not covered by Universal Ctags, so these kinds are designed from
+# scratch, taking letters from ctags' cross-language conventions (c/s/g/e/f/m/
+# v/t) and reusing `P` for protocol to match the Objective-C plugin. This table
+# must stay in sync with SWIFT_DEFAULT_KINDS / SWIFT_OPTIONAL_KINDS in src/lib.rs.
+
+[[kinds]]
+letter = "c"
+name = "class"
+default = true
+
+[[kinds]]
+letter = "s"
+name = "struct"
+default = true
+
+[[kinds]]
+letter = "P"
+name = "protocol"
+default = true
+
+[[kinds]]
+letter = "g"
+name = "enum"
+default = true
+
+[[kinds]]
+letter = "e"
+name = "enumerator"
+default = true
+
+[[kinds]]
+letter = "x"
+name = "extension"
+default = true
+
+[[kinds]]
+letter = "a"
+name = "actor"
+default = true
+
+[[kinds]]
+letter = "f"
+name = "function"
+default = true
+
+[[kinds]]
+letter = "m"
+name = "method"
+default = true
+
+[[kinds]]
+letter = "p"
+name = "property"
+default = true
+
+[[kinds]]
+letter = "v"
+name = "variable"
+default = true
+
+[[kinds]]
+letter = "t"
+name = "typealias"
+default = true
+
+[[kinds]]
+letter = "A"
+name = "associatedtype"
+default = true
+
+[[kinds]]
+letter = "o"
+name = "operator"
+default = true
+
+# --- Optional, off by default (high-volume, low navigation value) ---
+
+[[kinds]]
+letter = "l"
+name = "local"
+default = false
+
+[[kinds]]
+letter = "z"
+name = "parameter"
+default = false

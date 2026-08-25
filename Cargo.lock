@@ -2238,6 +2238,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tree-sitter-swift"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe36052155b9dd69ca82b3b8f1b4ccfb2d867125ac1a4db1dd7331829242668c"
+dependencies = [
+ "cc",
+ "tree-sitter-language",
+]
+
+[[package]]
 name = "tree-sitter-tags"
 version = "0.26.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2350,6 +2360,16 @@ version = "0.1.0"
 dependencies = [
  "tree-sitter",
  "tree-sitter-objc",
+ "treetags-plugin-common",
+ "wit-bindgen 0.58.0",
+]
+
+[[package]]
+name = "treetags-plugin-swift"
+version = "0.1.0"
+dependencies = [
+ "tree-sitter",
+ "tree-sitter-swift",
  "treetags-plugin-common",
  "wit-bindgen 0.58.0",
 ]
