@@ -17,4 +17,5 @@ ruby
 rust
 scala
 shell
+swift             [plugin]
 typescript

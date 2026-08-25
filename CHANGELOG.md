@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add Swift support via plugin
 - Add Objective C support via plugin
 - Add `--list-languages` cli arg to list supported languages
 Lists all installed languages. Will not list uninstalled plugins

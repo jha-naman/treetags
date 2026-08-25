@@ -1,0 +1,35 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
++	source.swift	/^    static func + (lhs: Point, rhs: Point) -> Point {$/;"	m	end:37	signature:(lhs: Point, rhs: Point)	struct:Point	typeref:typename:Point
++++	source.swift	/^    static prefix func +++ (operand: Point) -> Point {$/;"	m	end:56	extension:Point	signature:(operand: Point)	typeref:typename:Point
++++	source.swift	/^prefix operator +++$/;"	o
+Bank	source.swift	/^actor Bank {$/;"	a	end:61
+Direction	source.swift	/^enum Direction: String {$/;"	g	end:43	inherits:String
+Drawable	source.swift	/^protocol Drawable: AnyObject {$/;"	P	end:49	inherits:AnyObject
+Gear	source.swift	/^    enum Gear {$/;"	g	end:28	class:Vehicle
+Handler	source.swift	/^typealias Handler = (Int) -> Void$/;"	t	typeref:typename:(Int) -> Void
+Item	source.swift	/^    associatedtype Item$/;"	A	protocol:Drawable
+Point	source.swift	/^extension Point {$/;"	x	end:57
+Point	source.swift	/^struct Point<T: Numeric> {$/;"	s	end:38
+Vehicle	source.swift	/^public class Vehicle: NSObject, Codable {$/;"	c	end:29	access:public	inherits:NSObject,Codable
+accelerate	source.swift	/^    public func accelerate(by amount: Double, since t: Int) -> Bool {$/;"	m	end:20	access:public	class:Vehicle	signature:(by amount: Double, since t: Int)	typeref:typename:Bool
+area	source.swift	/^    var area: Double { get }$/;"	p	protocol:Drawable	typeref:typename:Double
+balance	source.swift	/^    var balance: Int = 0$/;"	p	actor:Bank	typeref:typename:Int
+deinit	source.swift	/^    deinit {}$/;"	m	end:23	class:Vehicle
+description	source.swift	/^    var description: String {$/;"	p	class:Vehicle	typeref:typename:String
+draw	source.swift	/^    func draw() -> Void$/;"	m	end:47	protocol:Drawable	signature:()	typeref:typename:Void
+east	source.swift	/^    case east = "E"$/;"	e	enum:Direction
+high	source.swift	/^        case low, high$/;"	e	enum:Vehicle.Gear
+init	source.swift	/^    init(speed: Double) { self.speed = speed }$/;"	m	end:22	class:Vehicle	signature:(speed: Double)
+kind	source.swift	/^    static let kind = "auto"$/;"	p	class:Vehicle
+low	source.swift	/^        case low, high$/;"	e	enum:Vehicle.Gear
+magnitude	source.swift	/^    func magnitude() -> T { return x }$/;"	m	end:52	extension:Point	signature:()	typeref:typename:T
+maxCount	source.swift	/^public let maxCount = 10$/;"	v	access:public
+name	source.swift	/^var name: String = "x"$/;"	v	typeref:typename:String
+north	source.swift	/^    case north, south$/;"	e	enum:Direction
+someDic	source.swift	/^let someDic: Dictionary<String, Double>$/;"	v	typeref:typename:Dictionary<String, Double>
+south	source.swift	/^    case north, south$/;"	e	enum:Direction
+speed	source.swift	/^    private var speed: Double$/;"	p	access:private	class:Vehicle	typeref:typename:Double
+subscript	source.swift	/^    subscript(index: Int) -> Int { return index }$/;"	m	end:24	class:Vehicle	signature:(index: Int)	typeref:typename:Int
+wheels	source.swift	/^    let wheels: Int = 4$/;"	p	class:Vehicle	typeref:typename:Int
+x	source.swift	/^    var x: T$/;"	p	struct:Point	typeref:typename:T
+y	source.swift	/^    var y: T$/;"	p	struct:Point	typeref:typename:T
