@@ -20,6 +20,7 @@ let tags = parser.parse_file(&file_path_relative_to_tag_file, &file_path, extens
 pub mod built_in_grammars;
 pub mod builtin_langs;
 pub mod config;
+pub mod decode_to_utf8;
 pub mod file_finder;
 pub mod lang_resolve;
 pub mod language_parser;

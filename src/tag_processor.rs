@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::decode_to_utf8;
 use crate::language_parser::{LangId, LanguageParserRegistry, NameResolution};
 use crate::parser::Parser;
 use crate::tag::Tag;
@@ -230,7 +231,23 @@ impl TagProcessor {
             },
         };
 
-        let mut tags = lp.generate_tags(parser, &code, &file_path_relative, config, &file_path);
+        let (decoded, encoding, had_replacements) = decode_to_utf8::decode_to_utf8(&code);
+
+        if had_replacements {
+            eprintln!(
+                "Warning: {} contains bytes that are not valid {}; they were replaced with U+FFFD.",
+                file_path_relative,
+                encoding.name()
+            );
+        }
+
+        let mut tags = lp.generate_tags(
+            parser,
+            decoded.as_bytes(),
+            &file_path_relative,
+            config,
+            &file_path,
+        );
 
         if config.sort {
             tags.sort_unstable_by(|a, b| a.sort_cmp(b));

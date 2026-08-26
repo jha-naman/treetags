@@ -6,6 +6,7 @@ use std::process;
 mod built_in_grammars;
 mod builtin_langs;
 mod config;
+mod decode_to_utf8;
 mod file_finder;
 mod kinds_listing;
 mod lang_resolve;

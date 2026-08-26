@@ -57,7 +57,7 @@ pub fn generate_tags_with_config(
         }
     };
 
-    let lines = split_by_newlines::split_by_newlines(code);
+    let lines = split_by_newlines::split_by_newlines(source_code.as_bytes());
 
     ts_parser
         .set_language(&language)

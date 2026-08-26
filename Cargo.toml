@@ -19,6 +19,8 @@ exclude = ["tests/", ".github/", "plugins/"]
 anyhow = "1"
 wasmtime = { version = "45", features = ["cranelift", "component-model"] }
 wasmtime-wasi = "45"
+encoding_rs = "0.8"
+chardetng = "1"
 clap = { version = "4.5.27", features = ["derive", "string"] }
 clap_complete = "4.5"
 dirs = "6.0.0"
