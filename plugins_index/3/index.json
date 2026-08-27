@@ -1,7 +1,86 @@
 {
   "abi_version": 3,
-  "generated_at": "2026-08-25T09:25:56Z",
+  "generated_at": "2026-08-27T12:26:27Z",
   "plugins": [
+    {
+      "name": "dart",
+      "version": "0.1.0",
+      "language": "dart",
+      "extensions": [
+        "dart"
+      ],
+      "kinds": [
+        {
+          "letter": "c",
+          "name": "class",
+          "default": true
+        },
+        {
+          "letter": "M",
+          "name": "mixin",
+          "default": true
+        },
+        {
+          "letter": "g",
+          "name": "enum",
+          "default": true
+        },
+        {
+          "letter": "e",
+          "name": "enumerator",
+          "default": true
+        },
+        {
+          "letter": "x",
+          "name": "extension",
+          "default": true
+        },
+        {
+          "letter": "t",
+          "name": "typedef",
+          "default": true
+        },
+        {
+          "letter": "f",
+          "name": "function",
+          "default": true
+        },
+        {
+          "letter": "m",
+          "name": "method",
+          "default": true
+        },
+        {
+          "letter": "p",
+          "name": "property",
+          "default": true
+        },
+        {
+          "letter": "F",
+          "name": "field",
+          "default": true
+        },
+        {
+          "letter": "v",
+          "name": "variable",
+          "default": true
+        },
+        {
+          "letter": "l",
+          "name": "local",
+          "default": false
+        },
+        {
+          "letter": "z",
+          "name": "parameter",
+          "default": false
+        }
+      ],
+      "wasm_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/dart.wasm",
+      "manifest_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/dart.toml",
+      "wasm_sha256": "921905f49d7376e2079c82b0b012005b66be8c2b16922d4da36299ff30e5392a",
+      "wasm_size": 1563037
+    },
     {
       "name": "java",
       "version": "0.2.0",

@@ -9,6 +9,7 @@ Language plugins compatible with treetags builds that support plugin ABI **3**. 
 
 | Plugin | Version | Language | Extensions | Install |
 | --- | --- | --- | --- | --- |
+| dart | 0.1.0 | dart | `.dart` | `treetags plugin install dart` |
 | java | 0.2.0 | java | `.java` | `treetags plugin install java` |
 | kotlin | 0.1.0 | kotlin | `.kt` `.kts` | `treetags plugin install kotlin` |
 | objective_c | 0.1.0 | objc | `.m` `.h` | `treetags plugin install objective_c` |
@@ -16,4 +17,4 @@ Language plugins compatible with treetags builds that support plugin ABI **3**. 
 
 Machine-readable index: [`index.json`](index.json)
 
-<small>Generated 2026-08-25T09:25:56Z</small>
+<small>Generated 2026-08-27T12:26:27Z</small>

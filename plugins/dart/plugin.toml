@@ -1,0 +1,79 @@
+name = "dart"
+version = "0.1.0"
+abi_version = 3
+extensions = ["dart"]
+language = "dart"
+
+# Dart is not covered by Universal Ctags, so these kinds are designed from
+# scratch, taking letters from ctags' cross-language conventions (c/g/e/f/m/v/t/x)
+# and harmonising with the Swift plugin. `f` is function (the strongest
+# convention), so class fields take the uppercase `F`; `m` is method, so mixin
+# takes uppercase `M`. This table must stay in sync with DART_DEFAULT_KINDS /
+# DART_OPTIONAL_KINDS in src/lib.rs.
+
+[[kinds]]
+letter = "c"
+name = "class"
+default = true
+
+[[kinds]]
+letter = "M"
+name = "mixin"
+default = true
+
+[[kinds]]
+letter = "g"
+name = "enum"
+default = true
+
+[[kinds]]
+letter = "e"
+name = "enumerator"
+default = true
+
+[[kinds]]
+letter = "x"
+name = "extension"
+default = true
+
+[[kinds]]
+letter = "t"
+name = "typedef"
+default = true
+
+[[kinds]]
+letter = "f"
+name = "function"
+default = true
+
+[[kinds]]
+letter = "m"
+name = "method"
+default = true
+
+[[kinds]]
+letter = "p"
+name = "property"
+default = true
+
+[[kinds]]
+letter = "F"
+name = "field"
+default = true
+
+[[kinds]]
+letter = "v"
+name = "variable"
+default = true
+
+# --- Optional, off by default (high-volume, low navigation value) ---
+
+[[kinds]]
+letter = "l"
+name = "local"
+default = false
+
+[[kinds]]
+letter = "z"
+name = "parameter"
+default = false
