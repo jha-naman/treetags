@@ -1,6 +1,7 @@
 c
 c#
 c++
+dart              [plugin]
 elixir
 go
 java              [plugin]

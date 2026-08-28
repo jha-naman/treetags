@@ -1,0 +1,15 @@
+[package]
+name = "treetags-plugin-dart"
+version = "0.1.0"
+edition = "2021"
+description = "Dart plugin for treetags"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+treetags-plugin-common = { path = "../common", features = ["tree-walker"] }
+tree-sitter = "0.26.5"
+tree-sitter-dart = "0.2.0"
+wit-bindgen = "0.58"

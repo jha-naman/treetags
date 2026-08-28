@@ -1,0 +1,54 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+Animal	source.dart	/^  Animal(this.name, {this.weight = 0});$/;"	m	end:29	class:Animal	signature:(this.name, {this.weight = 0})
+Animal	source.dart	/^abstract class Animal<T> extends Base with Walk, Run implements Comparable<T> {$/;"	c	end:43	inherits:Base,Walk,Run,Comparable
+Animal.baby	source.dart	/^  Animal.baby(this.name) : _age = 0;$/;"	m	end:30	class:Animal	signature:(this.name)
+Animal.create	source.dart	/^  factory Animal.create() => Animal('x');$/;"	m	end:31	class:Animal	signature:()
+Animal.redirect	source.dart	/^  factory Animal.redirect() = Animal.baby;$/;"	m	end:32	class:Animal	signature:()
+Bar	source.dart	/^class Bar = Animal with Swimmer;$/;"	c	end:69	inherits:Animal,Swimmer
+Color	source.dart	/^  const Color();$/;"	m	end:55	enum:Color	signature:()
+Color	source.dart	/^enum Color {$/;"	g	end:58
+Compare	source.dart	/^typedef Compare<T> = int Function(T a, T b);$/;"	t	typeref:typename:int Function(T a, T b)
+Id	source.dart	/^extension type const Id<T>._(String raw) implements String {$/;"	x	end:81	inherits:String	typeref:typename:String
+Id.gen	source.dart	/^  factory Id.gen() => Id._('x');$/;"	m	end:79	extension:Id	signature:()
+IntList	source.dart	/^typedef IntList = List<int>;$/;"	t	typeref:typename:List<int>
+Meters	source.dart	/^extension type Meters(int value) {$/;"	x	end:76	typeref:typename:int
+StringExt	source.dart	/^extension StringExt on String {$/;"	x	end:63	typeref:typename:String
+Swimmer	source.dart	/^mixin Swimmer on Animal implements Comparable {$/;"	M	end:48	inherits:Animal,Comparable
+_Private	source.dart	/^class _Private {}$/;"	c	end:71	access:private
+_age	source.dart	/^  int _age = 0;$/;"	F	access:private	class:Animal	typeref:typename:int
+_counter	source.dart	/^int _counter = 0;$/;"	v	access:private	typeref:typename:int
+a	source.dart	/^int a, b;$/;"	v	typeref:typename:int
+add	source.dart	/^int add(int a, int b) => a + b;$/;"	f	end:13	signature:(int a, int b)	typeref:typename:int
+age	source.dart	/^  int get age => _age;$/;"	p	end:35	class:Animal	typeref:typename:int
+age	source.dart	/^  set age(int v) => _age = v;$/;"	p	end:36	class:Animal	signature:(int v)
+b	source.dart	/^int a, b;$/;"	v	typeref:typename:int
+blue	source.dart	/^  blue;$/;"	e	enum:Color
+canSwim	source.dart	/^  bool get canSwim => true;$/;"	p	end:47	mixin:Swimmer	typeref:typename:bool
+clone	source.dart	/^  static Animal clone(Animal a) => a;$/;"	m	end:39	class:Animal	signature:(Animal a)	typeref:typename:Animal
+doubled	source.dart	/^  int get doubled => this * 2;$/;"	p	end:66	extension:int	typeref:typename:int
+echo	source.dart	/^  T echo<T>(T x) => x;$/;"	m	end:40	class:Animal	signature:(T x)	typeref:typename:T
+extMethod	source.dart	/^  external int extMethod();$/;"	m	end:33	class:Animal	signature:()	typeref:typename:int
+green	source.dart	/^  green,$/;"	e	enum:Color
+greeting	source.dart	/^final greeting = 'hi';$/;"	v
+int	source.dart	/^extension on int {$/;"	x	end:67	typeref:typename:int
+isBlank	source.dart	/^  bool get isBlank => trim().isEmpty;$/;"	p	end:61	extension:StringExt	typeref:typename:bool
+isRed	source.dart	/^  bool get isRed => this == Color.red;$/;"	p	end:56	enum:Color	typeref:typename:bool
+legs	source.dart	/^  static const int legs = 4;$/;"	F	class:Animal	typeref:typename:int
+main	source.dart	/^Future<void> main() async {$/;"	f	end:18	signature:()	typeref:typename:Future<void>
+name	source.dart	/^  final String name;$/;"	F	class:Animal	typeref:typename:String
+nested	source.dart	/^  void nested() {}$/;"	f	end:17	function:main	signature:()	typeref:typename:void
+operator +	source.dart	/^  Animal operator +(Animal other) => this;$/;"	m	end:42	class:Animal	signature:(Animal other)	typeref:typename:Animal
+operator +	source.dart	/^  Meters operator +(Meters o) => Meters(value + o.value);$/;"	m	end:75	extension:Meters	signature:(Meters o)	typeref:typename:Meters
+pi	source.dart	/^const double pi = 3.14;$/;"	v	typeref:typename:double
+raw	source.dart	/^extension type const Id<T>._(String raw) implements String {$/;"	F	extension:Id	typeref:typename:String
+red	source.dart	/^  red,$/;"	e	enum:Color
+repeat	source.dart	/^  String repeat(int n) => this * n;$/;"	m	end:62	extension:StringExt	signature:(int n)	typeref:typename:String
+show	source.dart	/^  void show() {}$/;"	m	end:57	enum:Color	signature:()	typeref:typename:void
+show	source.dart	/^  void show() {}$/;"	m	end:80	extension:Id	signature:()	typeref:typename:void
+speak	source.dart	/^  void speak() {}$/;"	m	end:38	class:Animal	signature:()	typeref:typename:void
+squared	source.dart	/^  int get squared => value * value;$/;"	p	end:74	extension:Meters	typeref:typename:int
+swim	source.dart	/^  void swim() {}$/;"	m	end:46	mixin:Swimmer	signature:()	typeref:typename:void
+topGetter	source.dart	/^int get topGetter => 42;$/;"	p	end:20	typeref:typename:int
+topSetter	source.dart	/^set topSetter(int v) {}$/;"	p	end:21	signature:(int v)
+value	source.dart	/^extension type Meters(int value) {$/;"	F	extension:Meters	typeref:typename:int
+weight	source.dart	/^  late double weight;$/;"	F	class:Animal	typeref:typename:double
