@@ -2335,6 +2335,7 @@ dependencies = [
  "tree-sitter-scala",
  "tree-sitter-tags",
  "tree-sitter-typescript",
+ "treetags-test-plugin-builder",
  "ureq",
  "walkdir",
  "wasmtime",
@@ -2406,6 +2407,10 @@ dependencies = [
  "treetags-plugin-common",
  "wit-bindgen 0.58.0",
 ]
+
+[[package]]
+name = "treetags-test-plugin-builder"
+version = "0.0.0"
 
 [[package]]
 name = "typenum"

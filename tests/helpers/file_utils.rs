@@ -37,11 +37,15 @@ pub fn normalize_output(output: &str) -> String {
 }
 
 /// Parse command line arguments from file content.
-/// Substitutes `{TREETAGS_TEST_PLUGINS_DIR}` with the compiled test plugins directory
-/// (set by build.rs when the wasm32-wasip2 target is available).
+/// Substitutes `{TREETAGS_TEST_PLUGINS_DIR}` with the compiled test plugins
+/// directory prepared by the test-only plugin-builder dependency.
 pub fn parse_args(content: &str) -> Result<Vec<String>, String> {
-    let plugins_dir = option_env!("TREETAGS_TEST_PLUGINS_DIR").unwrap_or("");
-    let expanded = content.replace("{TREETAGS_TEST_PLUGINS_DIR}", plugins_dir);
+    let expanded = if content.contains("{TREETAGS_TEST_PLUGINS_DIR}") {
+        let plugins_dir = treetags_test_plugin_builder::test_plugins_dir();
+        content.replace("{TREETAGS_TEST_PLUGINS_DIR}", plugins_dir)
+    } else {
+        content.to_string()
+    };
     expanded
         .lines()
         .filter(|line| !line.trim().is_empty() && !line.starts_with('#'))

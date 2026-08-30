@@ -1,5 +1,6 @@
 [workspace]
 members = [".", "plugins/common", "plugins/dart", "plugins/echo", "plugins/java", "plugins/kotlin", "plugins/objective_c", "plugins/swift"]
+exclude = ["test-support/test-plugin-builder"]
 resolver = "2"
 
 [package]
@@ -63,6 +64,7 @@ similar = "2.4"
 shlex = "1.3.0"
 serde = { version = "1.0", features = ["derive"] }
 tempfile = "3.27.0"
+treetags-test-plugin-builder = { path = "test-support/test-plugin-builder" }
 
 [build-dependencies]
 walkdir = "2"
