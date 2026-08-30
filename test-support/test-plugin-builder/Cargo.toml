@@ -1,0 +1,8 @@
+[package]
+name = "treetags-test-plugin-builder"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+path = "lib.rs"

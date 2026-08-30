@@ -1,30 +1,17 @@
-//! Runtime compilation of the WASM plugins used by integration tests.
-//!
-//! Plugin compilation deliberately lives here rather than in `build.rs` so that
-//! a plain `cargo build`/`cargo run` never pays for building the plugins. The
-//! `integration_tests` binary invokes [`test_plugins_dir`] from a `#[ctor]`
-//! constructor, so every plugin is built exactly once, up front, before libtest
-//! starts running test functions.
+//! Build script for the WASM plugins used by integration tests.
 //!
 //! Discovers every subdirectory of `plugins/` that has both a `Cargo.toml` and a
 //! `plugin.toml` template, compiles each to a `.wasm` component targeting
-//! `wasm32-wasip2`, and assembles the result under
-//! `<target>/treetags-test-plugins/plugins/{plugin_name}/`.
+//! `wasm32-wasip2`, and assembles the result under this package's `OUT_DIR`.
 
 use std::path::PathBuf;
-use std::sync::OnceLock;
 
-/// Returns the directory holding the compiled test plugins, building them on
-/// first call. Returns `""` if the plugins could not be built (e.g. the
-/// `wasm32-wasip2` target is not installed), matching the previous behaviour
-/// where `TREETAGS_TEST_PLUGINS_DIR` was simply unset.
-pub fn test_plugins_dir() -> &'static str {
-    static DIR: OnceLock<String> = OnceLock::new();
-    DIR.get_or_init(|| {
-        build_all()
-            .map(|p| p.display().to_string())
-            .unwrap_or_default()
-    })
+fn main() {
+    let plugins_dir = build_all()
+        .map(|path| path.display().to_string())
+        .unwrap_or_default();
+    println!("cargo:rustc-env=TREETAGS_TEST_PLUGINS_DIR={plugins_dir}");
+    println!("cargo:rerun-if-changed=../../plugins");
 }
 
 fn build_all() -> Option<PathBuf> {
@@ -43,15 +30,13 @@ fn build_all() -> Option<PathBuf> {
     }
 
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let plugins_src_dir = manifest_dir.join("plugins");
+    let workspace_dir = manifest_dir.join("../..");
+    let plugins_src_dir = workspace_dir.join("plugins");
     if !plugins_src_dir.exists() {
         return None;
     }
 
-    let target_dir = std::env::var_os("CARGO_TARGET_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| manifest_dir.join("target"));
-    let out_root = target_dir.join("treetags-test-plugins");
+    let out_root = PathBuf::from(std::env::var_os("OUT_DIR").expect("OUT_DIR is not set"));
     let plugins_out_dir = out_root.join("plugins");
     // Separate target dir avoids lock contention with the outer cargo invocation.
     let wasm_target_dir = out_root.join("wasm-target");
@@ -115,6 +100,7 @@ fn build_all() -> Option<PathBuf> {
                 "-p",
                 &crate_name,
             ])
+            .current_dir(&workspace_dir)
             .env("CARGO_TARGET_DIR", &wasm_target_dir)
             .status();
 
