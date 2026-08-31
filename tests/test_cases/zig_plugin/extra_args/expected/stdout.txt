@@ -1,0 +1,13 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+T	source.zig	/^pub inline fn max(comptime T: type, a: T, b: T) T {$/;"	z	function:max	typeref:typename:type
+a	source.zig	/^pub inline fn max(comptime T: type, a: T, b: T) T {$/;"	z	function:max	typeref:typename:T
+b	source.zig	/^pub inline fn max(comptime T: type, a: T, b: T) T {$/;"	z	function:max	typeref:typename:T
+chosen	source.zig	/^    const chosen = if (a > b) a else b;$/;"	l	function:max
+distance	source.zig	/^    pub fn distance(self: Point, other: Point) f64 {$/;"	f	end:13	access:public	signature:(self: Point, other: Point)	struct:Point	typeref:typename:f64
+dx	source.zig	/^        const dx = self.x - other.x;$/;"	l	function:Point.distance
+malloc	source.zig	/^extern fn malloc(size: usize) ?*anyopaque;$/;"	f	end:46	access:private	implementation:extern	signature:(size: usize)	typeref:typename:?*anyopaque
+max	source.zig	/^pub inline fn max(comptime T: type, a: T, b: T) T {$/;"	f	end:44	access:public	implementation:inline	signature:(comptime T: type, a: T, b: T)	typeref:typename:T
+other	source.zig	/^    pub fn distance(self: Point, other: Point) f64 {$/;"	z	function:Point.distance	typeref:typename:Point
+point	source.zig	/^    const point = Point{ .x = 1 };$/;"	l	test:point distance
+self	source.zig	/^    pub fn distance(self: Point, other: Point) f64 {$/;"	z	function:Point.distance	typeref:typename:Point
+size	source.zig	/^extern fn malloc(size: usize) ?*anyopaque;$/;"	z	typeref:typename:usize

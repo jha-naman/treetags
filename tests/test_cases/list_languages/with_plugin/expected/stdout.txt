@@ -20,3 +20,4 @@ scala
 shell
 swift             [plugin]
 typescript
+zig               [plugin]

@@ -1,0 +1,27 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+AccessDenied	source.zig	/^    AccessDenied,$/;"	E	errorSet:OpenError
+Axis	source.zig	/^    const Axis = enum {$/;"	g	end:18	access:private	struct:Point
+Color	source.zig	/^const Color = enum(u8) {$/;"	g	end:30	access:private
+Handle	source.zig	/^const Handle = opaque {};$/;"	o	end:32	access:private
+InternalCount	source.zig	/^const InternalCount: usize = 4;$/;"	C	access:private	typeref:typename:usize
+NotFound	source.zig	/^    NotFound,$/;"	E	errorSet:OpenError
+OpenError	source.zig	/^pub const OpenError = error {$/;"	r	end:37	access:public
+Point	source.zig	/^pub const Point = struct {$/;"	s	end:19	access:public
+Value	source.zig	/^const Value = union(enum) {$/;"	u	end:24	access:private
+Word	source.zig	/^const Word: type = usize;$/;"	t	access:private	typeref:typename:usize
+active	source.zig	/^pub var active: bool = true;$/;"	v	access:public	typeref:typename:bool
+distance	source.zig	/^    pub fn distance(self: Point, other: Point) f64 {$/;"	f	end:13	access:public	signature:(self: Point, other: Point)	struct:Point	typeref:typename:f64
+green	source.zig	/^    green = 4,$/;"	e	enum:Color
+horizontal	source.zig	/^        horizontal,$/;"	e	enum:Point.Axis
+integer	source.zig	/^    integer: i64,$/;"	F	typeref:typename:i64	union:Value
+malloc	source.zig	/^extern fn malloc(size: usize) ?*anyopaque;$/;"	f	end:46	access:private	implementation:extern	signature:(size: usize)	typeref:typename:?*anyopaque
+max	source.zig	/^pub inline fn max(comptime T: type, a: T, b: T) T {$/;"	f	end:44	access:public	implementation:inline	signature:(comptime T: type, a: T, b: T)	typeref:typename:T
+max	source.zig	/^test max {$/;"	T	end:55	access:private
+none	source.zig	/^    none,$/;"	F	union:Value
+origin_name	source.zig	/^    const origin_name = "zero";$/;"	C	access:private	struct:Point
+point distance	source.zig	/^test "point distance" {$/;"	T	end:51	access:private
+red	source.zig	/^    red,$/;"	e	enum:Color
+std	source.zig	/^const std = @import("std");$/;"	n	access:private
+vertical	source.zig	/^        vertical = 2,$/;"	e	enum:Point.Axis
+x	source.zig	/^    x: f64,$/;"	F	struct:Point	typeref:typename:f64
+y	source.zig	/^    y: f64 = 0,$/;"	F	struct:Point	typeref:typename:f64
