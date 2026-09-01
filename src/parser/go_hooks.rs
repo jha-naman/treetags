@@ -375,7 +375,10 @@ impl GoHooks {
             .flatten();
         let mut b = out
             .tag("n", name, (name, result.map_or(params_close, |s| s.last)))
-            .scope("interface", format!("{}.{}", self.package, cursor.text(owner)));
+            .scope(
+                "interface",
+                format!("{}.{}", self.package, cursor.text(owner)),
+            );
         if let Some(s) = result {
             let (a, z) = s.byte_range();
             b = b.typeref(TextValue::Span(a, z));
@@ -486,7 +489,9 @@ fn looks_like_type_params(cursor: &TokenCursor<'_>) -> bool {
     let mut depth = 0u32;
     let mut i = 0;
     loop {
-        let Some(t) = cursor.peek(i) else { return false };
+        let Some(t) = cursor.peek(i) else {
+            return false;
+        };
         match t.kind {
             go::PUNCT_5B => depth += 1,
             go::PUNCT_5D => {
@@ -602,7 +607,9 @@ fn array_after_bracket(cursor: &TokenCursor<'_>) -> bool {
     let mut depth = 0u32;
     let mut i = 1;
     let close = loop {
-        let Some(t) = cursor.peek(i) else { return false };
+        let Some(t) = cursor.peek(i) else {
+            return false;
+        };
         match t.kind {
             go::PUNCT_5B => depth += 1,
             go::PUNCT_5D => {
