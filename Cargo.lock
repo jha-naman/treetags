@@ -2317,6 +2317,7 @@ dependencies = [
  "predicates 2.1.5",
  "rayon",
  "regex",
+ "regex-automata",
  "semver",
  "serde",
  "serde_json",

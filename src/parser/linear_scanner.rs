@@ -4,17 +4,19 @@ use super::linear::{
     TokenStream,
 };
 
-pub(crate) struct GeneratedLexicon {
-    pub identifier: TokenKind,
-    pub literal: TokenKind,
-    pub unknown: TokenKind,
-    pub keywords: &'static [(&'static str, TokenKind)],
-    pub punctuation: &'static [(&'static str, TokenKind)],
+pub(crate) trait GeneratedLexicon {
+    const UNKNOWN: TokenKind;
+    fn lex(source: &str, offset: usize) -> GeneratedLexeme;
+}
+pub(crate) struct GeneratedLexeme {
+    pub len: usize,
+    pub kind: TokenKind,
+    pub skip: bool,
+    pub error: bool,
 }
 
-pub(crate) fn scan<E: ExternalLexer>(
+pub(crate) fn scan<E: ExternalLexer, L: GeneratedLexicon>(
     source: &str,
-    lex: &GeneratedLexicon,
 ) -> Result<TokenStream, String> {
     if source.len() > u32::MAX as usize {
         return Err("input exceeds the 4 GiB token-offset limit".into());
@@ -66,64 +68,29 @@ pub(crate) fn scan<E: ExternalLexer>(
         }
         let start = at;
         let start_row = row;
-        match bytes[at] {
-            b' ' | b'\t' | b'\r' => {
-                at += 1;
-                continue;
-            }
-            b'\n' => {
-                at += 1;
-                row += 1;
-                lines.push(at as u32);
-                bol = true;
-                continue;
-            }
-            b'/' if bytes.get(at + 1) == Some(&b'/') => {
-                at += 2;
-                while at < bytes.len() && bytes[at] != b'\n' {
-                    at += 1
-                }
-                continue;
-            }
-            b'/' if bytes.get(at + 1) == Some(&b'*') => {
-                at += 2;
-                while at < bytes.len() {
-                    if bytes[at] == b'\n' {
-                        row += 1;
-                        lines.push((at + 1) as u32)
-                    }
-                    if bytes[at] == b'*' && bytes.get(at + 1) == Some(&b'/') {
-                        at += 2;
-                        break;
-                    }
-                    at += 1
-                }
-                continue;
-            }
-            b'"' | b'\'' | b'`' => {
-                let quote = bytes[at];
-                at += 1;
-                while at < bytes.len() {
-                    if bytes[at] == b'\n' {
-                        row += 1;
-                        lines.push((at + 1) as u32)
-                    }
-                    if quote != b'`' && bytes[at] == b'\\' {
-                        at = (at + 2).min(bytes.len());
-                        continue;
-                    }
-                    let done = bytes[at] == quote;
-                    at += 1;
-                    if done {
-                        break;
-                    }
-                }
-                push(&mut tokens, lex.literal, start, at, start_row, bol, false)
-            }
-            _ => scan_regular(source, lex, &mut tokens, start, &mut at, row, bol),
+        let lexeme = L::lex(source, at);
+        let len = lexeme
+            .len
+            .max(source[at..].chars().next().unwrap().len_utf8());
+        at = (at + len).min(bytes.len());
+        advance(bytes, start, at, &mut row, &mut lines);
+        if !lexeme.skip {
+            push(
+                &mut tokens,
+                lexeme.kind,
+                start,
+                at,
+                start_row,
+                bol,
+                lexeme.error,
+            );
+            previous = tokens.last().copied();
         }
-        previous = tokens.last().copied();
-        bol = false;
+        if row != start_row {
+            bol = lines[row as usize] as usize == at;
+        } else if !lexeme.skip {
+            bol = false;
+        }
     }
     let input = ExternalLexInput {
         source,
@@ -146,57 +113,6 @@ pub(crate) fn scan<E: ExternalLexer>(
     })
 }
 
-fn scan_regular(
-    source: &str,
-    lex: &GeneratedLexicon,
-    out: &mut Vec<Tok>,
-    start: usize,
-    at: &mut usize,
-    row: u32,
-    bol: bool,
-) {
-    let ch = source[*at..].chars().next().unwrap();
-    if ch == '_' || ch.is_alphabetic() {
-        *at += ch.len_utf8();
-        while *at < source.len() {
-            let c = source[*at..].chars().next().unwrap();
-            if c == '_' || c.is_alphanumeric() {
-                *at += c.len_utf8()
-            } else {
-                break;
-            }
-        }
-        let text = &source[start..*at];
-        let kind = lex
-            .keywords
-            .binary_search_by_key(&text, |(text, _)| *text)
-            .map(|index| lex.keywords[index].1)
-            .unwrap_or(lex.identifier);
-        push(out, kind, start, *at, row, bol, false)
-    } else if ch.is_ascii_digit() {
-        *at += ch.len_utf8();
-        while *at < source.len() {
-            let c = source[*at..].chars().next().unwrap();
-            if c.is_ascii_alphanumeric() || matches!(c, '_' | '.') {
-                *at += c.len_utf8()
-            } else {
-                break;
-            }
-        }
-        push(out, lex.literal, start, *at, row, bol, false)
-    } else if let Some((p, kind)) = lex
-        .punctuation
-        .iter()
-        .filter(|(text, _)| source[start..].starts_with(*text))
-        .max_by_key(|(text, _)| text.len())
-    {
-        *at += p.len();
-        push(out, *kind, start, *at, row, bol, false)
-    } else {
-        *at += ch.len_utf8();
-        push(out, lex.unknown, start, *at, row, bol, true)
-    }
-}
 fn push(
     out: &mut Vec<Tok>,
     kind: TokenKind,
@@ -244,28 +160,118 @@ mod tests {
 
     #[test]
     fn generated_go_lexes_keywords_identifiers_and_longest_punctuation() {
-        let source = "package p\nx := y << 2";
+        let source = "package p\nx := y <<= 2; z &^= 1; f(...)";
         let stream = go::scan::<NoExternalLexer>(source).unwrap();
         assert_eq!(
             texts(source, &stream),
-            ["package", "p", "x", ":=", "y", "<<", "2"]
+            [
+                "package", "p", "x", ":=", "y", "<<=", "2", ";", "z", "&^=", "1", ";", "f", "(",
+                "...", ")"
+            ]
         );
         assert_eq!(stream.tokens[0].kind, go::KW_PACKAGE);
         assert_eq!(stream.tokens[1].kind, go::IDENTIFIER);
         assert_eq!(stream.tokens[3].kind, go::PUNCT_3A_3D);
-        assert_eq!(stream.tokens[5].kind, go::PUNCT_3C_3C);
+        assert_eq!(stream.tokens[5].kind, go::PUNCT_3C_3C_3D);
+        assert_eq!(stream.tokens[9].kind, go::PUNCT_26_5E_3D);
+        assert_eq!(stream.tokens[14].kind, go::PUNCT_2E_2E_2E);
         assert_ne!(go::KW_PACKAGE, go::KW_FUNC);
         assert_ne!(go::PUNCT_3A_3D, go::PUNCT_3D);
     }
     #[test]
     fn extras_strings_positions_and_unknown_progress_are_total() {
-        let source = "// {\n`a\nb` § x";
+        let source = "// {\n/* ignored\n} */ `a\nb` § x";
         let stream = go::scan::<NoExternalLexer>(source).unwrap();
         assert_eq!(texts(source, &stream), ["`a\nb`", "§", "x"]);
-        assert_eq!(stream.tokens[0].row, 1);
-        assert_eq!(stream.tokens[1].row, 2);
+        assert_eq!(stream.tokens[0].row, 2);
+        assert_eq!(stream.tokens[1].row, 3);
         assert_ne!(stream.tokens[1].flags.0 & TokenFlags::ERROR, 0);
-        assert_eq!(stream.line_starts, [0, 5, 8]);
+        assert_eq!(stream.line_starts, [0, 5, 16, 24]);
+    }
+
+    #[test]
+    fn generated_go_uses_xid_identifier_boundaries() {
+        let source = "π cafe\u{301} ·";
+        let stream = go::scan::<NoExternalLexer>(source).unwrap();
+        assert_eq!(texts(source, &stream), ["π", "cafe\u{301}", "·"]);
+        assert_eq!(stream.tokens[0].kind, go::IDENTIFIER);
+        assert_eq!(stream.tokens[1].kind, go::IDENTIFIER);
+        assert_ne!(stream.tokens[2].flags.0 & TokenFlags::ERROR, 0);
+    }
+
+    #[test]
+    fn generated_go_lexes_numeric_and_string_families() {
+        let source = r#"0 0b101_0 0o755 0xCA_FE 1.25 1e-3 0x1.fp2 42i .5 "a\n\x41" `a
+b` '\u03c0'"#;
+        let stream = go::scan::<NoExternalLexer>(source).unwrap();
+        assert_eq!(
+            texts(source, &stream),
+            [
+                "0",
+                "0b101_0",
+                "0o755",
+                "0xCA_FE",
+                "1.25",
+                "1e-3",
+                "0x1.fp2",
+                "42i",
+                ".5",
+                r#""a\n\x41""#,
+                "`a\nb`",
+                r#"'\u03c0'"#
+            ]
+        );
+        assert!(stream.tokens.iter().all(|t| t.kind == go::LITERAL));
+        assert_eq!(stream.tokens[10].row, 0);
+        assert_eq!(stream.tokens[11].row, 1);
+    }
+
+    #[test]
+    fn generated_go_comments_extras_and_unterminated_literals_are_total() {
+        let source = " \t// one\n/* two\n */ x \"unterminated\n`raw";
+        let stream = go::scan::<NoExternalLexer>(source).unwrap();
+        assert_eq!(texts(source, &stream), ["x", "\"unterminated", "`raw"]);
+        assert_eq!(stream.tokens[0].row, 2);
+        assert_ne!(stream.tokens[1].flags.0 & TokenFlags::ERROR, 0);
+        assert_ne!(stream.tokens[2].flags.0 & TokenFlags::ERROR, 0);
+    }
+
+    #[test]
+    fn generated_go_grammar_controls_malformed_numeric_and_escape_boundaries() {
+        let source = "0b_1 0b 1__2 1e 0x1p 1.foo \"\\x1\"";
+        let stream = go::scan::<NoExternalLexer>(source).unwrap();
+        assert_eq!(
+            texts(source, &stream),
+            ["0b_1", "0", "b", "1", "__2", "1", "e", "0x1", "p", "1.", "foo", "\"\\x1\""]
+        );
+        assert_ne!(stream.tokens[11].flags.0 & TokenFlags::ERROR, 0);
+    }
+
+    #[test]
+    fn generated_go_rune_newline_behavior_follows_the_pinned_pattern() {
+        // The canonical grammar's rune content is [^'\\], which includes a newline.
+        let source = "'\n' '\\x4'";
+        let stream = go::scan::<NoExternalLexer>(source).unwrap();
+        assert_eq!(texts(source, &stream), ["'\n'", "'\\x4'"]);
+        assert_eq!(stream.tokens[0].kind, go::LITERAL);
+        assert_ne!(stream.tokens[1].flags.0 & TokenFlags::ERROR, 0);
+    }
+
+    #[test]
+    fn generated_go_unterminated_block_comment_is_recovered_as_an_extra() {
+        let source = "x /* unterminated\ny";
+        let stream = go::scan::<NoExternalLexer>(source).unwrap();
+        assert_eq!(texts(source, &stream), ["x"]);
+        assert_eq!(stream.line_starts, [0, 18]);
+    }
+
+    #[test]
+    fn generated_go_uses_ecmascript_digit_whitespace_and_dot_semantics() {
+        let source = "١\u{a0}x\u{85}y";
+        let stream = go::scan::<NoExternalLexer>(source).unwrap();
+        assert_eq!(texts(source, &stream), ["١", "x", "\u{85}", "y"]);
+        assert_ne!(stream.tokens[0].flags.0 & TokenFlags::ERROR, 0);
+        assert_ne!(stream.tokens[2].flags.0 & TokenFlags::ERROR, 0);
     }
 
     #[derive(Default)]

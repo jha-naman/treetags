@@ -1,7 +1,7 @@
 //! Tree-free runtime for generated builtin scanners.
 #![allow(dead_code)] // API surface is intentionally ahead of the first consumer.
 
-pub(crate) use super::linear_scanner::GeneratedLexicon;
+pub(crate) use super::linear_scanner::{GeneratedLexeme, GeneratedLexicon};
 use std::num::NonZeroU32;
 
 #[repr(transparent)]
