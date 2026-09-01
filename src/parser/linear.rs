@@ -138,7 +138,18 @@ impl ExternalLexer for NoExternalLexer {}
 pub(crate) struct TokenCursor<'a> {
     source: &'a str,
     tokens: &'a [Tok],
+    start: usize,
     at: usize,
+    end: usize,
+}
+
+/// A half-open range in a generated token stream. Ranges are cheap, borrowed
+/// indirectly through their cursor, and can be revisited without rewinding the
+/// parent cursor.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct TokenRange {
+    pub start: usize,
+    pub end: usize,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -153,18 +164,9 @@ pub(crate) struct DelimiterKinds {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum BalancedBoundary {
-    Semicolon(Tok),
-    RowTransition,
-    OwnerClose(Tok),
-    Eof,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct BalancedSpan {
-    pub first: Option<Tok>,
-    pub last: Option<Tok>,
-    pub boundary: BalancedBoundary,
+pub(crate) struct BalancedPair {
+    pub open: Tok,
+    pub close: Tok,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -214,8 +216,22 @@ impl<'a> TokenCursor<'a> {
         Self {
             source,
             tokens,
+            start: 0,
             at: 0,
+            end: tokens.len(),
         }
+    }
+    fn contains_range(&self, range: TokenRange) -> bool {
+        self.start <= range.start && range.start <= range.end && range.end <= self.end
+    }
+    pub fn view(&self, range: TokenRange) -> Option<Self> {
+        self.contains_range(range).then_some(Self {
+            source: self.source,
+            tokens: self.tokens,
+            start: range.start,
+            at: range.start,
+            end: range.end,
+        })
     }
     pub fn next(&mut self) -> Option<Tok> {
         let value = self.peek(0)?;
@@ -223,7 +239,10 @@ impl<'a> TokenCursor<'a> {
         Some(value)
     }
     pub fn peek(&self, n: usize) -> Option<Tok> {
-        self.tokens.get(self.at + n).copied()
+        let index = self.at.checked_add(n)?;
+        (index < self.end)
+            .then(|| self.tokens.get(index).copied())
+            .flatten()
     }
     pub fn consume_if(&mut self, kind: TokenKind) -> Option<Tok> {
         (self.peek(0)?.kind == kind).then(|| self.next().unwrap())
@@ -237,73 +256,56 @@ impl<'a> TokenCursor<'a> {
     pub fn span_text(&self, start: Tok, end: Tok) -> &'a str {
         &self.source[start.start as usize..end.end as usize]
     }
-    pub fn skip_balanced(&mut self, open: &str, close: &str) -> Option<Tok> {
-        let first = self.next()?;
-        if self.text(first) != open {
-            return None;
-        }
-        self.skip_balanced_after_open(first, open, close)
-    }
-    pub fn skip_balanced_after_open(
+    /// Consumes one balanced token pair, including nested instances of that
+    /// same pair. On malformed input the cursor remains forward-only and ends
+    /// at EOF.
+    pub fn consume_balanced_pair(
         &mut self,
-        _first: Tok,
-        open: &str,
-        close: &str,
-    ) -> Option<Tok> {
-        let mut depth = 1;
+        open_kind: TokenKind,
+        close_kind: TokenKind,
+    ) -> Option<BalancedPair> {
+        let open = self.consume_if(open_kind)?;
+        let mut depth = 1u32;
         while let Some(token) = self.next() {
-            match self.text(token) {
-                x if x == open => depth += 1,
-                x if x == close => {
-                    depth -= 1;
-                    if depth == 0 {
-                        return Some(token);
-                    }
+            if token.kind == open_kind {
+                depth += 1;
+            } else if token.kind == close_kind {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(BalancedPair { open, close: token });
                 }
-                _ => {}
             }
         }
         None
     }
-    pub fn consume_through_row(&mut self, row: u32) -> Option<Tok> {
-        let mut last = None;
-        while self.peek(0).is_some_and(|t| t.row <= row) {
-            last = self.next()
-        }
-        last
-    }
-
     /// Consumes one declaration fragment without crossing a top-level logical
     /// boundary. Owner closes and row-transition tokens remain available to
     /// the caller; explicit semicolons are consumed. Every successful loop
     /// iteration consumes a token, including malformed unmatched closes.
-    pub fn consume_balanced_until(&mut self, rules: BalancedUntil) -> BalancedSpan {
+    pub fn consume_balanced_until(&mut self, rules: BalancedUntil) -> TokenRange {
         let mut depth = DelimiterDepth::default();
-        let mut first: Option<Tok> = None;
-        let mut last = None;
+        let start = self.at;
+        let mut last: Option<Tok> = None;
 
         loop {
             let Some(next) = self.peek(0) else {
-                return BalancedSpan {
-                    first,
-                    last,
-                    boundary: BalancedBoundary::Eof,
+                return TokenRange {
+                    start,
+                    end: self.at,
                 };
             };
             let top = depth.is_top_level();
             if top && rules.owner_close == Some(next.kind) {
-                return BalancedSpan {
-                    first,
-                    last,
-                    boundary: BalancedBoundary::OwnerClose(next),
+                return TokenRange {
+                    start,
+                    end: self.at,
                 };
             }
             if top && next.kind == rules.delimiters.semicolon {
-                let semicolon = self.next().expect("peeked token");
-                return BalancedSpan {
-                    first,
-                    last,
-                    boundary: BalancedBoundary::Semicolon(semicolon),
+                self.next().expect("peeked token");
+                return TokenRange {
+                    start,
+                    end: self.at - 1,
                 };
             }
             if top
@@ -312,18 +314,51 @@ impl<'a> TokenCursor<'a> {
                     next.row > token.row && (rules.can_terminate_line)(token.kind)
                 })
             {
-                return BalancedSpan {
-                    first,
-                    last,
-                    boundary: BalancedBoundary::RowTransition,
+                return TokenRange {
+                    start,
+                    end: self.at,
                 };
             }
 
             let token = self.next().expect("peeked token");
-            first.get_or_insert(token);
             last = Some(token);
             depth.observe(token.kind, rules.delimiters);
         }
+    }
+}
+
+/// A validated prefix made from repeated item/separator tokens. The range can
+/// be revisited after the rest of the enclosing syntax has been parsed.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct SeparatedRange {
+    pub range: TokenRange,
+    pub item: TokenKind,
+}
+
+impl SeparatedRange {
+    pub fn items<'a>(self, cursor: &TokenCursor<'a>) -> Option<SeparatedItems<'a>> {
+        Some(SeparatedItems {
+            cursor: cursor.view(self.range)?,
+            item: self.item,
+        })
+    }
+}
+
+pub(crate) struct SeparatedItems<'a> {
+    cursor: TokenCursor<'a>,
+    item: TokenKind,
+}
+
+impl Iterator for SeparatedItems<'_> {
+    type Item = Tok;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(token) = self.cursor.next() {
+            if token.kind == self.item {
+                return Some(token);
+            }
+        }
+        None
     }
 }
 
@@ -382,5 +417,61 @@ mod tests {
     #[test]
     fn compact_token_layout() {
         assert_eq!(std::mem::size_of::<Tok>(), 16);
+    }
+
+    #[test]
+    fn bounded_views_do_not_move_the_parent() {
+        let tokens = [tok(0, 0), tok(1, 1), tok(2, 2), tok(3, 3)];
+        let parent = TokenCursor::new("abcd", &tokens);
+        let mut child = parent.view(TokenRange { start: 1, end: 3 }).unwrap();
+        assert_eq!(child.next(), Some(tokens[1]));
+        assert_eq!(child.next(), Some(tokens[2]));
+        assert_eq!(child.next(), None);
+        assert_eq!(parent.peek(0), Some(tokens[0]));
+    }
+
+    #[test]
+    fn bounded_views_reject_ranges_outside_the_parent() {
+        let tokens = [tok(0, 0), tok(1, 0), tok(2, 0), tok(3, 0)];
+        let root = TokenCursor::new("abcd", &tokens);
+        let child = root.view(TokenRange { start: 1, end: 3 }).unwrap();
+
+        assert!(child.view(TokenRange { start: 0, end: 2 }).is_none());
+        assert!(child.view(TokenRange { start: 2, end: 4 }).is_none());
+        assert!(child.view(TokenRange { start: 3, end: 2 }).is_none());
+    }
+
+    #[test]
+    fn balanced_pair_returns_tokens_and_consumes_close() {
+        let open = TokenKind(2);
+        let close = TokenKind(3);
+        let tokens = [
+            tok_kind(open, 0, 0),
+            tok_kind(TokenKind(1), 1, 0),
+            tok_kind(open, 2, 0),
+            tok_kind(TokenKind(1), 3, 0),
+            tok_kind(close, 4, 0),
+            tok_kind(close, 5, 0),
+            tok_kind(TokenKind(1), 6, 0),
+        ];
+        let mut cursor = TokenCursor::new("(a(b))c", &tokens);
+        let pair = cursor.consume_balanced_pair(open, close).unwrap();
+        assert_eq!(pair.open, tokens[0]);
+        assert_eq!(pair.close, tokens[5]);
+        assert_eq!(cursor.next(), Some(tokens[6]));
+    }
+
+    fn tok(offset: u32, row: u32) -> Tok {
+        tok_kind(TokenKind(1), offset, row)
+    }
+
+    fn tok_kind(kind: TokenKind, offset: u32, row: u32) -> Tok {
+        Tok {
+            kind,
+            flags: TokenFlags::default(),
+            start: offset,
+            end: offset + 1,
+            row,
+        }
     }
 }
