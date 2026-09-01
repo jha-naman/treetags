@@ -300,81 +300,87 @@ impl GoHooks {
         is_struct: bool,
         open: Tok,
     ) -> Tok {
-        let mut depth = 1;
-        let mut close = open;
-        while let Some(first) = cursor.next() {
-            match first.kind {
-                go::PUNCT_7B => {
-                    depth += 1;
-                    continue;
-                }
-                go::PUNCT_7D => {
-                    depth -= 1;
-                    if depth == 0 {
-                        return first;
-                    }
+        loop {
+            let Some(next) = cursor.peek(0) else {
+                return open;
+            };
+            match next.kind {
+                go::PUNCT_7D => return cursor.next().unwrap(),
+                go::PUNCT_3B => {
+                    cursor.next();
                     continue;
                 }
                 _ => {}
             }
-            if depth != 1 || first.kind != go::IDENTIFIER {
+            if !is_struct {
+                self.interface_member(cursor, out, owner);
                 continue;
             }
-            let row = first.row;
-            if !is_struct && cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_28) {
-                let params_open = cursor.next().unwrap();
-                let Some(params_close) = cursor.skip_balanced_after_open(params_open, "(", ")")
-                else {
-                    continue;
-                };
-                let mut result_first = None;
-                let mut result_last = None;
-                while cursor.peek(0).is_some_and(|t| t.row == row) {
-                    let t = cursor.next().unwrap();
-                    result_first.get_or_insert(t);
-                    result_last = Some(t)
+            match field_shape(cursor) {
+                FieldShape::Embedded => {
+                    consume_type(cursor, field_until());
+                    consume_field_tag(cursor);
                 }
-                let mut b = out
-                    .tag("n", first, (first, result_last.unwrap_or(params_close)))
-                    .scope(
-                        "interface",
-                        format!("{}.{}", self.package, cursor.text(owner)),
-                    );
-                if let (Some(a), Some(z)) = (result_first, result_last) {
-                    b = b.typeref(TextValue::Span(a.start, z.end))
-                }
-                b.emit();
-            } else if is_struct {
-                let mut names = vec![first];
-                while cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_2C) {
-                    cursor.next();
-                    if let Some(n) = cursor.next() {
-                        names.push(n)
-                    }
-                }
-                let type_first = cursor
-                    .peek(0)
-                    .filter(|t| t.row == row)
-                    .and_then(|_| cursor.next());
-                let mut type_last = type_first;
-                while cursor.peek(0).is_some_and(|t| t.row == row) {
-                    type_last = cursor.next()
-                }
-                for name in names {
-                    let mut b = out
-                        .tag("m", name, (name, type_last.unwrap_or(name)))
-                        .scope("struct", format!("{}.{}", self.package, cursor.text(owner)));
-                    if let (Some(a), Some(z)) = (type_first, type_last) {
-                        if a.kind != go::KW_STRUCT {
-                            b = b.typeref(TextValue::Span(a.start, z.end))
+                FieldShape::Named => {
+                    let names = take_name_list(cursor);
+                    let ty = consume_type(cursor, field_until());
+                    consume_field_tag(cursor);
+                    for name in names {
+                        let mut b = out
+                            .tag("m", name, (name, ty.map_or(name, |s| s.last)))
+                            .scope("struct", format!("{}.{}", self.package, cursor.text(owner)));
+                        if let Some(s) = ty {
+                            if s.is_direct_named_family() {
+                                let (a, z) = s.byte_range();
+                                b = b.typeref(TextValue::Span(a, z));
+                            }
                         }
+                        b.emit();
                     }
-                    b.emit();
                 }
             }
-            close = first
         }
-        close
+    }
+
+    fn interface_member(&self, cursor: &mut TokenCursor<'_>, out: &mut TagEmitter<'_>, owner: Tok) {
+        let is_method = cursor.peek(0).map(|t| t.kind) == Some(go::IDENTIFIER)
+            && cursor.peek(1).map(|t| t.kind) == Some(go::PUNCT_28);
+        if !is_method {
+            consume_declaration(cursor, Some(go::PUNCT_7D), true);
+            return;
+        }
+        let name = cursor.next().unwrap();
+        let params_open = cursor.next().unwrap();
+        let Some(params_close) = cursor.skip_balanced_after_open(params_open, "(", ")") else {
+            return;
+        };
+        let has_result = cursor.peek(0).is_some_and(|t| {
+            !matches!(t.kind, go::PUNCT_7D | go::PUNCT_3B)
+                && !(t.row > params_close.row && can_terminate_line(params_close.kind))
+        });
+        let result = has_result
+            .then(|| {
+                consume_type(
+                    cursor,
+                    GoTypeUntil {
+                        context: GoTypeContext::FunctionResult,
+                        owner_close: Some(go::PUNCT_7D),
+                        logical_line: true,
+                        comma: false,
+                        equals: false,
+                        struct_tag: false,
+                    },
+                )
+            })
+            .flatten();
+        let mut b = out
+            .tag("n", name, (name, result.map_or(params_close, |s| s.last)))
+            .scope("interface", format!("{}.{}", self.package, cursor.text(owner)));
+        if let Some(s) = result {
+            let (a, z) = s.byte_range();
+            b = b.typeref(TextValue::Span(a, z));
+        }
+        b.emit();
     }
 
     fn function(
@@ -512,6 +518,110 @@ fn looks_like_type_params(cursor: &TokenCursor<'_>) -> bool {
                 | go::PUNCT_28 // (
         )
     )
+}
+
+enum FieldShape {
+    Named,
+    Embedded,
+}
+
+fn field_until() -> GoTypeUntil {
+    GoTypeUntil {
+        context: GoTypeContext::Type,
+        owner_close: Some(go::PUNCT_7D),
+        logical_line: true,
+        comma: false,
+        equals: false,
+        struct_tag: true,
+    }
+}
+
+fn field_shape(cursor: &TokenCursor<'_>) -> FieldShape {
+    let Some(first) = cursor.peek(0) else {
+        return FieldShape::Embedded;
+    };
+    if first.kind != go::IDENTIFIER {
+        return FieldShape::Embedded;
+    }
+    let Some(second) = cursor.peek(1) else {
+        return FieldShape::Embedded;
+    };
+    if second.row > first.row && can_terminate_line(first.kind) {
+        return FieldShape::Embedded;
+    }
+    match second.kind {
+        go::PUNCT_2C => FieldShape::Named,
+        go::PUNCT_2E => FieldShape::Embedded,
+        go::PUNCT_5B => {
+            if array_after_bracket(cursor) {
+                FieldShape::Named
+            } else {
+                FieldShape::Embedded
+            }
+        }
+        k if starts_type(k) => FieldShape::Named,
+        _ => FieldShape::Embedded,
+    }
+}
+
+fn take_name_list(cursor: &mut TokenCursor<'_>) -> Vec<Tok> {
+    let mut names = Vec::new();
+    while let Some(name) = cursor.consume_if(go::IDENTIFIER) {
+        names.push(name);
+        if cursor.consume_if(go::PUNCT_2C).is_none() {
+            break;
+        }
+    }
+    names
+}
+
+fn consume_field_tag(cursor: &mut TokenCursor<'_>) {
+    if cursor.peek(0).is_some_and(|t| t.kind == go::LITERAL) {
+        cursor.next();
+    }
+}
+
+fn starts_type(kind: super::linear::TokenKind) -> bool {
+    matches!(
+        kind,
+        go::IDENTIFIER
+            | go::PUNCT_2A // *
+            | go::PUNCT_5B // [
+            | go::PUNCT_28 // (
+            | go::PUNCT_3C_2D // <-
+            | go::KW_MAP
+            | go::KW_CHAN
+            | go::KW_FUNC
+            | go::KW_INTERFACE
+            | go::KW_STRUCT
+    )
+}
+
+fn array_after_bracket(cursor: &TokenCursor<'_>) -> bool {
+    debug_assert_eq!(cursor.peek(1).map(|t| t.kind), Some(go::PUNCT_5B));
+    let mut depth = 0u32;
+    let mut i = 1;
+    let close = loop {
+        let Some(t) = cursor.peek(i) else { return false };
+        match t.kind {
+            go::PUNCT_5B => depth += 1,
+            go::PUNCT_5D => {
+                depth -= 1;
+                if depth == 0 {
+                    break t;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    };
+    let Some(after) = cursor.peek(i + 1) else {
+        return false;
+    };
+    if after.row > close.row && can_terminate_line(close.kind) {
+        return false;
+    }
+    starts_type(after.kind)
 }
 
 struct FunctionOutcome {
@@ -808,6 +918,60 @@ var (
                 .extension_fields
                 .as_ref()
                 .is_none_or(|fields| fields.get("end").is_none())));
+    }
+    #[test]
+    fn delimiter_aware_members_match_oracle() {
+        let source = r#"package p
+import "io"
+type RegPtr struct{ name string }
+type Carry uint
+const (
+    SetCarry Carry = iota
+    AddCarry
+)
+type Node struct {
+    io.Reader
+    *Node
+    Set[int]
+    left, right *Node
+    Pair struct{ X int }
+    Grid [3][4]int
+    Tag string `json:"tag"`
+    fn func(int) error
+    ch <-chan int
+}
+type Compact struct{ a, b int; c string }
+type Constraint interface {
+    ~int | ~string
+    io.Reader
+    Do(x int) (int, error)
+}
+"#;
+        let config = crate::config::Config::parse_from(["treetags"]);
+        let kinds = TagKindConfig::from_string("", KIND_DEFAULTS, KIND_OPTIONALS);
+        let expected = crate::parser::go::oracle::generate(
+            &mut tree_sitter::Parser::new(),
+            source.as_bytes(),
+            "members.go",
+            &kinds,
+            &config,
+        )
+        .unwrap();
+        let actual = generate(
+            source,
+            "members.go",
+            super::super::linear::HookOptions::from_config(&kinds, &config),
+        )
+        .unwrap();
+        assert_eq!(actual, expected);
+        assert!(actual
+            .iter()
+            .any(|t| &*t.name == "Carry" && t.kind.as_deref() == Some("t")));
+        assert!(actual
+            .iter()
+            .any(|t| &*t.name == "SetCarry" && t.kind.as_deref() == Some("c")));
+        assert!(!actual.iter().any(|t| &*t.name == "Reader"));
+        assert!(!actual.iter().any(|t| &*t.name == "X"));
     }
     #[test]
     fn array_and_generic_type_definitions_match_oracle() {
