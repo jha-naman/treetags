@@ -21,6 +21,17 @@ jobs:
         components: rustfmt
         targets: wasm32-wasip2
 
+    - name: Install pinned Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22.17.0
+
+    - name: Install pinned tree-sitter CLI
+      run: cargo install tree-sitter-cli --version 0.25.10 --locked
+
+    - name: Check generated Go scanner
+      run: TREETAGS_NODE="$(command -v node)" cargo run --bin generate-go-scanner -- --check
+
     - name: Cache dependencies
       uses: Swatinem/rust-cache@v2
 

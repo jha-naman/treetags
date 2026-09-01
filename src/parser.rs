@@ -24,11 +24,16 @@ use tree_sitter_tags::{TagsConfiguration, TagsContext};
 
 pub(crate) mod common;
 pub(crate) mod cpp;
+mod generated;
 pub(crate) mod go;
+mod go_hooks;
 mod helper;
 pub(crate) mod js;
+mod linear;
+mod linear_scanner;
 pub(crate) mod python;
 pub(crate) mod rust;
+mod tag_emitter;
 pub(crate) mod typescript;
 
 pub(crate) use helper::kinds_from_mappings;

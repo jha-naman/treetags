@@ -16,6 +16,9 @@ default-run = "treetags"
 
 exclude = ["tests/", ".github/", "plugins/"]
 
+[features]
+linear-go = []
+
 [dependencies]
 anyhow = "1"
 wasmtime = { version = "45", features = ["cranelift", "component-model"] }
@@ -81,6 +84,10 @@ path = "src/bin/build_plugin.rs"
 [[bin]]
 name = "treetags-build-site"
 path = "src/bin/build_site.rs"
+
+[[bin]]
+name = "generate-go-scanner"
+path = "src/bin/generate_go_scanner.rs"
 
 [lib]
 name = "treetags"
