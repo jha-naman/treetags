@@ -1,0 +1,89 @@
+name = "zig"
+version = "0.1.0"
+abi_version = 3
+extensions = ["zig"]
+language = "zig"
+
+# Zig has no Universal Ctags parser. These letters follow the strongest
+# C/Rust conventions while retaining Zig-specific error-set and test kinds.
+# This table must stay in sync with ZIG_DEFAULT_KINDS / ZIG_OPTIONAL_KINDS.
+
+[[kinds]]
+letter = "s"
+name = "struct"
+default = true
+
+[[kinds]]
+letter = "u"
+name = "union"
+default = true
+
+[[kinds]]
+letter = "g"
+name = "enum"
+default = true
+
+[[kinds]]
+letter = "e"
+name = "enumerator"
+default = true
+
+[[kinds]]
+letter = "o"
+name = "opaque"
+default = true
+
+[[kinds]]
+letter = "r"
+name = "errorSet"
+default = true
+
+[[kinds]]
+letter = "E"
+name = "error"
+default = true
+
+[[kinds]]
+letter = "f"
+name = "function"
+default = true
+
+[[kinds]]
+letter = "m"
+name = "method"
+default = true
+
+[[kinds]]
+letter = "F"
+name = "field"
+default = true
+
+[[kinds]]
+letter = "c"
+name = "constant"
+default = true
+
+[[kinds]]
+letter = "v"
+name = "variable"
+default = true
+
+[[kinds]]
+letter = "n"
+name = "namespace"
+default = true
+
+[[kinds]]
+letter = "t"
+name = "test"
+default = true
+
+[[kinds]]
+letter = "l"
+name = "local"
+default = false
+
+[[kinds]]
+letter = "z"
+name = "parameter"
+default = false

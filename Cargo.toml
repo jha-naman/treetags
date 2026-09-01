@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "plugins/common", "plugins/dart", "plugins/echo", "plugins/java", "plugins/kotlin", "plugins/objective_c", "plugins/swift"]
+members = [".", "plugins/common", "plugins/dart", "plugins/echo", "plugins/java", "plugins/kotlin", "plugins/objective_c", "plugins/swift", "plugins/zig"]
 exclude = ["test-support/test-plugin-builder"]
 resolver = "2"
 
