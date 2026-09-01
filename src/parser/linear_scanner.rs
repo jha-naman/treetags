@@ -6,12 +6,10 @@ use super::linear::{
 
 pub(crate) struct GeneratedLexicon {
     pub identifier: TokenKind,
-    pub keyword: TokenKind,
     pub literal: TokenKind,
-    pub punctuation: TokenKind,
     pub unknown: TokenKind,
-    pub keywords: &'static [&'static str],
-    pub punctuation_strings: &'static [&'static str],
+    pub keywords: &'static [(&'static str, TokenKind)],
+    pub punctuation: &'static [(&'static str, TokenKind)],
 }
 
 pub(crate) fn scan<E: ExternalLexer>(
@@ -169,11 +167,11 @@ fn scan_regular(
             }
         }
         let text = &source[start..*at];
-        let kind = if lex.keywords.binary_search(&text).is_ok() {
-            lex.keyword
-        } else {
-            lex.identifier
-        };
+        let kind = lex
+            .keywords
+            .binary_search_by_key(&text, |(text, _)| *text)
+            .map(|index| lex.keywords[index].1)
+            .unwrap_or(lex.identifier);
         push(out, kind, start, *at, row, bol, false)
     } else if ch.is_ascii_digit() {
         *at += ch.len_utf8();
@@ -186,14 +184,14 @@ fn scan_regular(
             }
         }
         push(out, lex.literal, start, *at, row, bol, false)
-    } else if let Some(p) = lex
-        .punctuation_strings
+    } else if let Some((p, kind)) = lex
+        .punctuation
         .iter()
-        .filter(|p| source[start..].starts_with(**p))
-        .max_by_key(|p| p.len())
+        .filter(|(text, _)| source[start..].starts_with(*text))
+        .max_by_key(|(text, _)| text.len())
     {
         *at += p.len();
-        push(out, lex.punctuation, start, *at, row, bol, false)
+        push(out, *kind, start, *at, row, bol, false)
     } else {
         *at += ch.len_utf8();
         push(out, lex.unknown, start, *at, row, bol, true)
@@ -252,9 +250,12 @@ mod tests {
             texts(source, &stream),
             ["package", "p", "x", ":=", "y", "<<", "2"]
         );
-        assert_eq!(stream.tokens[0].kind, go::KEYWORD);
+        assert_eq!(stream.tokens[0].kind, go::KW_PACKAGE);
         assert_eq!(stream.tokens[1].kind, go::IDENTIFIER);
-        assert_eq!(stream.tokens[3].kind, go::PUNCTUATION);
+        assert_eq!(stream.tokens[3].kind, go::PUNCT_3A_3D);
+        assert_eq!(stream.tokens[5].kind, go::PUNCT_3C_3C);
+        assert_ne!(go::KW_PACKAGE, go::KW_FUNC);
+        assert_ne!(go::PUNCT_3A_3D, go::PUNCT_3D);
     }
     #[test]
     fn extras_strings_positions_and_unknown_progress_are_total() {

@@ -20,15 +20,14 @@ impl TagHooks for GoHooks {
         let mut braces = 0u32;
         let mut functions: Vec<(u32, usize, u32)> = Vec::new();
         while let Some(token) = cursor.next() {
-            let text = cursor.text(token);
-            match text {
-                "package" => {
+            match token.kind {
+                go::KW_PACKAGE => {
                     if let Some(name) = cursor.next() {
                         self.package = cursor.text(name).to_string();
                         output.tag("p", name, (token, name)).emit();
                     }
                 }
-                "func" => {
+                go::KW_FUNC => {
                     if let Some((_, handle)) = self.function(&input, &mut cursor, output, token) {
                         braces += 1;
                         if let Some(handle) = handle {
@@ -36,20 +35,20 @@ impl TagHooks for GoHooks {
                         }
                     }
                 }
-                "import" => {
+                go::KW_IMPORT => {
                     self.import(&mut cursor, output, token);
                 }
-                "var" => {
+                go::KW_VAR => {
                     self.values(&mut cursor, output, token, "v");
                 }
-                "const" => {
+                go::KW_CONST => {
                     self.values(&mut cursor, output, token, "c");
                 }
-                "type" => {
+                go::KW_TYPE => {
                     self.types(&mut cursor, output, token);
                 }
-                "{" => braces += 1,
-                "}" => {
+                go::PUNCT_7B => braces += 1,
+                go::PUNCT_7D => {
                     if let Some((depth, handle, start)) = functions.last().copied() {
                         if depth == braces {
                             output.set_end(handle, start, token.row);
@@ -66,13 +65,13 @@ impl TagHooks for GoHooks {
 
 impl GoHooks {
     fn import(&self, cursor: &mut TokenCursor<'_>, out: &mut TagEmitter<'_>, start: Tok) {
-        let grouped = cursor.peek(0).is_some_and(|t| cursor.text(t) == "(");
+        let grouped = cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_28);
         if grouped {
             cursor.next();
         }
         loop {
             let Some(first) = cursor.peek(0) else { return };
-            if grouped && cursor.text(first) == ")" {
+            if grouped && first.kind == go::PUNCT_29 {
                 cursor.next();
                 return;
             }
@@ -89,7 +88,7 @@ impl GoHooks {
             } else {
                 while cursor
                     .peek(0)
-                    .is_some_and(|t| t.row == alias.row && cursor.text(t) != ";")
+                    .is_some_and(|t| t.row == alias.row && t.kind != go::PUNCT_3B)
                 {
                     cursor.next();
                 }
@@ -107,13 +106,13 @@ impl GoHooks {
         start: Tok,
         kind: &'static str,
     ) {
-        let grouped = cursor.peek(0).is_some_and(|t| cursor.text(t) == "(");
+        let grouped = cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_28);
         if grouped {
             cursor.next();
         }
         loop {
             let Some(first) = cursor.peek(0) else { return };
-            if grouped && cursor.text(first) == ")" {
+            if grouped && first.kind == go::PUNCT_29 {
                 cursor.next();
                 return;
             }
@@ -130,7 +129,7 @@ impl GoHooks {
             let row = first.row;
             let mut names = Vec::new();
             names.push(cursor.next().unwrap());
-            while cursor.peek(0).is_some_and(|t| cursor.text(t) == ",") {
+            while cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_2C) {
                 cursor.next();
                 if let Some(name) = cursor.next() {
                     if name.kind == go::IDENTIFIER {
@@ -141,7 +140,7 @@ impl GoHooks {
             let mut type_first = None;
             let mut type_last = None;
             while let Some(t) = cursor.peek(0) {
-                if t.row != row || matches!(cursor.text(t), ";" | ")" | "=") {
+                if t.row != row || matches!(t.kind, go::PUNCT_3B | go::PUNCT_29 | go::PUNCT_3D) {
                     break;
                 }
                 let t = cursor.next().unwrap();
@@ -150,7 +149,7 @@ impl GoHooks {
             }
             while cursor
                 .peek(0)
-                .is_some_and(|t| t.row == row && !matches!(cursor.text(t), ";" | ")"))
+                .is_some_and(|t| t.row == row && !matches!(t.kind, go::PUNCT_3B | go::PUNCT_29))
             {
                 cursor.next();
             }
@@ -173,13 +172,13 @@ impl GoHooks {
     }
 
     fn types(&self, cursor: &mut TokenCursor<'_>, out: &mut TagEmitter<'_>, start: Tok) {
-        let grouped = cursor.peek(0).is_some_and(|t| cursor.text(t) == "(");
+        let grouped = cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_28);
         if grouped {
             cursor.next();
         }
         loop {
             let Some(name) = cursor.peek(0) else { return };
-            if grouped && cursor.text(name) == ")" {
+            if grouped && name.kind == go::PUNCT_29 {
                 cursor.next();
                 return;
             }
@@ -194,7 +193,7 @@ impl GoHooks {
                 continue;
             }
             let name = cursor.next().unwrap();
-            if cursor.peek(0).is_some_and(|t| cursor.text(t) == "[") {
+            if cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_5B) {
                 let open = cursor.peek(0).unwrap();
                 if let Some(close) = cursor.skip_balanced("[", "]") {
                     let mut generic = out.tag("t", name, (name, close));
@@ -206,11 +205,11 @@ impl GoHooks {
                         .emit();
                 }
             }
-            if cursor.peek(0).is_some_and(|t| cursor.text(t) == "=") {
+            if cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_3D) {
                 let row = name.row;
                 while cursor
                     .peek(0)
-                    .is_some_and(|t| t.row == row && !matches!(cursor.text(t), ";" | ")"))
+                    .is_some_and(|t| t.row == row && !matches!(t.kind, go::PUNCT_3B | go::PUNCT_29))
                 {
                     cursor.next();
                 }
@@ -221,11 +220,11 @@ impl GoHooks {
                 }
             }
             let Some(ty) = cursor.next() else { return };
-            match cursor.text(ty) {
-                "struct" | "interface" => {
-                    let is_struct = cursor.text(ty) == "struct";
+            match ty.kind {
+                go::KW_STRUCT | go::KW_INTERFACE => {
+                    let is_struct = ty.kind == go::KW_STRUCT;
                     let Some(open) = cursor.next() else { return };
-                    if cursor.text(open) != "{" {
+                    if open.kind != go::PUNCT_7B {
                         continue;
                     }
                     let mut b = out.tag(if is_struct { "s" } else { "i" }, name, (name, open));
@@ -241,10 +240,9 @@ impl GoHooks {
                 _ => {
                     let row = ty.row;
                     let mut last = ty;
-                    while cursor
-                        .peek(0)
-                        .is_some_and(|t| t.row == row && !matches!(cursor.text(t), ";" | ")"))
-                    {
+                    while cursor.peek(0).is_some_and(|t| {
+                        t.row == row && !matches!(t.kind, go::PUNCT_3B | go::PUNCT_29)
+                    }) {
                         last = cursor.next().unwrap()
                     }
                     let mut b = out.tag("t", name, (name, last));
@@ -271,12 +269,12 @@ impl GoHooks {
         let mut depth = 1;
         let mut close = open;
         while let Some(first) = cursor.next() {
-            match cursor.text(first) {
-                "{" => {
+            match first.kind {
+                go::PUNCT_7B => {
                     depth += 1;
                     continue;
                 }
-                "}" => {
+                go::PUNCT_7D => {
                     depth -= 1;
                     if depth == 0 {
                         return first;
@@ -289,7 +287,7 @@ impl GoHooks {
                 continue;
             }
             let row = first.row;
-            if !is_struct && cursor.peek(0).is_some_and(|t| cursor.text(t) == "(") {
+            if !is_struct && cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_28) {
                 let params_open = cursor.next().unwrap();
                 let Some(params_close) = cursor.skip_balanced_after_open(params_open, "(", ")")
                 else {
@@ -314,7 +312,7 @@ impl GoHooks {
                 b.emit();
             } else if is_struct {
                 let mut names = vec![first];
-                while cursor.peek(0).is_some_and(|t| cursor.text(t) == ",") {
+                while cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_2C) {
                     cursor.next();
                     if let Some(n) = cursor.next() {
                         names.push(n)
@@ -333,7 +331,7 @@ impl GoHooks {
                         .tag("m", name, (name, type_last.unwrap_or(name)))
                         .scope("struct", format!("{}.{}", self.package, cursor.text(owner)));
                     if let (Some(a), Some(z)) = (type_first, type_last) {
-                        if cursor.text(a) != "struct" {
+                        if a.kind != go::KW_STRUCT {
                             b = b.typeref(TextValue::Span(a.start, z.end))
                         }
                     }
@@ -353,14 +351,14 @@ impl GoHooks {
         start: Tok,
     ) -> Option<(Tok, Option<usize>)> {
         let mut receiver = None;
-        if cursor.peek(0).is_some_and(|t| cursor.text(t) == "(") {
+        if cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_28) {
             let open = cursor.next()?;
             let mut depth = 1;
             let mut words = Vec::new();
             while let Some(t) = cursor.next() {
-                match cursor.text(t) {
-                    "(" => depth += 1,
-                    ")" => {
+                match t.kind {
+                    go::PUNCT_28 => depth += 1,
+                    go::PUNCT_29 => {
                         depth -= 1;
                         if depth == 0 {
                             break;
@@ -377,11 +375,11 @@ impl GoHooks {
         if name.kind != go::IDENTIFIER {
             return None;
         }
-        if cursor.peek(0).is_some_and(|t| cursor.text(t) == "[") {
+        if cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_5B) {
             cursor.skip_balanced("[", "]")?;
         }
         let params_open = cursor.peek(0)?;
-        if cursor.text(params_open) != "(" {
+        if params_open.kind != go::PUNCT_28 {
             return None;
         }
         let params_close = cursor.skip_balanced("(", ")")?;
@@ -390,19 +388,19 @@ impl GoHooks {
         let mut nested = 0u32;
         let body_open = loop {
             let t = cursor.next()?;
-            match cursor.text(t) {
-                "(" | "[" => {
+            match t.kind {
+                go::PUNCT_28 | go::PUNCT_5B => {
                     nested += 1;
                     result_first.get_or_insert(t);
                     result_last = Some(t)
                 }
-                ")" | "]" => {
+                go::PUNCT_29 | go::PUNCT_5D => {
                     nested = nested.saturating_sub(1);
                     result_first.get_or_insert(t);
                     result_last = Some(t)
                 }
-                "{" if nested == 0 => break t,
-                ";" if nested == 0 => return Some((t, None)),
+                go::PUNCT_7B if nested == 0 => break t,
+                go::PUNCT_3B if nested == 0 => return Some((t, None)),
                 _ => {
                     result_first.get_or_insert(t);
                     result_last = Some(t)
