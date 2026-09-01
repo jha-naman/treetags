@@ -368,26 +368,36 @@ impl GoHooks {
         out: &mut TagEmitter<'_>,
         start: Tok,
     ) -> Option<FunctionOutcome> {
-        let mut receiver = None;
-        if cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_28) {
-            let open = cursor.next()?;
-            let mut depth = 1;
-            let mut words = Vec::new();
-            while let Some(t) = cursor.next() {
-                match t.kind {
-                    go::PUNCT_28 => depth += 1,
-                    go::PUNCT_29 => {
-                        depth -= 1;
-                        if depth == 0 {
-                            break;
-                        }
-                    }
-                    _ if t.kind == go::IDENTIFIER => words.push(t),
-                    _ => {}
-                }
+        let mut receiver_scope = None;
+        if cursor.consume_if(go::PUNCT_28).is_some() {
+            // Optional receiver name: an identifier directly followed by another
+            // identifier or `*` (the start of the receiver type).
+            if cursor.peek(0).map(|t| t.kind) == Some(go::IDENTIFIER)
+                && matches!(
+                    cursor.peek(1).map(|t| t.kind),
+                    Some(go::IDENTIFIER) | Some(go::PUNCT_2A)
+                )
+            {
+                cursor.next();
             }
-            receiver = words.get(1).copied().or_else(|| words.last().copied());
-            let _ = open;
+            let span = consume_type(
+                cursor,
+                GoTypeUntil {
+                    context: GoTypeContext::Type,
+                    owner_close: Some(go::PUNCT_29),
+                    logical_line: false,
+                    comma: false,
+                    equals: false,
+                    struct_tag: false,
+                },
+            );
+            cursor.consume_if(go::PUNCT_29);
+            receiver_scope = span.map(|s| {
+                cursor
+                    .span_text(s.first, s.last)
+                    .trim_start_matches('*')
+                    .to_string()
+            });
         }
         let name = cursor.next()?;
         if name.kind != go::IDENTIFIER {
@@ -432,15 +442,8 @@ impl GoHooks {
             .or_else(|| result.map(|span| span.last))
             .unwrap_or(params_close);
         let mut builder = out.tag("f", name, (start, declaration_end));
-        if let Some(receiver) = receiver {
-            builder = builder.scope(
-                "struct",
-                format!(
-                    "{}.{}",
-                    self.package,
-                    cursor.text(receiver).trim_start_matches('*')
-                ),
-            )
+        if let Some(receiver_scope) = receiver_scope {
+            builder = builder.scope("struct", format!("{}.{}", self.package, receiver_scope))
         } else if !self.package.is_empty() {
             builder = builder.scope("package", self.package.clone())
         }
@@ -650,6 +653,46 @@ var raw = `func Fake() {}`
         )
         .unwrap();
         assert_eq!(actual, expected);
+    }
+    #[test]
+    fn receiver_scopes_match_tree_sitter_oracle() {
+        let source = r#"package sync
+type entry[K comparable, V any] struct {
+    key K
+}
+type Point struct {
+    x int
+}
+func (head *entry[K, V]) swap(next *entry[K, V]) *entry[K, V] { return head }
+func (p Point) String() string { return "" }
+func (p *Point) Move() {}
+func (*Point) Reset() {}
+func (Point) Zero() {}
+func Free() {}
+"#;
+        let config = crate::config::Config::parse_from(["treetags"]);
+        let kinds = TagKindConfig::from_string("", KIND_DEFAULTS, KIND_OPTIONALS);
+        let expected = crate::parser::go::oracle::generate(
+            &mut tree_sitter::Parser::new(),
+            source.as_bytes(),
+            "receivers.go",
+            &kinds,
+            &config,
+        )
+        .unwrap();
+        let actual = generate(
+            source,
+            "receivers.go",
+            super::super::linear::HookOptions::from_config(&kinds, &config),
+        )
+        .unwrap();
+        assert_eq!(actual, expected);
+        let swap = actual.iter().find(|t| &*t.name == "swap").unwrap();
+        assert_eq!(swap.kind.as_deref(), Some("f"));
+        assert_eq!(
+            swap.extension_fields.as_ref().unwrap().get("struct"),
+            Some("sync.entry[K, V]")
+        );
     }
     #[test]
     fn balanced_grouped_values_match_tree_sitter_oracle() {
