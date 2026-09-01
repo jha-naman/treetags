@@ -34,13 +34,13 @@ const ZIG_DEFAULT_KINDS: &[(&[&str], &str)] = &[
     (&["o", "opaque"], "o"),
     (&["r", "errorSet"], "r"),
     (&["E", "error"], "E"),
-    (&["t", "typealias"], "t"),
     (&["f", "function"], "f"),
+    (&["m", "method"], "m"),
     (&["F", "field"], "F"),
-    (&["C", "constant"], "C"),
+    (&["c", "constant"], "c"),
     (&["v", "variable"], "v"),
     (&["n", "namespace"], "n"),
-    (&["T", "test"], "T"),
+    (&["t", "test"], "t"),
 ];
 
 const ZIG_OPTIONAL_KINDS: &[(&[&str], &str)] =
@@ -208,12 +208,10 @@ fn emit_variable(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalker) -> b
             .or_else(|| without_pub.strip_prefix("threadlocal "))
             .unwrap_or(without_pub)
             .trim_start();
-        if declared_type(cursor, source).as_deref() == Some("type") {
-            "t"
-        } else if without_linkage.starts_with("var ") || without_linkage.starts_with("extern ") {
+        if without_linkage.starts_with("var ") || without_linkage.starts_with("extern ") {
             "v"
         } else {
-            "C"
+            "c"
         }
     };
 
@@ -226,11 +224,7 @@ fn emit_variable(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalker) -> b
             add_field(
                 &mut tag,
                 "typeref",
-                if letter == "t" {
-                    initializer.clone().map(|ty| format!("typename:{ty}"))
-                } else {
-                    declared_type(cursor, source).map(|ty| format!("typename:{ty}"))
-                },
+                declared_type(cursor, source).map(|ty| format!("typename:{ty}")),
             );
         }
         if container.is_some() {
@@ -254,11 +248,20 @@ fn emit_function(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalker) -> b
     };
     let name = node_text(name_node, source).to_string();
 
-    if w.kinds.is_enabled("f") {
+    let letter = if matches!(
+        w.scopes.last_key(),
+        Some(ScopeKind::Struct | ScopeKind::Enum | ScopeKind::Union | ScopeKind::Opaque)
+    ) {
+        "m"
+    } else {
+        "f"
+    };
+
+    if w.kinds.is_enabled(letter) {
         let mut tag = make_tag(
             name.clone(),
             line_of(name_node),
-            "f",
+            letter,
             w.scopes.current_field(),
         );
         add_field(&mut tag, "access", Some(access_of(node, source)));
@@ -317,8 +320,8 @@ fn emit_test(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalker) -> bool 
         return false;
     };
 
-    if w.kinds.is_enabled("T") {
-        let mut tag = make_tag(name.clone(), line, "T", w.scopes.current_field());
+    if w.kinds.is_enabled("t") {
+        let mut tag = make_tag(name.clone(), line, "t", w.scopes.current_field());
         add_field(&mut tag, "access", Some(access_of(node, source)));
         tag.end_line = end_line(node);
         w.tags.push(tag);

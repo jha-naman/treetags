@@ -57,3 +57,5 @@ test max {
 test {
     _ = std;
 }
+
+var MutableType: type = usize;
