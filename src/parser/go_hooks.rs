@@ -1,6 +1,9 @@
 #![allow(dead_code)]
 use super::{
     generated::go,
+    go_syntax::{
+        can_terminate_line, consume_declaration, consume_type, GoTypeContext, GoTypeUntil,
+    },
     linear::{HookInput, TagHooks, Tok, TokenCursor},
     tag_emitter::{TagEmitter, TextValue},
 };
@@ -28,11 +31,15 @@ impl TagHooks for GoHooks {
                     }
                 }
                 go::KW_FUNC => {
-                    if let Some((_, handle)) = self.function(&input, &mut cursor, output, token) {
+                    if let Some(function) = self.function(&input, &mut cursor, output, token) {
+                        let Some(body_open) = function.body_open else {
+                            continue;
+                        };
                         braces += 1;
-                        if let Some(handle) = handle {
+                        if let Some(handle) = function.handle {
                             functions.push((braces, handle, token.row))
                         }
+                        let _ = body_open;
                     }
                 }
                 go::KW_IMPORT => {
@@ -126,7 +133,6 @@ impl GoHooks {
                 }
                 continue;
             }
-            let row = first.row;
             let mut names = Vec::new();
             names.push(cursor.next().unwrap());
             while cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_2C) {
@@ -137,30 +143,42 @@ impl GoHooks {
                     }
                 }
             }
-            let mut type_first = None;
-            let mut type_last = None;
-            while let Some(t) = cursor.peek(0) {
-                if t.row != row || matches!(t.kind, go::PUNCT_3B | go::PUNCT_29 | go::PUNCT_3D) {
-                    break;
-                }
-                let t = cursor.next().unwrap();
-                type_first.get_or_insert(t);
-                type_last = Some(t)
+            let last_name = *names.last().unwrap();
+            let owner_close = grouped.then_some(go::PUNCT_29);
+            let at_spec_boundary = cursor.peek(0).is_none_or(|next| {
+                next.kind == go::PUNCT_3B
+                    || owner_close == Some(next.kind)
+                    || (next.row > last_name.row && can_terminate_line(last_name.kind))
+            });
+            let mut type_span = None;
+            if !at_spec_boundary && cursor.peek(0).is_some_and(|t| t.kind != go::PUNCT_3D) {
+                type_span = consume_type(
+                    cursor,
+                    GoTypeUntil {
+                        context: GoTypeContext::Type,
+                        owner_close,
+                        logical_line: true,
+                        comma: false,
+                        equals: true,
+                        struct_tag: false,
+                    },
+                );
             }
-            while cursor
-                .peek(0)
-                .is_some_and(|t| t.row == row && !matches!(t.kind, go::PUNCT_3B | go::PUNCT_29))
-            {
+
+            if cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_3D) {
+                cursor.next();
+                consume_declaration(cursor, owner_close, true);
+            } else if cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_3B) {
                 cursor.next();
             }
             for name in names {
-                let mut b = out.tag(kind, name, (name, type_last.unwrap_or(name)));
+                let mut b = out.tag(kind, name, (name, type_span.map_or(name, |span| span.last)));
                 if !self.package.is_empty() {
                     b = b.scope("package", self.package.clone())
                 }
                 if kind == "v" {
-                    if let (Some(a), Some(z)) = (type_first, type_last) {
-                        b = b.typeref(TextValue::Span(a.start, z.end))
+                    if let Some(span) = type_span {
+                        b = b.typeref(TextValue::Span(span.first.start, span.last.end))
                     }
                 }
                 b.emit();
@@ -349,7 +367,7 @@ impl GoHooks {
         cursor: &mut TokenCursor<'_>,
         out: &mut TagEmitter<'_>,
         start: Tok,
-    ) -> Option<(Tok, Option<usize>)> {
+    ) -> Option<FunctionOutcome> {
         let mut receiver = None;
         if cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_28) {
             let open = cursor.next()?;
@@ -383,31 +401,37 @@ impl GoHooks {
             return None;
         }
         let params_close = cursor.skip_balanced("(", ")")?;
-        let mut result_first = None;
-        let mut result_last = None;
-        let mut nested = 0u32;
-        let body_open = loop {
-            let t = cursor.next()?;
-            match t.kind {
-                go::PUNCT_28 | go::PUNCT_5B => {
-                    nested += 1;
-                    result_first.get_or_insert(t);
-                    result_last = Some(t)
-                }
-                go::PUNCT_29 | go::PUNCT_5D => {
-                    nested = nested.saturating_sub(1);
-                    result_first.get_or_insert(t);
-                    result_last = Some(t)
-                }
-                go::PUNCT_7B if nested == 0 => break t,
-                go::PUNCT_3B if nested == 0 => return Some((t, None)),
-                _ => {
-                    result_first.get_or_insert(t);
-                    result_last = Some(t)
-                }
+        let mut result = None;
+        let mut body_open = None;
+        let next = cursor.peek(0);
+        if next.is_some_and(|t| t.kind == go::PUNCT_7B) {
+            body_open = cursor.next();
+        } else if next.is_some_and(|t| t.kind == go::PUNCT_3B) {
+            cursor.next();
+        } else if next
+            .is_some_and(|t| t.row == params_close.row || !can_terminate_line(params_close.kind))
+        {
+            result = consume_type(
+                cursor,
+                GoTypeUntil {
+                    context: GoTypeContext::FunctionResult,
+                    owner_close: Some(go::PUNCT_7B),
+                    logical_line: true,
+                    comma: false,
+                    equals: false,
+                    struct_tag: false,
+                },
+            );
+            if cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_7B) {
+                body_open = cursor.next();
+            } else if cursor.peek(0).is_some_and(|t| t.kind == go::PUNCT_3B) {
+                cursor.next();
             }
-        };
-        let mut builder = out.tag("f", name, (start, body_open));
+        }
+        let declaration_end = body_open
+            .or_else(|| result.map(|span| span.last))
+            .unwrap_or(params_close);
+        let mut builder = out.tag("f", name, (start, declaration_end));
         if let Some(receiver) = receiver {
             builder = builder.scope(
                 "struct",
@@ -421,12 +445,20 @@ impl GoHooks {
             builder = builder.scope("package", self.package.clone())
         }
         builder = builder.signature(TextValue::Span(params_open.start, params_close.end));
-        if let (Some(a), Some(b)) = (result_first, result_last) {
-            builder = builder.typeref(TextValue::Span(a.start, b.end))
+        if let Some(result) = result {
+            builder = builder.typeref(TextValue::Span(result.first.start, result.last.end))
         }
         let _ = input;
-        Some((body_open, builder.emit()))
+        Some(FunctionOutcome {
+            body_open,
+            handle: builder.emit(),
+        })
     }
+}
+
+struct FunctionOutcome {
+    body_open: Option<Tok>,
+    handle: Option<usize>,
 }
 
 pub(crate) fn generate(
@@ -618,6 +650,66 @@ var raw = `func Fake() {}`
         )
         .unwrap();
         assert_eq!(actual, expected);
+    }
+    #[test]
+    fn balanced_grouped_values_match_tree_sitter_oracle() {
+        let source = r#"package p
+const (
+    A = (1 + iota)
+    B
+    C = fn(1, map[string]int{"x": 2})
+    D
+)
+var (
+    x = make([]int, f(2))
+    y int
+)
+"#;
+        let config = crate::config::Config::parse_from(["treetags"]);
+        let kinds = TagKindConfig::from_string("", KIND_DEFAULTS, KIND_OPTIONALS);
+        let expected = crate::parser::go::oracle::generate(
+            &mut tree_sitter::Parser::new(),
+            source.as_bytes(),
+            "balanced.go",
+            &kinds,
+            &config,
+        )
+        .unwrap();
+        let actual = generate(
+            source,
+            "balanced.go",
+            super::super::linear::HookOptions::from_config(&kinds, &config),
+        )
+        .unwrap();
+        assert_eq!(actual, expected);
+    }
+    #[test]
+    fn bodyless_functions_do_not_consume_following_declarations() {
+        let source = "package p\nfunc A2e([]byte)\nfunc E2a([]byte)\nconst C = 1\n";
+        let config = crate::config::Config::parse_from(["treetags"]);
+        let kinds = TagKindConfig::from_string("", KIND_DEFAULTS, KIND_OPTIONALS);
+        let expected = crate::parser::go::oracle::generate(
+            &mut tree_sitter::Parser::new(),
+            source.as_bytes(),
+            "prototypes.go",
+            &kinds,
+            &config,
+        )
+        .unwrap();
+        let actual = generate(
+            source,
+            "prototypes.go",
+            super::super::linear::HookOptions::from_config(&kinds, &config),
+        )
+        .unwrap();
+        assert_eq!(actual, expected);
+        assert!(actual
+            .iter()
+            .filter(|tag| tag.kind.as_deref() == Some("f"))
+            .all(|tag| tag
+                .extension_fields
+                .as_ref()
+                .is_none_or(|fields| fields.get("end").is_none())));
     }
     #[test]
     fn short_var_behavior_matches_oracle() {

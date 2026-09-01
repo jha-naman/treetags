@@ -27,6 +27,7 @@ pub(crate) mod cpp;
 mod generated;
 pub(crate) mod go;
 mod go_hooks;
+mod go_syntax;
 mod helper;
 pub(crate) mod js;
 mod linear;

@@ -140,6 +140,75 @@ pub(crate) struct TokenCursor<'a> {
     tokens: &'a [Tok],
     at: usize,
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct DelimiterKinds {
+    pub paren_open: TokenKind,
+    pub paren_close: TokenKind,
+    pub bracket_open: TokenKind,
+    pub bracket_close: TokenKind,
+    pub brace_open: TokenKind,
+    pub brace_close: TokenKind,
+    pub semicolon: TokenKind,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum BalancedBoundary {
+    Semicolon(Tok),
+    RowTransition,
+    OwnerClose(Tok),
+    Eof,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct BalancedSpan {
+    pub first: Option<Tok>,
+    pub last: Option<Tok>,
+    pub boundary: BalancedBoundary,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct BalancedUntil {
+    pub delimiters: DelimiterKinds,
+    /// A close delimiter owned by the caller. It is reported but not consumed.
+    pub owner_close: Option<TokenKind>,
+    /// End on a row transition while all inner delimiters are balanced.
+    pub logical_line: bool,
+    /// Language-specific test for whether the previous significant token may
+    /// terminate a logical line. A function pointer keeps the hot path
+    /// monomorphic and allocation-free.
+    pub can_terminate_line: fn(TokenKind) -> bool,
+}
+
+#[derive(Default)]
+struct DelimiterDepth {
+    parens: u32,
+    brackets: u32,
+    braces: u32,
+}
+
+impl DelimiterDepth {
+    fn is_top_level(&self) -> bool {
+        self.parens == 0 && self.brackets == 0 && self.braces == 0
+    }
+
+    fn observe(&mut self, kind: TokenKind, d: DelimiterKinds) {
+        if kind == d.paren_open {
+            self.parens += 1;
+        } else if kind == d.paren_close {
+            self.parens = self.parens.saturating_sub(1);
+        } else if kind == d.bracket_open {
+            self.brackets += 1;
+        } else if kind == d.bracket_close {
+            self.brackets = self.brackets.saturating_sub(1);
+        } else if kind == d.brace_open {
+            self.braces += 1;
+        } else if kind == d.brace_close {
+            self.braces = self.braces.saturating_sub(1);
+        }
+    }
+}
+
 impl<'a> TokenCursor<'a> {
     pub fn new(source: &'a str, tokens: &'a [Tok]) -> Self {
         Self {
@@ -202,6 +271,59 @@ impl<'a> TokenCursor<'a> {
             last = self.next()
         }
         last
+    }
+
+    /// Consumes one declaration fragment without crossing a top-level logical
+    /// boundary. Owner closes and row-transition tokens remain available to
+    /// the caller; explicit semicolons are consumed. Every successful loop
+    /// iteration consumes a token, including malformed unmatched closes.
+    pub fn consume_balanced_until(&mut self, rules: BalancedUntil) -> BalancedSpan {
+        let mut depth = DelimiterDepth::default();
+        let mut first: Option<Tok> = None;
+        let mut last = None;
+
+        loop {
+            let Some(next) = self.peek(0) else {
+                return BalancedSpan {
+                    first,
+                    last,
+                    boundary: BalancedBoundary::Eof,
+                };
+            };
+            let top = depth.is_top_level();
+            if top && rules.owner_close == Some(next.kind) {
+                return BalancedSpan {
+                    first,
+                    last,
+                    boundary: BalancedBoundary::OwnerClose(next),
+                };
+            }
+            if top && next.kind == rules.delimiters.semicolon {
+                let semicolon = self.next().expect("peeked token");
+                return BalancedSpan {
+                    first,
+                    last,
+                    boundary: BalancedBoundary::Semicolon(semicolon),
+                };
+            }
+            if top
+                && rules.logical_line
+                && last.is_some_and(|token| {
+                    next.row > token.row && (rules.can_terminate_line)(token.kind)
+                })
+            {
+                return BalancedSpan {
+                    first,
+                    last,
+                    boundary: BalancedBoundary::RowTransition,
+                };
+            }
+
+            let token = self.next().expect("peeked token");
+            first.get_or_insert(token);
+            last = Some(token);
+            depth.observe(token.kind, rules.delimiters);
+        }
     }
 }
 
