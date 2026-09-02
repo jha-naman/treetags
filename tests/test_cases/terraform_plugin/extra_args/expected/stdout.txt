@@ -1,0 +1,10 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+bucket-name	source.tf	/^data "some-bucket-name" "bucket-name" {$/;"	d	language:Terraform	roles:def
+foo	source.tf	/^resource "venerable_resource" "foo" {$/;"	r	language:Terraform	roles:def
+foo	source.tf	/^variable "foo" {$/;"	v	language:Terraform	roles:def
+foo_module	source.tf	/^module "foo_module" {$/;"	m	language:Terraform	roles:def
+foo_provider	source.tf	/^provider "foo_provider" {$/;"	p	language:Terraform	roles:def
+foo_val	source.tf	/^  foo_val = var.foo ? "yes" : "no"$/;"	l	language:Terraform	roles:def
+foo_val	source.tf	/^output "foo_val" {$/;"	o	language:Terraform	roles:def
+typed_foo	source.tf	/^variable "typed_foo" {$/;"	v	language:Terraform	roles:def
+venerable_resource_name	source.tfvars	/^venerable_resource_name = "foo"$/;"	v	language:Terraform	roles:assigned

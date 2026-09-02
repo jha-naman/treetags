@@ -1,0 +1,9 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+bucket-name	source.tf	/^data "some-bucket-name" "bucket-name" {$/;"	d
+foo	source.tf	/^resource "venerable_resource" "foo" {$/;"	r
+foo	source.tf	/^variable "foo" {$/;"	v
+foo_module	source.tf	/^module "foo_module" {$/;"	m
+foo_provider	source.tf	/^provider "foo_provider" {$/;"	p
+foo_val	source.tf	/^  foo_val = var.foo ? "yes" : "no"$/;"	l
+foo_val	source.tf	/^output "foo_val" {$/;"	o
+typed_foo	source.tf	/^variable "typed_foo" {$/;"	v

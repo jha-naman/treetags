@@ -19,5 +19,6 @@ rust
 scala
 shell
 swift             [plugin]
+terraform         [plugin]
 typescript
 zig               [plugin]

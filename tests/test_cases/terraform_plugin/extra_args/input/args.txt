@@ -1,0 +1,2 @@
+--sort yes -f '-' --extras='+r' --fields='+l,+r' --plugin-dir {TREETAGS_TEST_PLUGINS_DIR}
+source.tf source.tfvars

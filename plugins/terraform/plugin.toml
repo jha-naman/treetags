@@ -1,0 +1,43 @@
+name = "terraform"
+version = "0.1.0"
+abi_version = 3
+extensions = ["tf", "tfvars"]
+language = "terraform"
+
+# This table mirrors Universal Ctags' Terraform kinds and must stay in sync
+# with TERRAFORM_DEFAULT_KINDS in src/lib.rs.
+
+[[kinds]]
+letter = "d"
+name = "data"
+default = true
+
+[[kinds]]
+letter = "l"
+name = "local"
+default = true
+
+[[kinds]]
+letter = "m"
+name = "module"
+default = true
+
+[[kinds]]
+letter = "o"
+name = "output"
+default = true
+
+[[kinds]]
+letter = "p"
+name = "provider"
+default = true
+
+[[kinds]]
+letter = "r"
+name = "resource"
+default = true
+
+[[kinds]]
+letter = "v"
+name = "variable"
+default = true
