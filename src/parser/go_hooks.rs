@@ -311,6 +311,16 @@ pub(crate) fn generate(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn production_generate(
+        parser: &mut tree_sitter::Parser,
+        code: &[u8],
+        path: &str,
+        kinds: &TagKindConfig,
+        config: &crate::config::Config,
+    ) -> Option<Vec<crate::tag::Tag>> {
+        crate::parser::go::generate(parser, code, path, kinds, config)
+    }
     use crate::parser::{
         go::{KIND_DEFAULTS, KIND_OPTIONALS},
         TagKindConfig,
@@ -368,11 +378,11 @@ mod tests {
     }
 
     #[test]
-    fn basic_fixture_matches_tree_sitter_oracle_with_default_fields() {
+    fn basic_fixture_matches_production_path_with_default_fields() {
         let source = include_str!("../../tests/test_cases/go/basic/input/source.go");
         let config = crate::config::Config::parse_from(["treetags"]);
         let kinds = TagKindConfig::from_string("", KIND_DEFAULTS, KIND_OPTIONALS);
-        let expected = crate::parser::go::oracle::generate(
+        let expected = production_generate(
             &mut tree_sitter::Parser::new(),
             source.as_bytes(),
             "source.go",
@@ -390,7 +400,7 @@ mod tests {
     }
 
     #[test]
-    fn basic_fixture_matches_oracle_with_all_go_fields() {
+    fn basic_fixture_matches_production_path_with_all_go_fields() {
         let source = include_str!("../../tests/test_cases/go/basic/input/source.go");
         let mut config = crate::config::Config::parse_from(["treetags"]);
         for field in ["line", "kind", "file", "signature", "access", "end"] {
@@ -398,7 +408,7 @@ mod tests {
         }
         config.extras_config.qualified = true;
         let kinds = TagKindConfig::from_string("picsmtfv", KIND_DEFAULTS, KIND_OPTIONALS);
-        let expected = crate::parser::go::oracle::generate(
+        let expected = production_generate(
             &mut tree_sitter::Parser::new(),
             source.as_bytes(),
             "source.go",
@@ -416,7 +426,7 @@ mod tests {
     }
 
     #[test]
-    fn modern_constructs_match_tree_sitter_oracle() {
+    fn modern_constructs_match_production_path() {
         let source = r#"package corpus
 import alias "example.com/x"
 type Box[T any] struct {
@@ -446,7 +456,7 @@ var raw = `func Fake() {}`
 "#;
         let config = crate::config::Config::parse_from(["treetags"]);
         let kinds = TagKindConfig::from_string("", KIND_DEFAULTS, KIND_OPTIONALS);
-        let expected = crate::parser::go::oracle::generate(
+        let expected = production_generate(
             &mut tree_sitter::Parser::new(),
             source.as_bytes(),
             "corpus.go",
@@ -463,7 +473,7 @@ var raw = `func Fake() {}`
         assert_eq!(actual, expected);
     }
     #[test]
-    fn receiver_scopes_match_tree_sitter_oracle() {
+    fn receiver_scopes_match_production_path() {
         let source = r#"package sync
 type entry[K comparable, V any] struct {
     key K
@@ -480,7 +490,7 @@ func Free() {}
 "#;
         let config = crate::config::Config::parse_from(["treetags"]);
         let kinds = TagKindConfig::from_string("", KIND_DEFAULTS, KIND_OPTIONALS);
-        let expected = crate::parser::go::oracle::generate(
+        let expected = production_generate(
             &mut tree_sitter::Parser::new(),
             source.as_bytes(),
             "receivers.go",
@@ -503,7 +513,7 @@ func Free() {}
         );
     }
     #[test]
-    fn balanced_grouped_values_match_tree_sitter_oracle() {
+    fn balanced_grouped_values_match_production_path() {
         let source = r#"package p
 const (
     A = (1 + iota)
@@ -518,7 +528,7 @@ var (
 "#;
         let config = crate::config::Config::parse_from(["treetags"]);
         let kinds = TagKindConfig::from_string("", KIND_DEFAULTS, KIND_OPTIONALS);
-        let expected = crate::parser::go::oracle::generate(
+        let expected = production_generate(
             &mut tree_sitter::Parser::new(),
             source.as_bytes(),
             "balanced.go",
@@ -539,7 +549,7 @@ var (
         let source = "package p\nfunc A2e([]byte)\nfunc E2a([]byte)\nconst C = 1\n";
         let config = crate::config::Config::parse_from(["treetags"]);
         let kinds = TagKindConfig::from_string("", KIND_DEFAULTS, KIND_OPTIONALS);
-        let expected = crate::parser::go::oracle::generate(
+        let expected = production_generate(
             &mut tree_sitter::Parser::new(),
             source.as_bytes(),
             "prototypes.go",
@@ -563,7 +573,7 @@ var (
                 .is_none_or(|fields| fields.get("end").is_none())));
     }
     #[test]
-    fn delimiter_aware_members_match_oracle() {
+    fn delimiter_aware_members_match_production_path() {
         let source = r#"package p
 import "io"
 type RegPtr struct{ name string }
@@ -592,7 +602,7 @@ type Constraint interface {
 "#;
         let config = crate::config::Config::parse_from(["treetags"]);
         let kinds = TagKindConfig::from_string("", KIND_DEFAULTS, KIND_OPTIONALS);
-        let expected = crate::parser::go::oracle::generate(
+        let expected = production_generate(
             &mut tree_sitter::Parser::new(),
             source.as_bytes(),
             "members.go",
@@ -617,7 +627,7 @@ type Constraint interface {
         assert!(!actual.iter().any(|t| &*t.name == "X"));
     }
     #[test]
-    fn array_and_generic_type_definitions_match_oracle() {
+    fn array_and_generic_type_definitions_match_production_path() {
         let source = r#"package p
 type ActionID [HashSize]byte
 type Grid [3][4]int
@@ -636,7 +646,7 @@ type (
 "#;
         let config = crate::config::Config::parse_from(["treetags"]);
         let kinds = TagKindConfig::from_string("", KIND_DEFAULTS, KIND_OPTIONALS);
-        let expected = crate::parser::go::oracle::generate(
+        let expected = production_generate(
             &mut tree_sitter::Parser::new(),
             source.as_bytes(),
             "types.go",
@@ -662,11 +672,11 @@ type (
         );
     }
     #[test]
-    fn short_var_behavior_matches_oracle() {
+    fn short_var_behavior_matches_production_path() {
         let source = "package p\nfunc f(){\n a:=1\n}\n";
         let config = crate::config::Config::parse_from(["treetags"]);
         let kinds = TagKindConfig::from_string("", KIND_DEFAULTS, KIND_OPTIONALS);
-        let expected = crate::parser::go::oracle::generate(
+        let expected = production_generate(
             &mut tree_sitter::Parser::new(),
             source.as_bytes(),
             "x.go",

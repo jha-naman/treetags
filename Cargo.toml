@@ -16,9 +16,6 @@ default-run = "treetags"
 
 exclude = ["tests/", ".github/", "plugins/"]
 
-[features]
-linear-go = []
-
 [dependencies]
 anyhow = "1"
 wasmtime = { version = "45", features = ["cranelift", "component-model"] }
@@ -45,7 +42,6 @@ tree-sitter-c-sharp = "0.23.1"
 tree-sitter-cpp = "0.23.4"
 tree-sitter-css = "0.23.2"
 tree-sitter-elixir = "0.3.3"
-tree-sitter-go = "0.23.4"
 tree-sitter-java = "0.23.5"
 tree-sitter-javascript = "0.23.1"
 tree-sitter-julia = "0.23.1"
