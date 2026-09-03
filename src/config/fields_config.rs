@@ -104,6 +104,9 @@ impl FieldsConfig {
                     "r" | "roles" => {
                         config.enabled_fields.insert("roles".to_string());
                     }
+                    "l" | "language" => {
+                        config.enabled_fields.insert("language".to_string());
+                    }
                     _ => eprintln!("Warning: Unknown field: {}", field),
                 }
             } else if let Some(prefix) = part.strip_prefix('-') {
@@ -136,6 +139,9 @@ impl FieldsConfig {
                     "r" | "roles" => {
                         config.enabled_fields.insert("roles".to_string());
                     }
+                    "l" | "language" => {
+                        config.enabled_fields.remove("language");
+                    }
                     _ => eprintln!("Warning: Unknown field: {}", field),
                 }
             } else {
@@ -167,6 +173,9 @@ impl FieldsConfig {
                     }
                     "r" | "roles" => {
                         config.enabled_fields.insert("roles".to_string());
+                    }
+                    "l" | "language" => {
+                        config.enabled_fields.insert("language".to_string());
                     }
                     // Add other field mappings as needed
                     _ => eprintln!("Warning: Unknown field: {}", part),
@@ -376,6 +385,7 @@ mod tests {
         assert!(config.is_field_enabled("file")); // f
         assert!(config.is_field_enabled("end")); // e
         assert!(config.is_field_enabled("typeref")); // t
+        assert!(config.is_field_enabled("language")); // l
 
         // Default fields should still be present
         assert!(config.is_field_enabled("name"));

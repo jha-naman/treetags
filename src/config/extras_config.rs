@@ -10,6 +10,8 @@ pub struct ExtrasConfig {
     pub qualified: bool,
     /// Enable file scope tags
     pub file_scope: bool,
+    /// Include reference tags (for example assignments in Terraform tfvars files)
+    pub reference: bool,
 }
 
 impl ExtrasConfig {
@@ -17,6 +19,7 @@ impl ExtrasConfig {
         Self {
             qualified: false,
             file_scope: false,
+            reference: false,
         }
     }
 
@@ -29,12 +32,14 @@ impl ExtrasConfig {
                 match prefix {
                     "q" | "qualified" => config.qualified = true,
                     "F" | "fileScope" => config.file_scope = true,
+                    "r" | "reference" => config.reference = true,
                     _ => eprintln!("Warning: Unknown extra: {}", part),
                 }
             } else if let Some(prefix) = part.strip_prefix('-') {
                 match prefix {
                     "q" | "qualified" => config.qualified = false,
                     "F" | "fileScope" => config.file_scope = false,
+                    "r" | "reference" => config.reference = false,
                     _ => eprintln!("Warning: Unknown extra: {}", part),
                 }
             }
@@ -207,5 +212,13 @@ mod tests {
 
         assert!(!config.qualified);
         assert!(!config.file_scope);
+        assert!(!config.reference);
+    }
+
+    #[test]
+    fn test_reference_tags() {
+        assert!(ExtrasConfig::from_string("+r").reference);
+        assert!(ExtrasConfig::from_string("+reference").reference);
+        assert!(!ExtrasConfig::from_string("+r,-r").reference);
     }
 }

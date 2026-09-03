@@ -8,7 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Add Terraform support via WASM plugin
 - Add Zig support via WASM plugin
+- Recognize `language` field and `reference` extra as valid value
 
 - [0.16.0]
 
