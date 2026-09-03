@@ -1,6 +1,6 @@
 {
   "abi_version": 3,
-  "generated_at": "2026-08-27T12:26:27Z",
+  "generated_at": "2026-09-03T04:08:35Z",
   "plugins": [
     {
       "name": "dart",
@@ -427,6 +427,150 @@
       "manifest_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/swift.toml",
       "wasm_sha256": "d47f654370b97664d507f3940739f66fda706a214b52fa3f4bcc58001f44035c",
       "wasm_size": 4079974
+    },
+    {
+      "name": "terraform",
+      "version": "0.1.0",
+      "language": "terraform",
+      "extensions": [
+        "tf",
+        "tfvars"
+      ],
+      "kinds": [
+        {
+          "letter": "d",
+          "name": "data",
+          "default": true
+        },
+        {
+          "letter": "l",
+          "name": "local",
+          "default": true
+        },
+        {
+          "letter": "m",
+          "name": "module",
+          "default": true
+        },
+        {
+          "letter": "o",
+          "name": "output",
+          "default": true
+        },
+        {
+          "letter": "p",
+          "name": "provider",
+          "default": true
+        },
+        {
+          "letter": "r",
+          "name": "resource",
+          "default": true
+        },
+        {
+          "letter": "v",
+          "name": "variable",
+          "default": true
+        }
+      ],
+      "wasm_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/terraform.wasm",
+      "manifest_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/terraform.toml",
+      "wasm_sha256": "ba32fcae4ea5f40d49c71309869f45ba01a53276e0dae844245028fb3ea66d22",
+      "wasm_size": 364401
+    },
+    {
+      "name": "zig",
+      "version": "0.1.0",
+      "language": "zig",
+      "extensions": [
+        "zig"
+      ],
+      "kinds": [
+        {
+          "letter": "s",
+          "name": "struct",
+          "default": true
+        },
+        {
+          "letter": "u",
+          "name": "union",
+          "default": true
+        },
+        {
+          "letter": "g",
+          "name": "enum",
+          "default": true
+        },
+        {
+          "letter": "e",
+          "name": "enumerator",
+          "default": true
+        },
+        {
+          "letter": "o",
+          "name": "opaque",
+          "default": true
+        },
+        {
+          "letter": "r",
+          "name": "errorSet",
+          "default": true
+        },
+        {
+          "letter": "E",
+          "name": "error",
+          "default": true
+        },
+        {
+          "letter": "f",
+          "name": "function",
+          "default": true
+        },
+        {
+          "letter": "m",
+          "name": "method",
+          "default": true
+        },
+        {
+          "letter": "F",
+          "name": "field",
+          "default": true
+        },
+        {
+          "letter": "c",
+          "name": "constant",
+          "default": true
+        },
+        {
+          "letter": "v",
+          "name": "variable",
+          "default": true
+        },
+        {
+          "letter": "n",
+          "name": "namespace",
+          "default": true
+        },
+        {
+          "letter": "t",
+          "name": "test",
+          "default": true
+        },
+        {
+          "letter": "l",
+          "name": "local",
+          "default": false
+        },
+        {
+          "letter": "z",
+          "name": "parameter",
+          "default": false
+        }
+      ],
+      "wasm_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/zig.wasm",
+      "manifest_url": "https://github.com/jha-naman/treetags/releases/download/plugin-store-v3/zig.toml",
+      "wasm_sha256": "167a1c3a765dad7081a0cd48fba86212d5c43133bab8d8ffbf263f18111e8378",
+      "wasm_size": 963954
     }
   ]
 }

@@ -16,4 +16,4 @@ treetags plugin install NAME  # install one
 
 - [ABI 3](3/) — latest
 
-<small>Generated 2026-08-27T12:26:27Z</small>
+<small>Generated 2026-09-03T04:08:35Z</small>

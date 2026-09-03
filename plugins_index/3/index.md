@@ -14,7 +14,9 @@ Language plugins compatible with treetags builds that support plugin ABI **3**. 
 | kotlin | 0.1.0 | kotlin | `.kt` `.kts` | `treetags plugin install kotlin` |
 | objective_c | 0.1.0 | objc | `.m` `.h` | `treetags plugin install objective_c` |
 | swift | 0.1.0 | swift | `.swift` | `treetags plugin install swift` |
+| terraform | 0.1.0 | terraform | `.tf` `.tfvars` | `treetags plugin install terraform` |
+| zig | 0.1.0 | zig | `.zig` | `treetags plugin install zig` |
 
 Machine-readable index: [`index.json`](index.json)
 
-<small>Generated 2026-08-27T12:26:27Z</small>
+<small>Generated 2026-09-03T04:08:35Z</small>
