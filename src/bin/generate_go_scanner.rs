@@ -646,6 +646,69 @@ fn token_name(prefix: &str, text: &str) -> String {
         )
     }
 }
+/// Human-readable name for a single ASCII punctuation byte, so hooks can read
+/// `go::LBRACE` instead of `go::PUNCT_7B`. Multi-byte punctuation joins these
+/// (`:=` -> `COLON_EQ`). Returns `None` for bytes we have no name for, in which
+/// case only the canonical `PUNCT_..` const is emitted.
+fn byte_alias(b: u8) -> Option<&'static str> {
+    Some(match b {
+        b'{' => "LBRACE",
+        b'}' => "RBRACE",
+        b'(' => "LPAREN",
+        b')' => "RPAREN",
+        b'[' => "LBRACKET",
+        b']' => "RBRACKET",
+        b';' => "SEMI",
+        b',' => "COMMA",
+        b'.' => "DOT",
+        b':' => "COLON",
+        b'=' => "EQ",
+        b'*' => "STAR",
+        b'&' => "AMP",
+        b'|' => "PIPE",
+        b'+' => "PLUS",
+        b'-' => "MINUS",
+        b'/' => "SLASH",
+        b'%' => "PERCENT",
+        b'<' => "LT",
+        b'>' => "GT",
+        b'!' => "BANG",
+        b'^' => "CARET",
+        b'~' => "TILDE",
+        b'?' => "QUESTION",
+        b'@' => "AT",
+        b'#' => "HASH",
+        b'$' => "DOLLAR",
+        b'\\' => "BACKSLASH",
+        _ => return None,
+    })
+}
+fn punct_alias(text: &str) -> Option<String> {
+    let parts = text.bytes().map(byte_alias).collect::<Option<Vec<_>>>()?;
+    (!parts.is_empty()).then(|| parts.join("_"))
+}
+fn punct_aliases(p: &BTreeSet<String>) -> String {
+    p.iter()
+        .filter_map(|text| {
+            let alias = punct_alias(text)?;
+            Some(format!(
+                "pub const {alias}:TokenKind={};\n",
+                token_name("PUNCT", text)
+            ))
+        })
+        .collect()
+}
+/// A ready-made `DelimiterKinds` so a language never hand-declares one, emitted
+/// when the grammar has the full set of brace/bracket/paren/semicolon tokens.
+fn delimiters_const(p: &BTreeSet<String>) -> String {
+    let need = ["(", ")", "[", "]", "{", "}", ";"];
+    if !need.iter().all(|d| p.contains(*d)) {
+        return String::new();
+    }
+    "pub const DELIMITERS:DelimiterKinds=DelimiterKinds{paren_open:LPAREN,paren_close:RPAREN,\
+bracket_open:LBRACKET,bracket_close:RBRACKET,brace_open:LBRACE,brace_close:RBRACE,semicolon:SEMI};\n"
+        .to_string()
+}
 fn token_constants(k: &BTreeSet<String>, p: &BTreeSet<String>) -> String {
     k.iter()
         .map(|text| ("KW", text))
@@ -749,9 +812,9 @@ fn render(
 // grammar.js sha256: {hash}
 // evaluated with: {cli}
 
-use crate::parser::linear::{{ExternalLexer,GeneratedLexeme,GeneratedLexicon,TokenKind,TokenStream}};
+use crate::parser::linear::{{DelimiterKinds,ExternalLexer,GeneratedLexeme,GeneratedLexicon,TokenKind,TokenStream}};
 pub const IDENTIFIER:TokenKind=TokenKind(1);pub const LITERAL:TokenKind=TokenKind(2);pub const UNKNOWN:TokenKind=TokenKind(3);
-{}
+{constants}
 pub const WORD_TOKEN_RULE:&str={word:?};pub const DECLARED_EXTERNAL_COUNT:usize={externals};
 pub const LEXICAL_PATTERNS:&[&str]=&[
 {}];
@@ -793,9 +856,14 @@ fn lex(source:&str,at:usize)->GeneratedLexeme{{
 }}
 pub fn scan<E:ExternalLexer>(source:&str)->Result<TokenStream,String>{{crate::parser::linear_scanner::scan::<E,Lexicon>(source)}}
 "#,
-        token_constants(k, p),
         list(r),
         keyword_match(k),
-        punctuation_match(p)
+        punctuation_match(p),
+        constants = format!(
+            "{}{}{}",
+            token_constants(k, p),
+            punct_aliases(p),
+            delimiters_const(p)
+        ),
     )
 }

@@ -4,7 +4,7 @@
 // evaluated with: tree-sitter 0.25.10; node v22.17.0
 
 use crate::parser::linear::{
-    ExternalLexer, GeneratedLexeme, GeneratedLexicon, TokenKind, TokenStream,
+    DelimiterKinds, ExternalLexer, GeneratedLexeme, GeneratedLexicon, TokenKind, TokenStream,
 };
 pub const IDENTIFIER: TokenKind = TokenKind(1);
 pub const LITERAL: TokenKind = TokenKind(2);
@@ -89,6 +89,64 @@ pub const PUNCT_7C_3D: TokenKind = TokenKind(80);
 pub const PUNCT_7C_7C: TokenKind = TokenKind(81);
 pub const PUNCT_7D: TokenKind = TokenKind(82);
 pub const PUNCT_7E: TokenKind = TokenKind(83);
+pub const BANG: TokenKind = PUNCT_21;
+pub const BANG_EQ: TokenKind = PUNCT_21_3D;
+pub const PERCENT: TokenKind = PUNCT_25;
+pub const PERCENT_EQ: TokenKind = PUNCT_25_3D;
+pub const AMP: TokenKind = PUNCT_26;
+pub const AMP_AMP: TokenKind = PUNCT_26_26;
+pub const AMP_EQ: TokenKind = PUNCT_26_3D;
+pub const AMP_CARET: TokenKind = PUNCT_26_5E;
+pub const AMP_CARET_EQ: TokenKind = PUNCT_26_5E_3D;
+pub const LPAREN: TokenKind = PUNCT_28;
+pub const RPAREN: TokenKind = PUNCT_29;
+pub const STAR: TokenKind = PUNCT_2A;
+pub const STAR_EQ: TokenKind = PUNCT_2A_3D;
+pub const PLUS: TokenKind = PUNCT_2B;
+pub const PLUS_PLUS: TokenKind = PUNCT_2B_2B;
+pub const PLUS_EQ: TokenKind = PUNCT_2B_3D;
+pub const COMMA: TokenKind = PUNCT_2C;
+pub const MINUS: TokenKind = PUNCT_2D;
+pub const MINUS_MINUS: TokenKind = PUNCT_2D_2D;
+pub const MINUS_EQ: TokenKind = PUNCT_2D_3D;
+pub const DOT: TokenKind = PUNCT_2E;
+pub const DOT_DOT_DOT: TokenKind = PUNCT_2E_2E_2E;
+pub const SLASH: TokenKind = PUNCT_2F;
+pub const SLASH_EQ: TokenKind = PUNCT_2F_3D;
+pub const COLON: TokenKind = PUNCT_3A;
+pub const COLON_EQ: TokenKind = PUNCT_3A_3D;
+pub const SEMI: TokenKind = PUNCT_3B;
+pub const LT: TokenKind = PUNCT_3C;
+pub const LT_MINUS: TokenKind = PUNCT_3C_2D;
+pub const LT_LT: TokenKind = PUNCT_3C_3C;
+pub const LT_LT_EQ: TokenKind = PUNCT_3C_3C_3D;
+pub const LT_EQ: TokenKind = PUNCT_3C_3D;
+pub const EQ: TokenKind = PUNCT_3D;
+pub const EQ_EQ: TokenKind = PUNCT_3D_3D;
+pub const GT: TokenKind = PUNCT_3E;
+pub const GT_EQ: TokenKind = PUNCT_3E_3D;
+pub const GT_GT: TokenKind = PUNCT_3E_3E;
+pub const GT_GT_EQ: TokenKind = PUNCT_3E_3E_3D;
+pub const LBRACKET: TokenKind = PUNCT_5B;
+pub const BACKSLASH: TokenKind = PUNCT_5C;
+pub const RBRACKET: TokenKind = PUNCT_5D;
+pub const CARET: TokenKind = PUNCT_5E;
+pub const CARET_EQ: TokenKind = PUNCT_5E_3D;
+pub const LBRACE: TokenKind = PUNCT_7B;
+pub const PIPE: TokenKind = PUNCT_7C;
+pub const PIPE_EQ: TokenKind = PUNCT_7C_3D;
+pub const PIPE_PIPE: TokenKind = PUNCT_7C_7C;
+pub const RBRACE: TokenKind = PUNCT_7D;
+pub const TILDE: TokenKind = PUNCT_7E;
+pub const DELIMITERS: DelimiterKinds = DelimiterKinds {
+    paren_open: LPAREN,
+    paren_close: RPAREN,
+    bracket_open: LBRACKET,
+    bracket_close: RBRACKET,
+    brace_open: LBRACE,
+    brace_close: RBRACE,
+    semicolon: SEMI,
+};
 
 pub const WORD_TOKEN_RULE: &str = "identifier";
 pub const DECLARED_EXTERNAL_COUNT: usize = 0;

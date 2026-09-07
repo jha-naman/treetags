@@ -4,25 +4,17 @@
 
 use super::{
     generated::go,
-    linear::{
-        BalancedPair, BalancedUntil, DelimiterKinds, SeparatedRange, Tok, TokenCursor, TokenRange,
-    },
+    linear::{BalancedPair, BalancedUntil, SeparatedRange, Tok, TokenCursor, TokenRange},
 };
 
-pub(crate) const DELIMITERS: DelimiterKinds = DelimiterKinds {
-    paren_open: go::PUNCT_28,
-    paren_close: go::PUNCT_29,
-    bracket_open: go::PUNCT_5B,
-    bracket_close: go::PUNCT_5D,
-    brace_open: go::PUNCT_7B,
-    brace_close: go::PUNCT_7D,
-    semicolon: go::PUNCT_3B,
-};
+// The generator emits a ready-made `DelimiterKinds` from the grammar's bracket
+// tokens; re-export it so hooks share one source of truth.
+pub(crate) use super::generated::go::DELIMITERS;
 
 pub(crate) fn member_until() -> BalancedUntil {
     BalancedUntil {
         delimiters: DELIMITERS,
-        owner_close: Some(go::PUNCT_7D),
+        owner_close: Some(go::RBRACE),
         logical_line: true,
         can_terminate_line,
     }
@@ -59,11 +51,11 @@ pub(crate) fn can_terminate_line(kind: super::linear::TokenKind) -> bool {
             | go::KW_NIL
             | go::KW_RETURN
             | go::KW_TRUE
-            | go::PUNCT_2B_2B
-            | go::PUNCT_2D_2D
-            | go::PUNCT_29
-            | go::PUNCT_5D
-            | go::PUNCT_7D
+            | go::PLUS_PLUS
+            | go::MINUS_MINUS
+            | go::RPAREN
+            | go::RBRACKET
+            | go::RBRACE
     )
 }
 
@@ -167,11 +159,11 @@ pub(crate) fn consume_type(cursor: &mut TokenCursor<'_>, until: GoTypeUntil) -> 
         let top = parens == 0 && brackets == 0 && braces == 0;
         let boundary = if top && until.owner_close == Some(next.kind) {
             Some(GoTypeBoundary::OwnerClose(next))
-        } else if top && until.comma && next.kind == go::PUNCT_2C {
+        } else if top && until.comma && next.kind == go::COMMA {
             Some(GoTypeBoundary::Comma(next))
-        } else if top && until.equals && next.kind == go::PUNCT_3D {
+        } else if top && until.equals && next.kind == go::EQ {
             Some(GoTypeBoundary::Equals(next))
-        } else if top && next.kind == go::PUNCT_3B {
+        } else if top && next.kind == go::SEMI {
             Some(GoTypeBoundary::Semicolon(next))
         } else if top && until.struct_tag && next.kind == go::LITERAL && last.is_some() {
             Some(GoTypeBoundary::StructTag(next))
@@ -190,12 +182,12 @@ pub(crate) fn consume_type(cursor: &mut TokenCursor<'_>, until: GoTypeUntil) -> 
         let token = cursor.next().expect("peeked token");
         last = Some(token);
         match token.kind {
-            go::PUNCT_28 => parens += 1,
-            go::PUNCT_29 => parens = parens.saturating_sub(1),
-            go::PUNCT_5B => brackets += 1,
-            go::PUNCT_5D => brackets = brackets.saturating_sub(1),
-            go::PUNCT_7B => braces += 1,
-            go::PUNCT_7D => braces = braces.saturating_sub(1),
+            go::LPAREN => parens += 1,
+            go::RPAREN => parens = parens.saturating_sub(1),
+            go::LBRACKET => brackets += 1,
+            go::RBRACKET => brackets = brackets.saturating_sub(1),
+            go::LBRACE => braces += 1,
+            go::RBRACE => braces = braces.saturating_sub(1),
             _ => {}
         }
     }
@@ -216,18 +208,18 @@ fn classify(cursor: &TokenCursor<'_>, context: GoTypeContext) -> GoTypeCategory 
     };
     match first.kind {
         go::IDENTIFIER => GoTypeCategory::Named,
-        go::PUNCT_2A => GoTypeCategory::Pointer,
+        go::STAR => GoTypeCategory::Pointer,
         go::KW_MAP => GoTypeCategory::Map,
-        go::KW_CHAN | go::PUNCT_3C_2D => GoTypeCategory::Channel,
+        go::KW_CHAN | go::LT_MINUS => GoTypeCategory::Channel,
         go::KW_FUNC => GoTypeCategory::Function,
         go::KW_INTERFACE => GoTypeCategory::Interface,
         go::KW_STRUCT => GoTypeCategory::Struct,
-        go::PUNCT_28 => match context {
+        go::LPAREN => match context {
             GoTypeContext::Type => GoTypeCategory::Parenthesized,
             GoTypeContext::FunctionResult => GoTypeCategory::ParameterList,
         },
-        go::PUNCT_5B => {
-            if cursor.peek(1).is_some_and(|t| t.kind == go::PUNCT_5D) {
+        go::LBRACKET => {
+            if cursor.peek(1).is_some_and(|t| t.kind == go::RBRACKET) {
                 GoTypeCategory::Slice
             } else {
                 GoTypeCategory::Array
@@ -246,7 +238,7 @@ pub(crate) struct GoDeclGroup {
 
 impl GoDeclGroup {
     pub fn new(cursor: &mut TokenCursor<'_>, start: Tok) -> Self {
-        let grouped = cursor.consume_if(go::PUNCT_28).is_some();
+        let grouped = cursor.consume_if(go::LPAREN).is_some();
         Self {
             start_row: start.row,
             grouped,
@@ -255,7 +247,7 @@ impl GoDeclGroup {
     }
 
     pub fn owner_close(self) -> Option<super::linear::TokenKind> {
-        self.grouped.then_some(go::PUNCT_29)
+        self.grouped.then_some(go::RPAREN)
     }
 
     fn next_head(&mut self, cursor: &mut TokenCursor<'_>) -> Option<Tok> {
@@ -263,7 +255,7 @@ impl GoDeclGroup {
             return None;
         }
         let next = cursor.peek(0)?;
-        if self.grouped && next.kind == go::PUNCT_29 {
+        if self.grouped && next.kind == go::RPAREN {
             cursor.next();
             self.done = true;
             return None;
@@ -303,7 +295,7 @@ pub(crate) fn next_import_spec(
         }
         while cursor
             .peek(0)
-            .is_some_and(|token| token.row == alias.row && token.kind != go::PUNCT_3B)
+            .is_some_and(|token| token.row == alias.row && token.kind != go::SEMI)
         {
             cursor.next();
         }
@@ -336,10 +328,7 @@ pub(crate) fn next_value_spec(
         }
         let names_start = cursor.mark();
         let mut last_name = cursor.next().expect("peeked value name");
-        while cursor
-            .peek(0)
-            .is_some_and(|token| token.kind == go::PUNCT_2C)
-        {
+        while cursor.peek(0).is_some_and(|token| token.kind == go::COMMA) {
             cursor.next();
             if let Some(name) = cursor.next() {
                 if name.kind == go::IDENTIFIER {
@@ -356,15 +345,11 @@ pub(crate) fn next_value_spec(
         };
         let owner_close = group.owner_close();
         let at_spec_boundary = cursor.peek(0).is_none_or(|next| {
-            next.kind == go::PUNCT_3B
+            next.kind == go::SEMI
                 || owner_close == Some(next.kind)
                 || (next.row > last_name.row && can_terminate_line(last_name.kind))
         });
-        let ty = if !at_spec_boundary
-            && cursor
-                .peek(0)
-                .is_some_and(|token| token.kind != go::PUNCT_3D)
-        {
+        let ty = if !at_spec_boundary && cursor.peek(0).is_some_and(|token| token.kind != go::EQ) {
             consume_type(
                 cursor,
                 GoTypeUntil {
@@ -379,10 +364,10 @@ pub(crate) fn next_value_spec(
         } else {
             None
         };
-        if cursor.consume_if(go::PUNCT_3D).is_some() {
+        if cursor.consume_if(go::EQ).is_some() {
             consume_declaration(cursor, owner_close, true);
         } else {
-            cursor.consume_if(go::PUNCT_3B);
+            cursor.consume_if(go::SEMI);
         }
         group.finish_single();
         return Some(GoValueSpec { names, ty });
@@ -424,20 +409,17 @@ pub(crate) fn next_type_spec(
         let name = cursor.next().expect("peeked type name");
         let type_params = if cursor
             .peek(0)
-            .is_some_and(|token| token.kind == go::PUNCT_5B)
+            .is_some_and(|token| token.kind == go::LBRACKET)
             && looks_like_type_params(cursor)
         {
-            cursor.consume_balanced_pair(go::PUNCT_5B, go::PUNCT_5D)
+            cursor.consume_balanced_pair(go::LBRACKET, go::RBRACKET)
         } else {
             None
         };
-        if cursor
-            .peek(0)
-            .is_some_and(|token| token.kind == go::PUNCT_3D)
-        {
+        if cursor.peek(0).is_some_and(|token| token.kind == go::EQ) {
             let row = name.row;
             while cursor.peek(0).is_some_and(|token| {
-                token.row == row && !matches!(token.kind, go::PUNCT_3B | go::PUNCT_29)
+                token.row == row && !matches!(token.kind, go::SEMI | go::RPAREN)
             }) {
                 cursor.next();
             }
@@ -455,7 +437,7 @@ pub(crate) fn next_type_spec(
                     group.done = true;
                     return None;
                 };
-                if open.kind != go::PUNCT_7B {
+                if open.kind != go::LBRACE {
                     if !group.grouped {
                         group.done = true;
                     }
@@ -503,10 +485,7 @@ pub(crate) enum GoStructField {
 
 pub(crate) fn next_struct_field(cursor: &mut TokenCursor<'_>) -> Option<GoStructField> {
     skip_semicolons(cursor);
-    if cursor
-        .peek(0)
-        .is_none_or(|token| token.kind == go::PUNCT_7D)
-    {
+    if cursor.peek(0).is_none_or(|token| token.kind == go::RBRACE) {
         return None;
     }
     if field_shape(cursor) == FieldShape::Embedded {
@@ -516,7 +495,7 @@ pub(crate) fn next_struct_field(cursor: &mut TokenCursor<'_>) -> Option<GoStruct
     }
     let start = cursor.mark();
     while cursor.consume_if(go::IDENTIFIER).is_some() {
-        if cursor.consume_if(go::PUNCT_2C).is_none() {
+        if cursor.consume_if(go::COMMA).is_none() {
             break;
         }
     }
@@ -545,26 +524,23 @@ pub(crate) enum GoInterfaceMember {
 
 pub(crate) fn next_interface_member(cursor: &mut TokenCursor<'_>) -> Option<GoInterfaceMember> {
     skip_semicolons(cursor);
-    if cursor
-        .peek(0)
-        .is_none_or(|token| token.kind == go::PUNCT_7D)
-    {
+    if cursor.peek(0).is_none_or(|token| token.kind == go::RBRACE) {
         return None;
     }
     let is_method = cursor.peek(0).map(|token| token.kind) == Some(go::IDENTIFIER)
-        && cursor.peek(1).map(|token| token.kind) == Some(go::PUNCT_28);
+        && cursor.peek(1).map(|token| token.kind) == Some(go::LPAREN);
     if !is_method {
-        consume_declaration(cursor, Some(go::PUNCT_7D), true);
+        consume_declaration(cursor, Some(go::RBRACE), true);
         return Some(GoInterfaceMember::Constraint);
     }
     let name = cursor.next().expect("peeked method name");
-    let Some(params) = cursor.consume_balanced_pair(go::PUNCT_28, go::PUNCT_29) else {
+    let Some(params) = cursor.consume_balanced_pair(go::LPAREN, go::RPAREN) else {
         return None;
     };
     let params_open = params.open;
     let params_close = params.close;
     let has_result = cursor.peek(0).is_some_and(|token| {
-        !matches!(token.kind, go::PUNCT_7D | go::PUNCT_3B)
+        !matches!(token.kind, go::RBRACE | go::SEMI)
             && !(token.row > params_close.row && can_terminate_line(params_close.kind))
     });
     let result = has_result
@@ -573,7 +549,7 @@ pub(crate) fn next_interface_member(cursor: &mut TokenCursor<'_>) -> Option<GoIn
                 cursor,
                 GoTypeUntil {
                     context: GoTypeContext::FunctionResult,
-                    owner_close: Some(go::PUNCT_7D),
+                    owner_close: Some(go::RBRACE),
                     logical_line: true,
                     comma: false,
                     equals: false,
@@ -601,11 +577,11 @@ pub(crate) struct GoFunctionDecl {
 }
 
 pub(crate) fn parse_function(cursor: &mut TokenCursor<'_>) -> Option<GoFunctionDecl> {
-    let receiver = if cursor.consume_if(go::PUNCT_28).is_some() {
+    let receiver = if cursor.consume_if(go::LPAREN).is_some() {
         if cursor.peek(0).map(|token| token.kind) == Some(go::IDENTIFIER)
             && matches!(
                 cursor.peek(1).map(|token| token.kind),
-                Some(go::IDENTIFIER) | Some(go::PUNCT_2A)
+                Some(go::IDENTIFIER) | Some(go::STAR)
             )
         {
             cursor.next();
@@ -614,14 +590,14 @@ pub(crate) fn parse_function(cursor: &mut TokenCursor<'_>) -> Option<GoFunctionD
             cursor,
             GoTypeUntil {
                 context: GoTypeContext::Type,
-                owner_close: Some(go::PUNCT_29),
+                owner_close: Some(go::RPAREN),
                 logical_line: false,
                 comma: false,
                 equals: false,
                 struct_tag: false,
             },
         );
-        cursor.consume_if(go::PUNCT_29);
+        cursor.consume_if(go::RPAREN);
         span
     } else {
         None
@@ -632,19 +608,19 @@ pub(crate) fn parse_function(cursor: &mut TokenCursor<'_>) -> Option<GoFunctionD
     }
     if cursor
         .peek(0)
-        .is_some_and(|token| token.kind == go::PUNCT_5B)
+        .is_some_and(|token| token.kind == go::LBRACKET)
     {
-        cursor.consume_balanced_pair(go::PUNCT_5B, go::PUNCT_5D)?;
+        cursor.consume_balanced_pair(go::LBRACKET, go::RBRACKET)?;
     }
-    let params = cursor.consume_balanced_pair(go::PUNCT_28, go::PUNCT_29)?;
+    let params = cursor.consume_balanced_pair(go::LPAREN, go::RPAREN)?;
     let params_open = params.open;
     let params_close = params.close;
     let mut result = None;
     let mut body_open = None;
     let next = cursor.peek(0);
-    if next.is_some_and(|token| token.kind == go::PUNCT_7B) {
+    if next.is_some_and(|token| token.kind == go::LBRACE) {
         body_open = cursor.next();
-    } else if next.is_some_and(|token| token.kind == go::PUNCT_3B) {
+    } else if next.is_some_and(|token| token.kind == go::SEMI) {
         cursor.next();
     } else if next.is_some_and(|token| {
         token.row == params_close.row || !can_terminate_line(params_close.kind)
@@ -653,20 +629,17 @@ pub(crate) fn parse_function(cursor: &mut TokenCursor<'_>) -> Option<GoFunctionD
             cursor,
             GoTypeUntil {
                 context: GoTypeContext::FunctionResult,
-                owner_close: Some(go::PUNCT_7B),
+                owner_close: Some(go::LBRACE),
                 logical_line: true,
                 comma: false,
                 equals: false,
                 struct_tag: false,
             },
         );
-        if cursor
-            .peek(0)
-            .is_some_and(|token| token.kind == go::PUNCT_7B)
-        {
+        if cursor.peek(0).is_some_and(|token| token.kind == go::LBRACE) {
             body_open = cursor.next();
         } else {
-            cursor.consume_if(go::PUNCT_3B);
+            cursor.consume_if(go::SEMI);
         }
     }
     Some(GoFunctionDecl {
@@ -680,7 +653,7 @@ pub(crate) fn parse_function(cursor: &mut TokenCursor<'_>) -> Option<GoFunctionD
 }
 
 fn looks_like_type_params(cursor: &TokenCursor<'_>) -> bool {
-    debug_assert_eq!(cursor.peek(0).map(|token| token.kind), Some(go::PUNCT_5B));
+    debug_assert_eq!(cursor.peek(0).map(|token| token.kind), Some(go::LBRACKET));
     let mut depth = 0u32;
     let mut index = 0;
     loop {
@@ -688,14 +661,14 @@ fn looks_like_type_params(cursor: &TokenCursor<'_>) -> bool {
             return false;
         };
         match token.kind {
-            go::PUNCT_5B => depth += 1,
-            go::PUNCT_5D => {
+            go::LBRACKET => depth += 1,
+            go::RBRACKET => {
                 depth -= 1;
                 if depth == 0 {
                     break;
                 }
             }
-            go::PUNCT_2C if depth == 1 => return true,
+            go::COMMA if depth == 1 => return true,
             _ => {}
         }
         index += 1;
@@ -705,15 +678,15 @@ fn looks_like_type_params(cursor: &TokenCursor<'_>) -> bool {
             cursor.peek(2).map(|token| token.kind),
             Some(
                 go::IDENTIFIER
-                    | go::PUNCT_7E
+                    | go::TILDE
                     | go::KW_INTERFACE
-                    | go::PUNCT_2A
-                    | go::PUNCT_5B
+                    | go::STAR
+                    | go::LBRACKET
                     | go::KW_CHAN
                     | go::KW_FUNC
                     | go::KW_MAP
-                    | go::PUNCT_3C_2D
-                    | go::PUNCT_28
+                    | go::LT_MINUS
+                    | go::LPAREN
             )
         )
 }
@@ -727,7 +700,7 @@ enum FieldShape {
 fn field_until() -> GoTypeUntil {
     GoTypeUntil {
         context: GoTypeContext::Type,
-        owner_close: Some(go::PUNCT_7D),
+        owner_close: Some(go::RBRACE),
         logical_line: true,
         comma: false,
         equals: false,
@@ -749,9 +722,9 @@ fn field_shape(cursor: &TokenCursor<'_>) -> FieldShape {
         return FieldShape::Embedded;
     }
     match second.kind {
-        go::PUNCT_2C => FieldShape::Named,
-        go::PUNCT_2E => FieldShape::Embedded,
-        go::PUNCT_5B => {
+        go::COMMA => FieldShape::Named,
+        go::DOT => FieldShape::Embedded,
+        go::LBRACKET => {
             if array_after_bracket(cursor) {
                 FieldShape::Named
             } else {
@@ -773,17 +746,17 @@ fn consume_field_tag(cursor: &mut TokenCursor<'_>) {
 }
 
 fn skip_semicolons(cursor: &mut TokenCursor<'_>) {
-    while cursor.consume_if(go::PUNCT_3B).is_some() {}
+    while cursor.consume_if(go::SEMI).is_some() {}
 }
 
 fn starts_type(kind: super::linear::TokenKind) -> bool {
     matches!(
         kind,
         go::IDENTIFIER
-            | go::PUNCT_2A
-            | go::PUNCT_5B
-            | go::PUNCT_28
-            | go::PUNCT_3C_2D
+            | go::STAR
+            | go::LBRACKET
+            | go::LPAREN
+            | go::LT_MINUS
             | go::KW_MAP
             | go::KW_CHAN
             | go::KW_FUNC
@@ -793,7 +766,7 @@ fn starts_type(kind: super::linear::TokenKind) -> bool {
 }
 
 fn array_after_bracket(cursor: &TokenCursor<'_>) -> bool {
-    debug_assert_eq!(cursor.peek(1).map(|token| token.kind), Some(go::PUNCT_5B));
+    debug_assert_eq!(cursor.peek(1).map(|token| token.kind), Some(go::LBRACKET));
     let mut depth = 0u32;
     let mut index = 1;
     let close = loop {
@@ -801,8 +774,8 @@ fn array_after_bracket(cursor: &TokenCursor<'_>) -> bool {
             return false;
         };
         match token.kind {
-            go::PUNCT_5B => depth += 1,
-            go::PUNCT_5D => {
+            go::LBRACKET => depth += 1,
+            go::RBRACKET => {
                 depth -= 1;
                 if depth == 0 {
                     break token;
@@ -898,7 +871,7 @@ mod tests {
             "First = map[string]int{\"x\": fn(1)}\n)",
             "First = []int{call(1, 2)}\n)",
         ] {
-            let (text, rest) = declaration(source, Some(go::PUNCT_29));
+            let (text, rest) = declaration(source, Some(go::RPAREN));
             assert_eq!(text, source.lines().next().unwrap());
             assert_eq!(rest, ")");
         }
@@ -934,7 +907,7 @@ mod tests {
 
     #[test]
     fn declaration_boundaries_leave_owner_and_next_line_unconsumed() {
-        let (text, rest) = declaration("A = f(1); B", Some(go::PUNCT_29));
+        let (text, rest) = declaration("A = f(1); B", Some(go::RPAREN));
         assert_eq!(text, "A = f(1)");
         assert_eq!(rest, "B");
 
@@ -1026,12 +999,12 @@ mod tests {
 
     #[test]
     fn type_stops_before_field_tag_and_compact_owner_close() {
-        let (span, text, rest) = ty("[]string `json:\",omitempty\"` }", Some(go::PUNCT_7D), true);
+        let (span, text, rest) = ty("[]string `json:\",omitempty\"` }", Some(go::RBRACE), true);
         assert_eq!(span.category, GoTypeCategory::Slice);
         assert_eq!(text, "[]string");
         assert_eq!(rest, "`json:\",omitempty\"`");
 
-        let (_, text, rest) = ty("map[string]struct{ X int }}", Some(go::PUNCT_7D), true);
+        let (_, text, rest) = ty("map[string]struct{ X int }}", Some(go::RBRACE), true);
         assert_eq!(text, "map[string]struct{ X int }");
         assert_eq!(rest, "}");
     }
@@ -1039,7 +1012,7 @@ mod tests {
     #[test]
     fn compact_struct_type_leaves_owner_close_for_member_parser() {
         let source = "map[string]struct{ X []int }} type Carry uint";
-        let (span, text, rest) = ty(source, Some(go::PUNCT_7D), true);
+        let (span, text, rest) = ty(source, Some(go::RBRACE), true);
         assert_eq!(span.category, GoTypeCategory::Map);
         assert_eq!(text, "map[string]struct{ X []int }");
         assert_eq!(rest, "}");

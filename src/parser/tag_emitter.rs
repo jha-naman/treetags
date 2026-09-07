@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use super::linear::{HookInput, Tok};
+use super::linear::{BlockMap, HookInput, Tok};
 use crate::tag::{ExtensionFields, Tag};
 use std::{borrow::Cow, sync::Arc};
 
@@ -36,10 +36,28 @@ impl From<Tok> for TextValue<'_> {
 pub(crate) struct TagEmitter<'a> {
     input: HookInput<'a>,
     tags: &'a mut Vec<Tag>,
+    blocks: BlockMap,
+    /// Innermost-last stack of enclosing scope frames. A tag with no explicit
+    /// `.scope(...)` inherits the top frame, so hooks push a frame once instead
+    /// of re-attaching the same scope to every declaration inside it.
+    scopes: Vec<(&'static str, String)>,
 }
 impl<'a> TagEmitter<'a> {
-    pub fn new(input: HookInput<'a>, tags: &'a mut Vec<Tag>) -> Self {
-        Self { input, tags }
+    pub fn new(input: HookInput<'a>, tags: &'a mut Vec<Tag>, blocks: BlockMap) -> Self {
+        Self {
+            input,
+            tags,
+            blocks,
+            scopes: Vec::new(),
+        }
+    }
+    /// Pushes an enclosing scope that later `.tag(...)` calls inherit until the
+    /// matching [`leave_scope`](Self::leave_scope).
+    pub fn enter_scope(&mut self, kind: &'static str, name: String) {
+        self.scopes.push((kind, name));
+    }
+    pub fn leave_scope(&mut self) {
+        self.scopes.pop();
     }
     pub fn tag<'e>(
         &'e mut self,
@@ -93,6 +111,12 @@ impl<'e, 'a> TagBuilder<'e, 'a> {
         self.end_row = Some(row);
         self
     }
+    /// Sets `end:` to the line that closes `open`'s balanced delimiter, using
+    /// the emitter's precomputed [`BlockMap`]. A no-op if `open` is unmatched.
+    pub fn body(mut self, open: Tok) -> Self {
+        self.end_row = self.emitter.blocks.close_row(open);
+        self
+    }
     pub fn emit(self) -> Option<usize> {
         let options = self.emitter.input.options;
         if !options.tag_config.is_kind_enabled(self.kind) {
@@ -125,9 +149,17 @@ impl<'e, 'a> TagBuilder<'e, 'a> {
         if options.file {
             fields.insert("file", self.emitter.input.path.to_string())
         }
-        if let Some((kind, value)) = self.scope {
+        let scope = match &self.scope {
+            Some((kind, value)) => Some((*kind, value.get(source).into_owned())),
+            None => self
+                .emitter
+                .scopes
+                .last()
+                .map(|(kind, value)| (*kind, value.clone())),
+        };
+        if let Some((kind, value)) = scope {
             if options.scope || options.qualified {
-                fields.insert(kind, value.get(source).into_owned())
+                fields.insert(kind, value)
             }
         }
         if let Some(v) = self.typeref {
@@ -159,19 +191,5 @@ impl<'e, 'a> TagBuilder<'e, 'a> {
             extension_fields: (!fields.is_empty()).then_some(fields),
         });
         Some(handle)
-    }
-}
-
-impl TagEmitter<'_> {
-    pub fn set_end(&mut self, handle: usize, start_row: u32, end_row: u32) {
-        if !self.input.options.end || end_row <= start_row {
-            return;
-        }
-        if let Some(tag) = self.tags.get_mut(handle) {
-            let fields = tag
-                .extension_fields
-                .get_or_insert_with(ExtensionFields::new);
-            fields.insert("end", (end_row + 1).to_string());
-        }
     }
 }

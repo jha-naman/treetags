@@ -4,9 +4,9 @@ use super::{
     go_syntax::{
         member_until, next_import_spec, next_interface_member, next_struct_field, next_type_spec,
         next_value_spec, parse_function, GoDeclGroup, GoInterfaceMember, GoStructField,
-        GoTypeSpecRhs,
+        GoTypeSpecRhs, DELIMITERS,
     },
-    linear::{HookInput, TagHooks, Tok, TokenCursor},
+    linear::{BlockMap, HookInput, TagHooks, Tok, TokenCursor},
     tag_emitter::{TagEmitter, TextValue},
 };
 
@@ -22,50 +22,20 @@ impl TagHooks for GoHooks {
         mut cursor: TokenCursor<'_>,
         output: &mut TagEmitter<'_>,
     ) {
-        let mut braces = 0u32;
-        let mut functions: Vec<(u32, usize, u32)> = Vec::new();
         while let Some(token) = cursor.next() {
             match token.kind {
                 go::KW_PACKAGE => {
                     if let Some(name) = cursor.next() {
                         self.package = cursor.text(name).to_string();
                         output.tag("p", name, (token, name)).emit();
+                        output.enter_scope("package", self.package.clone());
                     }
                 }
-                go::KW_FUNC => {
-                    if let Some(function) = self.function(&mut cursor, output, token) {
-                        let Some(body_open) = function.body_open else {
-                            continue;
-                        };
-                        braces += 1;
-                        if let Some(handle) = function.handle {
-                            functions.push((braces, handle, token.row))
-                        }
-                        let _ = body_open;
-                    }
-                }
-                go::KW_IMPORT => {
-                    self.import(&mut cursor, output, token);
-                }
-                go::KW_VAR => {
-                    self.values(&mut cursor, output, token, "v");
-                }
-                go::KW_CONST => {
-                    self.values(&mut cursor, output, token, "c");
-                }
-                go::KW_TYPE => {
-                    self.types(&mut cursor, output, token);
-                }
-                go::PUNCT_7B => braces += 1,
-                go::PUNCT_7D => {
-                    if let Some((depth, handle, start)) = functions.last().copied() {
-                        if depth == braces {
-                            output.set_end(handle, start, token.row);
-                            functions.pop();
-                        }
-                    }
-                    braces = braces.saturating_sub(1)
-                }
+                go::KW_FUNC => self.function(&mut cursor, output, token),
+                go::KW_IMPORT => self.import(&mut cursor, output, token),
+                go::KW_VAR => self.values(&mut cursor, output, token, "v"),
+                go::KW_CONST => self.values(&mut cursor, output, token, "c"),
+                go::KW_TYPE => self.types(&mut cursor, output, token),
                 _ => {}
             }
         }
@@ -99,9 +69,6 @@ impl GoHooks {
             };
             for name in names {
                 let mut b = out.tag(kind, name, (name, spec.ty.map_or(name, |span| span.last)));
-                if !self.package.is_empty() {
-                    b = b.scope("package", self.package.clone())
-                }
                 if kind == "v" {
                     if let Some(span) = spec.ty {
                         b = b.typeref(TextValue::Span(span.first.start, span.last.end))
@@ -117,11 +84,7 @@ impl GoHooks {
         while let Some(spec) = next_type_spec(&mut group, cursor) {
             let name = spec.name;
             if let Some(type_params) = spec.type_params {
-                let mut generic = out.tag("t", name, (name, type_params.close));
-                if !self.package.is_empty() {
-                    generic = generic.scope("package", self.package.clone())
-                }
-                generic
+                out.tag("t", name, (name, type_params.close))
                     .typeref(TextValue::Span(
                         type_params.open.start,
                         type_params.close.end,
@@ -135,22 +98,19 @@ impl GoHooks {
                     open,
                     is_struct,
                 } => {
-                    let mut b = out.tag(if is_struct { "s" } else { "i" }, name, (name, open));
-                    if !self.package.is_empty() {
-                        b = b.scope("package", self.package.clone())
-                    }
-                    let handle = b.emit();
-                    let close = self.members(cursor, out, name, is_struct, open);
-                    if let Some(handle) = handle {
-                        out.set_end(handle, name.row, close.row);
-                    }
+                    out.tag(if is_struct { "s" } else { "i" }, name, (name, open))
+                        .body(open)
+                        .emit();
+                    out.enter_scope(
+                        if is_struct { "struct" } else { "interface" },
+                        format!("{}.{}", self.package, cursor.text(name)),
+                    );
+                    self.members(cursor, out, is_struct);
+                    out.leave_scope();
                 }
                 GoTypeSpecRhs::Type(span) => {
                     if spec.type_params.is_none() {
                         let mut b = out.tag("t", name, (name, span.map_or(name, |s| s.last)));
-                        if !self.package.is_empty() {
-                            b = b.scope("package", self.package.clone())
-                        }
                         if let Some(s) = span {
                             let (a, z) = s.byte_range();
                             b = b.typeref(TextValue::Span(a, z));
@@ -162,21 +122,11 @@ impl GoHooks {
         }
     }
 
-    fn members(
-        &self,
-        cursor: &mut TokenCursor<'_>,
-        out: &mut TagEmitter<'_>,
-        owner: Tok,
-        is_struct: bool,
-        open: Tok,
-    ) -> Tok {
+    fn members(&self, cursor: &mut TokenCursor<'_>, out: &mut TagEmitter<'_>, is_struct: bool) {
         loop {
-            while cursor.consume_if(go::PUNCT_3B).is_some() {}
-            if let Some(close) = cursor.consume_if(go::PUNCT_7D) {
-                return close;
-            }
-            if cursor.peek(0).is_none() {
-                return open;
+            while cursor.consume_if(go::SEMI).is_some() {}
+            if cursor.consume_if(go::RBRACE).is_some() || cursor.peek(0).is_none() {
+                return;
             }
 
             let range = cursor.consume_balanced_until(member_until());
@@ -190,9 +140,7 @@ impl GoHooks {
                         continue;
                     };
                     for name in names {
-                        let mut b = out
-                            .tag("m", name, (name, ty.map_or(name, |s| s.last)))
-                            .scope("struct", format!("{}.{}", self.package, cursor.text(owner)));
+                        let mut b = out.tag("m", name, (name, ty.map_or(name, |s| s.last)));
                         if let Some(s) = ty {
                             if s.is_direct_named_family() {
                                 let (a, z) = s.byte_range();
@@ -205,19 +153,13 @@ impl GoHooks {
             } else {
                 let mut member_cursor = cursor.view(range).expect("syntax-produced range");
                 if let Some(member) = next_interface_member(&mut member_cursor) {
-                    self.emit_interface_member(cursor, out, owner, member);
+                    self.emit_interface_member(out, member);
                 }
             }
         }
     }
 
-    fn emit_interface_member(
-        &self,
-        cursor: &TokenCursor<'_>,
-        out: &mut TagEmitter<'_>,
-        owner: Tok,
-        member: GoInterfaceMember,
-    ) {
+    fn emit_interface_member(&self, out: &mut TagEmitter<'_>, member: GoInterfaceMember) {
         let GoInterfaceMember::Method {
             name,
             params_open: _,
@@ -227,12 +169,7 @@ impl GoHooks {
         else {
             return;
         };
-        let mut b = out
-            .tag("n", name, (name, result.map_or(params_close, |s| s.last)))
-            .scope(
-                "interface",
-                format!("{}.{}", self.package, cursor.text(owner)),
-            );
+        let mut b = out.tag("n", name, (name, result.map_or(params_close, |s| s.last)));
         if let Some(s) = result {
             let (a, z) = s.byte_range();
             b = b.typeref(TextValue::Span(a, z));
@@ -240,13 +177,10 @@ impl GoHooks {
         b.emit();
     }
 
-    fn function(
-        &self,
-        cursor: &mut TokenCursor<'_>,
-        out: &mut TagEmitter<'_>,
-        start: Tok,
-    ) -> Option<FunctionOutcome> {
-        let function = parse_function(cursor)?;
+    fn function(&self, cursor: &mut TokenCursor<'_>, out: &mut TagEmitter<'_>, start: Tok) {
+        let Some(function) = parse_function(cursor) else {
+            return;
+        };
         let receiver_scope = function.receiver.map(|span| {
             cursor
                 .span_text(span.first, span.last)
@@ -260,8 +194,6 @@ impl GoHooks {
         let mut builder = out.tag("f", function.name, (start, declaration_end));
         if let Some(receiver_scope) = receiver_scope {
             builder = builder.scope("struct", format!("{}.{}", self.package, receiver_scope))
-        } else if !self.package.is_empty() {
-            builder = builder.scope("package", self.package.clone())
         }
         builder = builder.signature(TextValue::Span(
             function.params_open.start,
@@ -270,16 +202,11 @@ impl GoHooks {
         if let Some(result) = function.result {
             builder = builder.typeref(TextValue::Span(result.first.start, result.last.end))
         }
-        Some(FunctionOutcome {
-            body_open: function.body_open,
-            handle: builder.emit(),
-        })
+        if let Some(body_open) = function.body_open {
+            builder = builder.body(body_open)
+        }
+        builder.emit();
     }
-}
-
-struct FunctionOutcome {
-    body_open: Option<Tok>,
-    handle: Option<usize>,
 }
 
 pub(crate) fn generate(
@@ -298,8 +225,9 @@ pub(crate) fn generate(
         options,
         line_starts: &stream.line_starts,
     };
+    let blocks = BlockMap::new(&stream.tokens, DELIMITERS);
     let mut tags = Vec::new();
-    let mut emitter = TagEmitter::new(input, &mut tags);
+    let mut emitter = TagEmitter::new(input, &mut tags, blocks);
     GoHooks::default().generate(
         input,
         TokenCursor::new(source, &stream.tokens),

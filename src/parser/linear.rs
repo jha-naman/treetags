@@ -211,6 +211,58 @@ impl DelimiterDepth {
     }
 }
 
+/// Precomputed matching-delimiter map for a whole token stream. For every open
+/// paren/bracket/brace it records the row of the matching close, so a hook can
+/// set a tag's `end:` line from the token that opens a body without tracking
+/// nesting depth itself. Built once, O(n), and total on malformed input:
+/// unmatched or mismatched delimiters simply have no recorded close.
+pub(crate) struct BlockMap {
+    /// Keyed by the open token's byte start (unique per token) → close row.
+    close_rows: std::collections::HashMap<u32, u32>,
+}
+
+impl BlockMap {
+    pub fn new(tokens: &[Tok], d: DelimiterKinds) -> Self {
+        let family = |kind: TokenKind| -> Option<(u8, bool)> {
+            if kind == d.paren_open {
+                Some((0, true))
+            } else if kind == d.paren_close {
+                Some((0, false))
+            } else if kind == d.bracket_open {
+                Some((1, true))
+            } else if kind == d.bracket_close {
+                Some((1, false))
+            } else if kind == d.brace_open {
+                Some((2, true))
+            } else if kind == d.brace_close {
+                Some((2, false))
+            } else {
+                None
+            }
+        };
+        let mut close_rows = std::collections::HashMap::new();
+        let mut stack: Vec<(u32, u8)> = Vec::new();
+        for token in tokens {
+            match family(token.kind) {
+                Some((f, true)) => stack.push((token.start, f)),
+                Some((f, false)) => {
+                    if stack.last().is_some_and(|&(_, open)| open == f) {
+                        let (open_start, _) = stack.pop().expect("checked non-empty");
+                        close_rows.insert(open_start, token.row);
+                    }
+                }
+                None => {}
+            }
+        }
+        Self { close_rows }
+    }
+
+    /// The row of the delimiter that closes `open`, if it is matched.
+    pub fn close_row(&self, open: Tok) -> Option<u32> {
+        self.close_rows.get(&open.start).copied()
+    }
+}
+
 impl<'a> TokenCursor<'a> {
     pub fn new(source: &'a str, tokens: &'a [Tok]) -> Self {
         Self {
@@ -459,6 +511,45 @@ mod tests {
         assert_eq!(pair.open, tokens[0]);
         assert_eq!(pair.close, tokens[5]);
         assert_eq!(cursor.next(), Some(tokens[6]));
+    }
+
+    const TEST_DELIMS: DelimiterKinds = DelimiterKinds {
+        paren_open: TokenKind(10),
+        paren_close: TokenKind(11),
+        bracket_open: TokenKind(12),
+        bracket_close: TokenKind(13),
+        brace_open: TokenKind(14),
+        brace_close: TokenKind(15),
+        semicolon: TokenKind(16),
+    };
+
+    #[test]
+    fn block_map_records_matching_close_rows_and_ignores_unmatched() {
+        // rows:  { ( ) }  [   (nested + one dangling open bracket)
+        let tokens = [
+            tok_kind(TokenKind(14), 0, 0), // {  -> matched at row 3
+            tok_kind(TokenKind(10), 1, 1), // (  -> matched at row 2
+            tok_kind(TokenKind(11), 2, 2), // )
+            tok_kind(TokenKind(15), 3, 3), // }
+            tok_kind(TokenKind(12), 4, 4), // [  -> never closed
+        ];
+        let map = BlockMap::new(&tokens, TEST_DELIMS);
+        assert_eq!(map.close_row(tokens[0]), Some(3));
+        assert_eq!(map.close_row(tokens[1]), Some(2));
+        assert_eq!(map.close_row(tokens[4]), None);
+    }
+
+    #[test]
+    fn block_map_leaves_family_mismatched_delimiters_unmatched() {
+        // `{ ( }` — the `}` does not match the innermost `(`, so nothing closes.
+        let tokens = [
+            tok_kind(TokenKind(14), 0, 0), // {
+            tok_kind(TokenKind(10), 1, 1), // (
+            tok_kind(TokenKind(15), 2, 2), // }
+        ];
+        let map = BlockMap::new(&tokens, TEST_DELIMS);
+        assert_eq!(map.close_row(tokens[0]), None);
+        assert_eq!(map.close_row(tokens[1]), None);
     }
 
     fn tok(offset: u32, row: u32) -> Tok {
