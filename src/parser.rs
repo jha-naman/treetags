@@ -22,6 +22,7 @@ use std::sync::Arc;
 use tree_sitter::Parser as TSParser;
 use tree_sitter_tags::{TagsConfiguration, TagsContext};
 
+pub(crate) mod c_sharp;
 pub(crate) mod common;
 pub(crate) mod cpp;
 pub(crate) mod go;

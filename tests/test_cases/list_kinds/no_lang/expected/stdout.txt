@@ -15,6 +15,20 @@ c
     z  parameter [off]
     L  label [off]
     D  macroparam [off]
+c#
+    E  event
+    c  class
+    d  macro
+    e  enumerator
+    f  field
+    g  enum
+    i  interface
+    m  method
+    n  namespace
+    p  property
+    s  struct
+    t  typedef
+    l  local [off]
 c++
     d  macro
     e  enumerator
