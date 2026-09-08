@@ -268,6 +268,16 @@ impl CHooks {
             let Some(first) = cursor.next() else {
                 return;
             };
+            if first.kind == c::LITERAL {
+                // A preprocessor directive inside the body (e.g. `#define FLAG 1`)
+                // is a macro/header, not a member. Route it through the directive
+                // handler so it emits `d`/`h` (inheriting the aggregate scope) and
+                // consumes its whole logical line — a `#define` has no terminating
+                // `;`, so falling through would swallow the following member.
+                let source = cursor.source();
+                self.directive(source, cursor, out, first);
+                continue;
+            }
             if matches!(first.kind, c::KW_STRUCT | c::KW_UNION) {
                 self.struct_typed_member(cursor, out, first);
                 continue;
@@ -1034,6 +1044,41 @@ mod tests {
 
     fn assert_matches_oracle(source: &str) {
         assert_eq!(sorted(actual(source)), sorted(oracle(source)));
+    }
+
+    #[test]
+    fn define_inside_struct_body_matches_oracle() {
+        // A `#define` inside an aggregate body is a macro scoped to the struct,
+        // not a member, and (having no `;`) must not swallow the member after it.
+        assert_matches_oracle(
+            "struct Config {\n\
+             \tint width;\n\
+             #define CONFIG_FLAG_A (1 << 0)\n\
+             \tint height;\n\
+             };\n",
+        );
+    }
+
+    #[test]
+    fn include_inside_struct_body_is_kept() {
+        // The oracle omits an `#include` inside an aggregate body; native keeps it
+        // (a legitimate header tag), still consuming the whole line so the member
+        // that follows is not swallowed.
+        let tags = actual(
+            "struct Config {\n\
+             \tint width;\n\
+             #include <bits.h>\n\
+             \tint height;\n\
+             };\n",
+        );
+        let kind_of = |name: &str| {
+            tags.iter()
+                .find(|t| t.name == name)
+                .and_then(|t| t.kind.as_deref())
+        };
+        assert_eq!(kind_of("bits.h"), Some("h"));
+        assert_eq!(kind_of("width"), Some("m"));
+        assert_eq!(kind_of("height"), Some("m"));
     }
 
     #[test]

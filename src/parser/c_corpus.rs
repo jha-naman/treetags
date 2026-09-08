@@ -206,6 +206,122 @@ fn c_corpus_one() {
     }
 }
 
+/// Temporary triage pass: classifies each divergence by whether it is a
+/// kind-mismatch (same name+address, different kind), a field-diff (same
+/// name+kind+address, different extension fields), or a pure oracle-only /
+/// native-only tag. Prints the biggest buckets so we can pick the next fix.
+#[test]
+#[ignore = "triage helper; run explicitly with --ignored"]
+fn c_corpus_analyze() {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/root".into());
+    let root = PathBuf::from(
+        std::env::var("TT_CORPUS_ROOT").unwrap_or_else(|_| format!("{home}/play/linux")),
+    );
+    let limit: usize = std::env::var("TT_CORPUS_LIMIT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(3000);
+    let files = collect_files(&root, &[], limit);
+
+    // bucket label -> (count, up to 4 examples, distinct files)
+    type Bucket = (usize, Vec<String>, std::collections::BTreeSet<String>);
+    let mut buckets: BTreeMap<String, Bucket> = BTreeMap::new();
+    let mut bump = |label: String, example: String, file: &str| {
+        let e = buckets.entry(label).or_default();
+        e.0 += 1;
+        if e.1.len() < 4 {
+            e.1.push(example);
+        }
+        e.2.insert(file.to_string());
+    };
+
+    for path in &files {
+        let rel = path
+            .strip_prefix(&root)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .to_string();
+        let bytes = match std::fs::read(path) {
+            Ok(b) => b,
+            Err(_) => continue,
+        };
+        let Ok(source) = std::str::from_utf8(&bytes) else {
+            continue;
+        };
+        let res = catch_unwind(AssertUnwindSafe(|| {
+            (oracle(&bytes, &rel), native(source, &rel))
+        }));
+        let Ok((want, got)) = res else { continue };
+        if want == got {
+            continue;
+        }
+
+        // Key by (name, address). Value: list of (kind, full-fields-repr).
+        type Val = Vec<(Option<String>, String)>;
+        let mut want_map: BTreeMap<(String, String), Val> = BTreeMap::new();
+        let mut got_map: BTreeMap<(String, String), Val> = BTreeMap::new();
+        let fields = |t: &Tag| format!("{:?}", t.extension_fields);
+        for t in &want {
+            want_map
+                .entry((t.name.clone(), t.address.clone()))
+                .or_default()
+                .push((t.kind.as_ref().map(|k| k.to_string()), fields(t)));
+        }
+        for t in &got {
+            got_map
+                .entry((t.name.clone(), t.address.clone()))
+                .or_default()
+                .push((t.kind.as_ref().map(|k| k.to_string()), fields(t)));
+        }
+
+        let all_keys: std::collections::BTreeSet<_> =
+            want_map.keys().chain(got_map.keys()).cloned().collect();
+        for key in all_keys {
+            let w = want_map.get(&key);
+            let g = got_map.get(&key);
+            match (w, g) {
+                (Some(w), Some(g)) if w == g => {}
+                (Some(w), Some(g)) => {
+                    let wk = w[0].0.as_deref().unwrap_or("?");
+                    let gk = g[0].0.as_deref().unwrap_or("?");
+                    let label = if wk != gk {
+                        format!("KIND-MISMATCH oracle={wk} native={gk}")
+                    } else {
+                        format!("FIELD-DIFF kind={wk}")
+                    };
+                    bump(
+                        label,
+                        format!("{rel}: {} | oracle={:?} native={:?}", key.0, w, g),
+                        &rel,
+                    );
+                }
+                (Some(w), None) => bump(
+                    format!("ORACLE-ONLY kind={}", w[0].0.as_deref().unwrap_or("?")),
+                    format!("{rel}: {} @ {}", key.0, key.1),
+                    &rel,
+                ),
+                (None, Some(g)) => bump(
+                    format!("NATIVE-ONLY kind={}", g[0].0.as_deref().unwrap_or("?")),
+                    format!("{rel}: {} @ {}", key.0, key.1),
+                    &rel,
+                ),
+                (None, None) => {}
+            }
+        }
+    }
+
+    let mut sorted: Vec<_> = buckets.into_iter().collect();
+    sorted.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
+    eprintln!("\n================ DIVERGENCE TRIAGE ================");
+    for (label, (count, examples, files)) in sorted.iter().take(25) {
+        eprintln!("\n[{count:>5}] {label}  ({} files)", files.len());
+        for ex in examples {
+            eprintln!("    {ex}");
+        }
+    }
+    eprintln!("==================================================\n");
+}
+
 #[test]
 #[ignore = "large external corpus diff; run explicitly with --ignored"]
 fn c_corpus_diff() {

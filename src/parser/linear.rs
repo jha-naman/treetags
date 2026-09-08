@@ -302,6 +302,9 @@ impl<'a> TokenCursor<'a> {
     pub fn mark(&self) -> usize {
         self.at
     }
+    pub fn source(&self) -> &'a str {
+        self.source
+    }
     pub fn text(&self, token: Tok) -> &'a str {
         &self.source[token.start as usize..token.end as usize]
     }
