@@ -161,3 +161,18 @@ void nested_callback(void (*callback)(struct Nested *, union NestedValue *));
 int with_types(struct Argument *arg, union Payload *p, enum Flag f) { return 0; }
 DECLARE(struct MacroArgument *, enum MacroEnum, union MacroUnion);
 #define TYPE_CAST(x) ((struct OpaqueMacroBody *)(x))
+
+// Semicolon-less macro calls must not consume the next file-scope item.
+DEFINE_FREE(cleanup_item, void *, release(_T))
+#define AFTER_FREE 1
+int after_free(void) { return AFTER_FREE; }
+EXPORT_SYMBOL(after_free)
+LIST_HEAD(pending_items)
+DEFINE_PER_CPU(int, item_count)
+int after_macro_calls(union Payload *p, enum Flag f) { return 0; }
+CUSTOM_CALL(outer(inner(1)),
+            second(2))
+void after_nested_call(struct Context *, union Value *, enum Mode);
+int variable_after_calls;
+EXPORT_SYMBOL(variable_after_calls);
+#define AFTER_EXPORT 2

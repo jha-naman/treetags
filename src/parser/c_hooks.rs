@@ -6,7 +6,7 @@
 
 use super::{
     generated::c,
-    linear::{BlockMap, HookInput, NoExternalLexer, TagHooks, Tok, TokenCursor},
+    linear::{BlockMap, HookInput, NoExternalLexer, TagHooks, Tok, TokenCursor, TokenRange},
     tag_emitter::{TagEmitter, TextValue},
 };
 
@@ -51,6 +51,18 @@ impl TagHooks for CHooks {
         // The walk always sits at file scope: function bodies are skipped whole,
         // and aggregate bodies are consumed by their handlers.
         while let Some(token) = cursor.peek(0) {
+            if let Some(range) = standalone_macro_call(&cursor) {
+                // A macro invocation need not end in `;`. Bound both reference
+                // scanning and consumption to the call so the next item cannot
+                // be mistaken for its return type, body, or declaration tail.
+                let call = cursor.view(range).expect("range from this cursor");
+                scan_type_references(&call, output, &mut self.references_end);
+                while cursor.mark() < range.end {
+                    cursor.next();
+                }
+                cursor.consume_if(c::SEMI);
+                continue;
+            }
             scan_type_references(&cursor, output, &mut self.references_end);
             cursor.next();
             match token.kind {
@@ -399,6 +411,50 @@ impl CHooks {
     }
 }
 
+/// Recognize a bare `NAME(...)` (optionally storage-qualified), without relying
+/// on macro names or line breaks. A body or declarator continuation belongs to
+/// the ordinary declaration handler; only standalone calls stop at `)`.
+fn standalone_macro_call(cursor: &TokenCursor<'_>) -> Option<TokenRange> {
+    let mut i = 0;
+    while cursor
+        .peek(i)
+        .is_some_and(|t| matches!(t.kind, c::KW_STATIC | c::KW_EXTERN))
+    {
+        i += 1;
+    }
+    if cursor.peek(i)?.kind != c::IDENTIFIER || cursor.peek(i + 1)?.kind != c::LPAREN {
+        return None;
+    }
+    i += 2;
+    let mut depth = 1u32;
+    while let Some(token) = cursor.peek(i) {
+        match token.kind {
+            c::LPAREN => depth += 1,
+            c::RPAREN => {
+                depth -= 1;
+                if depth == 0 {
+                    let end = i + 1;
+                    if cursor.peek(end).is_some_and(|t| {
+                        matches!(
+                            t.kind,
+                            c::LBRACE | c::EQ | c::COMMA | c::LPAREN | c::LBRACKET
+                        )
+                    }) {
+                        return None;
+                    }
+                    return Some(TokenRange {
+                        start: cursor.mark(),
+                        end: cursor.mark() + end,
+                    });
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
 /// Inspect a declaration before its handler consumes the signature. References
 /// keep the enclosing scope; named definitions are emitted by their handlers.
 /// Stop at a body or statement boundary so skipped function bodies stay skipped.
@@ -712,6 +768,49 @@ mod tests {
 
     fn assert_matches_oracle(source: &str) {
         assert_eq!(sorted(actual(source)), sorted(oracle(source)));
+    }
+
+    #[test]
+    fn standalone_macro_calls_do_not_swallow_following_items() {
+        for invocation in [
+            "DEFINE_FREE(cleanup, void *, release(_T))",
+            "EXPORT_SYMBOL(exported)",
+            "LIST_HEAD(entries)",
+            "DEFINE_PER_CPU(int, counter)",
+            "static DEFINE_PER_CPU(int, counter)",
+            "CUSTOM_CALL(outer(inner(1)),\n second(2))",
+        ] {
+            for suffix in ["", ";"] {
+                let following = "#define AFTER_CALL 1\n\
+                    int after_call(void) { return AFTER_CALL; }\n\
+                    int after_variable;\n";
+                let source = format!("{invocation}{suffix}\n{following}");
+                assert_matches_oracle(&source);
+                assert_eq!(sorted(actual(&source)), sorted(actual(following)));
+            }
+        }
+    }
+
+    #[test]
+    fn macro_boundary_preserves_following_signature_scope() {
+        assert_matches_oracle(
+            "LIST_HEAD(entries)\n\
+             int after_macro(union Payload *p, enum State s) { return 0; }\n\
+             EXPORT_SYMBOL(after_macro)\n\
+             void next_prototype(struct Context *, union Value *, enum Mode);\n",
+        );
+    }
+
+    #[test]
+    fn macro_call_boundary_keeps_declaration_continuations() {
+        assert_matches_oracle(
+            "DEFINE_PER_CPU(int, counter) = initial_value;\n\
+             int after_initializer;\n\
+             int multiline(\n int value\n)\n{ return value; }\n\
+             void prototype(\n struct Context *\n);\n\
+             int (*callback)(int);\n\
+             int after_callback;\n",
+        );
     }
 
     #[test]
