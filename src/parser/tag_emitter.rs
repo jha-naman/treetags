@@ -86,7 +86,7 @@ pub(crate) struct TagBuilder<'e, 'a> {
     declaration: (Tok, Tok),
     scope: Option<(&'static str, TextValue<'a>)>,
     signature: Option<TextValue<'a>>,
-    typeref: Option<TextValue<'a>>,
+    typeref: Option<(&'static str, TextValue<'a>)>,
     access: Option<TextValue<'a>>,
     end_row: Option<u32>,
 }
@@ -99,8 +99,13 @@ impl<'e, 'a> TagBuilder<'e, 'a> {
         self.signature = Some(value.into());
         self
     }
-    pub fn typeref(mut self, value: impl Into<TextValue<'a>>) -> Self {
-        self.typeref = Some(value.into());
+    /// `typeref:typename:<value>`.
+    pub fn typeref(self, value: impl Into<TextValue<'a>>) -> Self {
+        self.typeref_as("typename", value)
+    }
+    /// `typeref:<kind>:<value>` — e.g. `struct:` for a struct-typed reference.
+    pub fn typeref_as(mut self, kind: &'static str, value: impl Into<TextValue<'a>>) -> Self {
+        self.typeref = Some((kind, value.into()));
         self
     }
     pub fn access(mut self, value: impl Into<TextValue<'a>>) -> Self {
@@ -162,9 +167,9 @@ impl<'e, 'a> TagBuilder<'e, 'a> {
                 fields.insert(kind, value)
             }
         }
-        if let Some(v) = self.typeref {
+        if let Some((kind, v)) = self.typeref {
             if options.typeref {
-                fields.insert("typeref", format!("typename:{}", v.get(source)))
+                fields.insert("typeref", format!("{}:{}", kind, v.get(source)))
             }
         }
         if let Some(v) = self.signature {

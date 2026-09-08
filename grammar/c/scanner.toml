@@ -2,3 +2,6 @@
 name = "c"
 grammar = "grammar/c/grammar.js"
 output = "src/parser/generated/c.rs"
+# `preproc_arg` is a greedy rest-of-line token tree-sitter gates by parse state;
+# the linear scanner cannot gate it, so it would swallow whole lines.
+exclude = ["preproc_arg"]

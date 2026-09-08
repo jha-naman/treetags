@@ -21,6 +21,14 @@ struct Manifest {
     name: String,
     grammar: PathBuf,
     output: PathBuf,
+    /// Lexical rules to drop from the scanner. Tree-sitter gates context-only
+    /// tokens (e.g. C's `preproc_arg`, a greedy rest-of-line token) by parse
+    /// state; the state-unaware linear scanner cannot, so such a token would win
+    /// longest-match everywhere and swallow whole lines. Excluding it lets the
+    /// surrounding content lex normally — fine for tag generation, which only
+    /// needs declaration names, not macro bodies.
+    #[serde(default)]
+    exclude: Vec<String>,
 }
 
 fn read_manifest(root: &Path, lang: &str) -> Result<Manifest> {
@@ -85,7 +93,8 @@ fn generate_one(root: &Path, manifest: &Manifest, check: bool) -> Result<()> {
         bail!("tree-sitter could not evaluate grammar.js; set TREETAGS_NODE to an absolute pinned Node executable")
     }
     let json: Value = serde_json::from_slice(&fs::read(temp.join("src/grammar.json"))?)?;
-    let (machines, strings, patterns) = compile_lexical_machines(&json)?;
+    let exclude: BTreeSet<String> = manifest.exclude.iter().cloned().collect();
+    let (machines, strings, patterns) = compile_lexical_machines(&json, &exclude)?;
     validate_pattern_semantics(&node, &temp, &patterns)?;
     let keywords: BTreeSet<_> = strings
         .iter()
@@ -598,6 +607,7 @@ fn collect_terminals(
 }
 fn compile_lexical_machines(
     json: &Value,
+    exclude: &BTreeSet<String>,
 ) -> Result<(Vec<Machine>, BTreeSet<String>, BTreeSet<String>)> {
     let rules = json["rules"].as_object().context("grammar rules missing")?;
     let candidates = rules
@@ -616,6 +626,9 @@ fn compile_lexical_machines(
     }
     let word = json["word"].as_str().context("word token missing")?;
     selected.insert(word.into());
+    for name in exclude {
+        selected.remove(name);
+    }
     let mut skip_names = BTreeSet::<String>::new();
     for extra in json["extras"]
         .as_array()
