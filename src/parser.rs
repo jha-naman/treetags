@@ -22,9 +22,9 @@ use std::sync::Arc;
 use tree_sitter::Parser as TSParser;
 use tree_sitter_tags::{TagsConfiguration, TagsContext};
 
-pub(crate) mod c_hooks;
 #[cfg(test)]
 mod c_corpus;
+pub(crate) mod c_hooks;
 pub(crate) mod common;
 pub(crate) mod cpp;
 mod generated;
