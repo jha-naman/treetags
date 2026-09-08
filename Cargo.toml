@@ -70,6 +70,12 @@ treetags-test-plugin-builder = { path = "test-support/test-plugin-builder" }
 walkdir = "2"
 cc = "1"
 
+[features]
+# Use the native linear-scanner C hook instead of the tree-sitter C walker.
+# Byte-identical on the in-repo C fixtures; off by default pending broad-corpus
+# validation.
+native-c = []
+
 [[bin]]
 name = "treetags"
 path = "src/main.rs"

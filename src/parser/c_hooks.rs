@@ -512,6 +512,27 @@ fn filename_hash(path: &str) -> String {
     format!("{hash:08x}")
 }
 
+/// Adapter matching `BuiltinGenerateFn` so the C row can select this backend
+/// behind the `native-c` feature. Mirrors `go::generate`.
+pub(crate) fn generate_builtin(
+    _ts_parser: &mut tree_sitter::Parser,
+    code: &[u8],
+    path: &str,
+    kinds: &super::TagKindConfig,
+    config: &crate::config::Config,
+) -> Option<Vec<crate::tag::Tag>> {
+    let source = match std::str::from_utf8(code) {
+        Ok(source) => source,
+        Err(_) => {
+            eprintln!("Warning: Input for {path} is not valid UTF-8, skipping.");
+            return None;
+        }
+    };
+    generate(source, path, super::linear::HookOptions::from_config(kinds, config))
+        .map_err(|error| eprintln!("Warning: Failed to scan {path}: {error}"))
+        .ok()
+}
+
 pub(crate) fn generate(
     source: &str,
     path: &str,

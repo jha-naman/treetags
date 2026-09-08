@@ -10,6 +10,14 @@ pub(crate) type BuiltinGenerateFn = fn(
     &crate::config::Config,
 ) -> Option<Vec<Tag>>;
 
+/// C tag generator: the tree-sitter walker by default, or the native
+/// linear-scanner hook under `--features native-c` (byte-identical on the
+/// in-repo C fixtures; pending broad-corpus validation before it becomes default).
+#[cfg(feature = "native-c")]
+const C_GENERATE_FN: BuiltinGenerateFn = crate::parser::c_hooks::generate_builtin;
+#[cfg(not(feature = "native-c"))]
+const C_GENERATE_FN: BuiltinGenerateFn = cpp::generate;
+
 /// Full descriptor for a builtin language: name, extensions, kind mappings, generate fn.
 pub(crate) struct BuiltinLangDesc {
     pub lang: &'static str,
@@ -80,7 +88,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_defaults: cpp::C_KIND_DEFAULTS,
         kind_optionals: cpp::C_KIND_OPTIONALS,
         disambiguation: &[],
-        generate_fn: cpp::generate,
+        generate_fn: C_GENERATE_FN,
     },
     BuiltinLangDesc {
         lang: js::LANG_NAME,
