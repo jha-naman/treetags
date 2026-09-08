@@ -37,6 +37,8 @@ pub(crate) struct TagEmitter<'a> {
     input: HookInput<'a>,
     tags: &'a mut Vec<Tag>,
     blocks: BlockMap,
+    /// C retains the innermost enclosing scope of each kind.
+    inherit_all_scopes: bool,
     /// Innermost-last stack of enclosing scope frames. A tag with no explicit
     /// `.scope(...)` inherits the top frame, so hooks push a frame once instead
     /// of re-attaching the same scope to every declaration inside it.
@@ -49,8 +51,14 @@ impl<'a> TagEmitter<'a> {
             tags,
             blocks,
             scopes: Vec::new(),
+            inherit_all_scopes: false,
         }
     }
+    /// Retains the innermost scope of each kind, as required by the C oracle.
+    pub fn inherit_all_scopes(&mut self) {
+        self.inherit_all_scopes = true;
+    }
+
     /// Pushes an enclosing scope that later `.tag(...)` calls inherit until the
     /// matching [`leave_scope`](Self::leave_scope).
     pub fn enter_scope(&mut self, kind: &'static str, name: String) {
@@ -153,6 +161,11 @@ impl<'e, 'a> TagBuilder<'e, 'a> {
         }
         if options.file {
             fields.insert("file", self.emitter.input.path.to_string())
+        }
+        if self.emitter.inherit_all_scopes && (options.scope || options.qualified) {
+            for (kind, value) in &self.emitter.scopes {
+                fields.insert(*kind, value.clone());
+            }
         }
         let scope = match &self.scope {
             Some((kind, value)) => Some((*kind, value.get(source).into_owned())),

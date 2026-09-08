@@ -48,6 +48,7 @@ impl TagHooks for CHooks {
         mut cursor: TokenCursor<'_>,
         output: &mut TagEmitter<'_>,
     ) {
+        output.inherit_all_scopes();
         // The walk always sits at file scope: function bodies are skipped whole,
         // and aggregate bodies are consumed by their handlers.
         while let Some(token) = cursor.peek(0) {
@@ -268,41 +269,54 @@ impl CHooks {
         }
     }
 
-    /// `struct NAME *field;` inside an aggregate body: a `s` reference tag plus
-    /// the member `m` with a `struct:` typeref.
+    /// Aggregate-typed fields, recursively including named and anonymous bodies.
+    /// Trailing declarators belong to the enclosing scope, not the nested body.
     fn struct_typed_member(
         &mut self,
         cursor: &mut TokenCursor<'_>,
         out: &mut TagEmitter<'_>,
-        _akw: Tok,
+        akw: Tok,
     ) {
-        let Some(name) = cursor.consume_if(c::IDENTIFIER) else {
-            skip_to_semicolon(cursor);
-            return;
-        };
-        if cursor.peek(0).map(|t| t.kind) == Some(c::LBRACE) {
-            // A nested aggregate member definition; still to come.
-            cursor.next();
-            skip_block(cursor);
+        let name = cursor.consume_if(c::IDENTIFIER);
+        let nested = cursor.peek(0).map(|t| t.kind) == Some(c::LBRACE);
+        if nested {
+            let (kind, scope_key) = agg_kind(akw);
+            if let Some(name) = name {
+                self.struct_body(
+                    cursor,
+                    out,
+                    kind,
+                    scope_key,
+                    cursor.text(name).to_string(),
+                    akw,
+                );
+            } else if akw.kind == c::KW_STRUCT {
+                let anonymous = self.anon();
+                self.struct_body(cursor, out, kind, scope_key, anonymous, akw);
+            } else {
+                // The oracle gives anonymous unions neither a name nor a scope.
+                cursor.next();
+                self.members(cursor, out);
+            }
+        } else if name.is_none() {
             skip_to_semicolon(cursor);
             return;
         }
-        let struct_name = cursor.text(name).to_string();
-        let (field, star) = read_declarator(cursor);
+        let (field, star) = read_field_declarator(cursor);
         if let Some(field) = field {
-            let builder = out.tag("m", field, (name, field));
-            if star {
-                builder
-                    .typeref_as("struct", TextValue::Owned(format!("{struct_name} *")))
-                    .emit();
-            } else {
-                builder
-                    .typeref_as(
-                        "typename",
-                        TextValue::Owned(format!("struct:{struct_name}")),
-                    )
-                    .emit();
+            let mut builder = out.tag("m", field, (akw, field));
+            // Only struct specifiers contribute a field typeref in cpp.rs.
+            if akw.kind == c::KW_STRUCT {
+                if let Some(name) = name {
+                    let struct_name = cursor.text(name);
+                    builder = if star {
+                        builder.typeref_as("struct", TextValue::Owned(format!("{struct_name} *")))
+                    } else {
+                        builder.typeref(TextValue::Owned(format!("struct:{struct_name}")))
+                    };
+                }
             }
+            builder.emit();
         }
     }
 
@@ -638,6 +652,38 @@ fn read_declarator(cursor: &mut TokenCursor<'_>) -> (Option<Tok>, bool) {
     (name, star)
 }
 
+/// The oracle ignores array field declarators, including aggregate arrays.
+fn read_field_declarator(cursor: &mut TokenCursor<'_>) -> (Option<Tok>, bool) {
+    let (mut name, mut star) = (None, false);
+    while let Some(token) = cursor.peek(0) {
+        match token.kind {
+            c::SEMI | c::RBRACE => {
+                cursor.consume_if(c::SEMI);
+                break;
+            }
+            c::LBRACKET => {
+                name = None;
+                cursor.consume_balanced_pair(c::LBRACKET, c::RBRACKET);
+            }
+            c::LPAREN => {
+                cursor.consume_balanced_pair(c::LPAREN, c::RPAREN);
+            }
+            c::IDENTIFIER => {
+                name = Some(token);
+                cursor.next();
+            }
+            c::STAR => {
+                star = true;
+                cursor.next();
+            }
+            _ => {
+                cursor.next();
+            }
+        }
+    }
+    (name, star)
+}
+
 /// Consumes to the `}` matching an already-consumed `{`.
 fn skip_block(cursor: &mut TokenCursor<'_>) {
     let mut depth = 1u32;
@@ -942,6 +988,64 @@ mod tests {
              typedef struct {\n  int width;\n  int height;\n} rect;\n\
              typedef struct Node\n{\n    int val;\n    struct Node *next;\n} Node;\n",
         );
+    }
+
+    #[test]
+    fn nested_aggregates_match_oracle() {
+        assert_matches_oracle(
+            "struct Outer {\n\
+               int before;\n\
+               struct { int anonymous_field; struct { int deep; } inner; };\n\
+               union { int integer; struct { int promoted; }; } value;\n\
+               struct Named { int named_field; union Choice { int choice; } selected; } named;\n\
+               struct Named *pointer;\n\
+               union Choice *union_pointer;\n\
+               int after;\n\
+             };\n\
+             typedef struct { struct { int child; } nested; } Alias;\n\
+             int following(void) { return 0; }\n",
+        );
+    }
+
+    #[test]
+    fn nested_aggregate_declarators_match_oracle() {
+        assert_matches_oracle(
+            "struct Outer {\n\
+                struct\n Named { int member; } *pointer;\n\
+                struct { int anonymous; } *anonymous_pointer;\n\
+                union NamedUnion { int member; } *union_pointer;\n\
+                union { int member; } *anonymous_union_pointer;\n\
+                struct { int element; } array[4];\n\
+                union { int element; } union_array[4];\n\
+                int following;\n };\n",
+        );
+    }
+
+    #[test]
+    fn nested_aggregate_scope_options_match_oracle() {
+        let source = "struct Outer { union Inner { struct { int field; } child; } value; };";
+        let kinds = TagKindConfig::from_string("", C_KIND_DEFAULTS, C_KIND_OPTIONALS);
+        for args in [
+            vec!["treetags", "--fields=-s"],
+            vec!["treetags", "--fields=-s", "--extras=+q"],
+        ] {
+            let config = crate::config::Config::parse_from(args);
+            let expected = crate::parser::cpp::generate(
+                &mut tree_sitter::Parser::new(),
+                source.as_bytes(),
+                "source.c",
+                &kinds,
+                &config,
+            )
+            .unwrap();
+            let actual = generate(
+                source,
+                "source.c",
+                super::super::linear::HookOptions::from_config(&kinds, &config),
+            )
+            .unwrap();
+            assert_eq!(sorted(actual), sorted(expected));
+        }
     }
 
     #[test]

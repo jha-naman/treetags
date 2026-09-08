@@ -195,3 +195,27 @@ int after_continued_action(void) { return AFTER_CONTINUED_ACTION; }
     final_part
 void after_continued_empty(struct Context *, union Value *, enum Mode);
 int variable_after_continued;
+
+// Nested anonymous aggregates retain their fields and enclosing scopes.
+struct NestedContainer {
+    int before_nested;
+    struct {
+        int anonymous_member;
+        struct { int deep_member; } inner;
+    };
+    union {
+        int integer_value;
+        struct { int promoted_member; };
+    } payload;
+    struct NamedChild {
+        int named_member;
+        union NamedChoice { int choice_member; } selected;
+    } child;
+    struct NamedChild *child_pointer;
+    union NamedChoice *choice_pointer;
+    int after_nested;
+};
+typedef struct {
+    struct { int typedef_child; } nested;
+} NestedAlias;
+int after_nested_aggregates(void) { return 0; }
