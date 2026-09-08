@@ -83,8 +83,8 @@ name = "treetags-build-site"
 path = "src/bin/build_site.rs"
 
 [[bin]]
-name = "generate-go-scanner"
-path = "src/bin/generate_go_scanner.rs"
+name = "generate-scanner"
+path = "src/bin/generate_scanner.rs"
 
 [lib]
 name = "treetags"

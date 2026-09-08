@@ -1,0 +1,4 @@
+# Scanner-generation manifest consumed by `cargo run --bin generate-scanner`.
+name = "c"
+grammar = "grammar/c/grammar.js"
+output = "src/parser/generated/c.rs"

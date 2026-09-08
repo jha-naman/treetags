@@ -3,22 +3,73 @@ use regex_automata::{
     dfa::{dense, Automaton},
     Anchored, Input, MatchKind,
 };
+use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     env, fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command,
 };
-const OUTPUT: &str = "src/parser/generated/go.rs";
 const TREE_SITTER_VERSION: &str = "tree-sitter 0.25.10";
 const NODE_VERSION: &str = "v22.17.0";
+
+/// One language's scanner-generation inputs, read from `grammar/<lang>/scanner.toml`.
+#[derive(Deserialize)]
+struct Manifest {
+    name: String,
+    grammar: PathBuf,
+    output: PathBuf,
+}
+
+fn read_manifest(root: &Path, lang: &str) -> Result<Manifest> {
+    let path = root.join("grammar").join(lang).join("scanner.toml");
+    let text =
+        fs::read_to_string(&path).with_context(|| format!("read manifest {}", path.display()))?;
+    toml::from_str(&text).with_context(|| format!("parse manifest {}", path.display()))
+}
+
+/// Every language that ships a `grammar/<lang>/scanner.toml`, sorted for stable
+/// `--all` ordering.
+fn discover_langs(root: &Path) -> Result<Vec<String>> {
+    let mut langs = Vec::new();
+    for entry in fs::read_dir(root.join("grammar"))? {
+        let entry = entry?;
+        if entry.path().join("scanner.toml").is_file() {
+            langs.push(entry.file_name().to_string_lossy().into_owned());
+        }
+    }
+    langs.sort();
+    Ok(langs)
+}
+
 fn main() -> Result<()> {
-    let check = env::args().skip(1).any(|x| x == "--check");
+    let args: Vec<String> = env::args().skip(1).collect();
+    let check = args.iter().any(|a| a == "--check");
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let grammar = fs::read(root.join("grammar/go/grammar.js"))?;
-    let temp = env::temp_dir().join(format!("treetags-go-gen-{}", std::process::id()));
+    let langs = match args.iter().position(|a| a == "--lang") {
+        Some(i) => vec![args
+            .get(i + 1)
+            .context("--lang requires a language name")?
+            .clone()],
+        None => discover_langs(&root)?,
+    };
+    for lang in &langs {
+        let manifest = read_manifest(&root, lang)?;
+        generate_one(&root, &manifest, check)
+            .with_context(|| format!("generate scanner for `{}`", manifest.name))?;
+    }
+    Ok(())
+}
+
+fn generate_one(root: &Path, manifest: &Manifest, check: bool) -> Result<()> {
+    let grammar = fs::read(root.join(&manifest.grammar))?;
+    let temp = env::temp_dir().join(format!(
+        "treetags-{}-gen-{}",
+        manifest.name,
+        std::process::id()
+    ));
     if temp.exists() {
         fs::remove_dir_all(&temp)?
     }
@@ -93,13 +144,14 @@ fn main() -> Result<()> {
         bail!("rustfmt failed on generated scanner")
     }
     generated = fs::read_to_string(candidate)?;
-    let path = root.join(OUTPUT);
+    let path = root.join(&manifest.output);
+    let output = manifest.output.display();
     if check {
         if fs::read_to_string(&path)? != generated {
-            bail!("{OUTPUT} is stale")
+            bail!("{output} is stale; regenerate with `cargo run --bin generate-scanner -- --lang {}`", manifest.name)
         }
     } else {
-        fs::write(path, generated)?
+        fs::write(&path, generated)?
     }
     fs::remove_dir_all(temp).ok();
     Ok(())
@@ -359,9 +411,61 @@ fn nested_prec(node: &Value) -> i32 {
                 .unwrap_or(0),
         )
 }
+/// Whether a `PREC` node appears strictly inside the rule's outermost precedence
+/// wrapper. `token(prec(-1, /pat/))` (e.g. C's `preproc_arg`) has none — its
+/// single token priority is faithful — so it must not be treated as branch-local
+/// precedence even though `nested_prec` != `outer_prec` (the inner pattern's
+/// absent precedence reads as 0). Genuine per-branch precedence, which one
+/// machine priority cannot represent, does have an inner `PREC`.
+fn has_inner_prec(node: &Value) -> bool {
+    let mut n = node;
+    while matches!(
+        n["type"].as_str(),
+        Some("ALIAS" | "TOKEN" | "IMMEDIATE_TOKEN")
+    ) {
+        n = &n["content"];
+    }
+    if matches!(
+        n["type"].as_str(),
+        Some("PREC" | "PREC_LEFT" | "PREC_RIGHT")
+    ) {
+        contains_prec(&n["content"])
+    } else {
+        contains_prec(n)
+    }
+}
+fn contains_prec(node: &Value) -> bool {
+    if matches!(
+        node["type"].as_str(),
+        Some("PREC" | "PREC_LEFT" | "PREC_RIGHT")
+    ) {
+        return true;
+    }
+    if node.get("content").is_some_and(contains_prec) {
+        return true;
+    }
+    node.get("members")
+        .and_then(Value::as_array)
+        .is_some_and(|ms| ms.iter().any(contains_prec))
+}
 fn compile_dfa(pattern: &str) -> Result<(Vec<u16>, Vec<u8>, usize, Vec<bool>, Vec<bool>)> {
+    compile_dfa_with(pattern, MatchKind::All)
+}
+/// Extras (skip tokens) are single-pattern longest-match machines; the runtime
+/// records every accepting prefix from the tables, so `LeftmostFirst` is both
+/// correct and avoids the `MatchKind::All` overlapping-alternation
+/// determinization blowup (e.g. C's `\s|\\\r?\n`, whose branches overlap on
+/// `\r`/`\n`). A single-class extra like Go's `\s` determinizes identically
+/// under either kind.
+fn compile_extra_dfa(pattern: &str) -> Result<(Vec<u16>, Vec<u8>, usize, Vec<bool>, Vec<bool>)> {
+    compile_dfa_with(pattern, MatchKind::LeftmostFirst)
+}
+fn compile_dfa_with(
+    pattern: &str,
+    match_kind: MatchKind,
+) -> Result<(Vec<u16>, Vec<u8>, usize, Vec<bool>, Vec<bool>)> {
     let dfa = dense::Builder::new()
-        .configure(dense::Config::new().match_kind(MatchKind::All))
+        .configure(dense::Config::new().match_kind(match_kind))
         .build(pattern)
         .with_context(|| format!("compile lexical expression {pattern}"))?;
     let start = dfa.start_state_forward(&Input::new("").anchored(Anchored::Yes))?;
@@ -470,11 +574,14 @@ fn collect_terminals(
         }
         Some("SYMBOL") => {
             let n = node["name"].as_str().unwrap();
+            // `seen` is a permanent visited set: a rule's reachable terminals are
+            // fully gathered on first visit, so revisiting it via another path
+            // (the previous `seen.remove` backtracking) only re-collects the same
+            // set — exponentially so on densely cross-referenced grammars like C.
             if !machines.contains(n) && seen.insert(n.into()) {
                 if let Some(rule) = rules.get(n) {
                     collect_terminals(rule, rules, machines, strings, patterns, seen)
                 }
-                seen.remove(n);
             }
         }
         _ => {
@@ -529,7 +636,7 @@ fn compile_lexical_machines(
             .with_context(|| format!("missing lexical rule {name}"))?;
         let skip = skip_names.contains(name);
         let pattern = ir_regex(node, rules, &mut BTreeSet::new())?;
-        if nested_prec(node) != outer_prec(node) {
+        if nested_prec(node) != outer_prec(node) && has_inner_prec(node) {
             let prefix=leading_string(node).filter(|p|!p.is_empty()).with_context(||format!("branch-local lexical precedence in non-delimited rule {name} is unsupported"))?;
             let competitors = selected
                 .iter()
@@ -567,7 +674,7 @@ fn compile_lexical_machines(
             continue;
         }
         let pattern = ir_regex(extra, rules, &mut BTreeSet::new())?;
-        let (dfa, classes, class_count, accept, dead) = compile_dfa(&pattern)?;
+        let (dfa, classes, class_count, accept, dead) = compile_extra_dfa(&pattern)?;
         out.push(Machine {
             name: format!("extra_{index}"),
             dfa,
@@ -646,6 +753,29 @@ fn token_name(prefix: &str, text: &str) -> String {
         )
     }
 }
+/// Unique const name per keyword. Uppercasing collapses case-only variants
+/// (e.g. C's `true`/`TRUE`, `_Alignof`/`_alignof`) onto one Rust identifier, so
+/// colliding names are disambiguated deterministically: the first in sorted
+/// order keeps the clean `KW_UPPER`, later ones get a `_2`, `_3`, ... suffix.
+/// Collision-free grammars (Go) are unaffected.
+fn keyword_names(keywords: &BTreeSet<String>) -> BTreeMap<String, String> {
+    let mut groups: BTreeMap<String, Vec<&String>> = BTreeMap::new();
+    for kw in keywords {
+        groups.entry(kw.to_ascii_uppercase()).or_default().push(kw);
+    }
+    let mut names = BTreeMap::new();
+    for (base, members) in groups {
+        for (i, kw) in members.iter().enumerate() {
+            let name = if i == 0 {
+                format!("KW_{base}")
+            } else {
+                format!("KW_{base}_{}", i + 1)
+            };
+            names.insert((*kw).clone(), name);
+        }
+    }
+    names
+}
 /// Human-readable name for a single ASCII punctuation byte, so hooks can read
 /// `go::LBRACE` instead of `go::PUNCT_7B`. Multi-byte punctuation joins these
 /// (`:=` -> `COLON_EQ`). Returns `None` for bytes we have no name for, in which
@@ -709,24 +839,24 @@ fn delimiters_const(p: &BTreeSet<String>) -> String {
 bracket_open:LBRACKET,bracket_close:RBRACKET,brace_open:LBRACE,brace_close:RBRACE,semicolon:SEMI};\n"
         .to_string()
 }
-fn token_constants(k: &BTreeSet<String>, p: &BTreeSet<String>) -> String {
+fn token_constants(
+    k: &BTreeSet<String>,
+    p: &BTreeSet<String>,
+    kw_names: &BTreeMap<String, String>,
+) -> String {
     k.iter()
-        .map(|text| ("KW", text))
-        .chain(p.iter().map(|text| ("PUNCT", text)))
+        .map(|text| (kw_names[text].clone(), text))
+        .chain(p.iter().map(|text| (token_name("PUNCT", text), text)))
         .enumerate()
-        .map(|(index, (prefix, text))| {
-            format!(
-                "pub const {}:TokenKind=TokenKind({});\n",
-                token_name(prefix, text),
-                index + 4
-            )
+        .map(|(index, (name, _text))| {
+            format!("pub const {name}:TokenKind=TokenKind({});\n", index + 4)
         })
         .collect()
 }
-fn keyword_match(values: &BTreeSet<String>) -> String {
+fn keyword_match(values: &BTreeSet<String>, kw_names: &BTreeMap<String, String>) -> String {
     values
         .iter()
-        .map(|text| format!("            {text:?}=>{},\n", token_name("KW", text)))
+        .map(|text| format!("            {text:?}=>{},\n", kw_names[text]))
         .collect()
 }
 fn punctuation_match(values: &BTreeSet<String>) -> String {
@@ -762,6 +892,7 @@ fn render(
     r: &BTreeSet<String>,
     machines: &[Machine],
 ) -> String {
+    let kw_names = keyword_names(k);
     let mut machine_defs = String::new();
     let mut machine_rows = String::new();
     for (i, m) in machines.iter().enumerate() {
@@ -807,7 +938,7 @@ fn render(
         machine_rows.push_str(&format!("Machine{{trans:TRANS_{i},classes:CLASS_{i},class_count:{},accept:ACCEPT_{i},dead:DEAD_{i},kind:{kind},skip:{},priority:{},recovery:{recovery},recovery_prefixes:&[{prefixes}]}},\n",m.class_count,m.skip,m.priority));
     }
     format!(
-        r#"// @generated by `cargo run --bin generate-go-scanner`; do not edit.
+        r#"// @generated by `cargo run --bin generate-scanner`; do not edit.
 // generator: treetags-linear-scanner-v4
 // grammar.js sha256: {hash}
 // evaluated with: {cli}
@@ -857,11 +988,11 @@ fn lex(source:&str,at:usize)->GeneratedLexeme{{
 pub fn scan<E:ExternalLexer>(source:&str)->Result<TokenStream,String>{{crate::parser::linear_scanner::scan::<E,Lexicon>(source)}}
 "#,
         list(r),
-        keyword_match(k),
+        keyword_match(k, &kw_names),
         punctuation_match(p),
         constants = format!(
             "{}{}{}",
-            token_constants(k, p),
+            token_constants(k, p, &kw_names),
             punct_aliases(p),
             delimiters_const(p)
         ),

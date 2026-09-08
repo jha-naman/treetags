@@ -29,8 +29,8 @@ jobs:
     - name: Install pinned tree-sitter CLI
       run: cargo install tree-sitter-cli --version 0.25.10 --locked
 
-    - name: Check generated Go scanner
-      run: TREETAGS_NODE="$(command -v node)" cargo run --bin generate-go-scanner -- --check
+    - name: Check generated scanners
+      run: TREETAGS_NODE="$(command -v node)" cargo run --bin generate-scanner -- --check
 
     - name: Cache dependencies
       uses: Swatinem/rust-cache@v2
