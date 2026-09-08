@@ -176,3 +176,22 @@ void after_nested_call(struct Context *, union Value *, enum Mode);
 int variable_after_calls;
 EXPORT_SYMBOL(variable_after_calls);
 #define AFTER_EXPORT 2
+
+// Continued replacement lists are opaque and end at the unescaped newline.
+#define CONTINUED_VALUE \
+    first_part + \
+    second_part
+#define AFTER_CONTINUED_VALUE 3
+int after_continued_value(void) { return AFTER_CONTINUED_VALUE; }
+#define CONTINUED_ACTION(value) \
+    do { \
+        struct MacroOnly *hidden = (value); \
+        release(hidden); \
+    } while (0)
+#define AFTER_CONTINUED_ACTION 4
+int after_continued_action(void) { return AFTER_CONTINUED_ACTION; }
+#define CONTINUED_EMPTY \
+    \
+    final_part
+void after_continued_empty(struct Context *, union Value *, enum Mode);
+int variable_after_continued;

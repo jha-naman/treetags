@@ -44,7 +44,7 @@ impl CHooks {
 impl TagHooks for CHooks {
     fn generate(
         &mut self,
-        _input: HookInput<'_>,
+        input: HookInput<'_>,
         mut cursor: TokenCursor<'_>,
         output: &mut TagEmitter<'_>,
     ) {
@@ -66,7 +66,7 @@ impl TagHooks for CHooks {
             scan_type_references(&cursor, output, &mut self.references_end);
             cursor.next();
             match token.kind {
-                c::LITERAL => self.directive(&mut cursor, output, token),
+                c::LITERAL => self.directive(input.source, &mut cursor, output, token),
                 c::KW_ENUM => self.enum_decl(&mut cursor, output, token),
                 c::KW_STRUCT | c::KW_UNION => self.aggregate(&mut cursor, output, token),
                 c::KW_TYPEDEF => self.typedef(&mut cursor, output, token),
@@ -85,14 +85,21 @@ impl TagHooks for CHooks {
 
 impl CHooks {
     /// `#define NAME …` → macro `d`; `#include <h>`/`"h"` → header `h`. Every
-    /// directive consumes its whole line so macro bodies and guard operands are
-    /// not mis-read as declarations.
-    fn directive(&self, cursor: &mut TokenCursor<'_>, out: &mut TagEmitter<'_>, token: Tok) {
+    /// directive consumes its whole logical line, including backslash-newline
+    /// continuations, so macro bodies and guard operands stay opaque.
+    fn directive(
+        &self,
+        source: &str,
+        cursor: &mut TokenCursor<'_>,
+        out: &mut TagEmitter<'_>,
+        token: Tok,
+    ) {
         let text = cursor.text(token);
+        let end = directive_end(source, token.start as usize);
         if text.starts_with("#define") {
             if cursor
                 .peek(0)
-                .is_some_and(|t| t.kind == c::IDENTIFIER && t.row == token.row)
+                .is_some_and(|t| t.kind == c::IDENTIFIER && (t.start as usize) < end)
             {
                 let name = cursor.next().expect("peeked macro name");
                 out.tag("d", name, (token, name)).emit();
@@ -100,7 +107,7 @@ impl CHooks {
         }
         let (mut first, mut last) = (None, None);
         while let Some(next) = cursor.peek(0) {
-            if next.row != token.row {
+            if next.start as usize >= end {
                 break;
             }
             cursor.next();
@@ -409,6 +416,26 @@ impl CHooks {
         }
         skip_to_semicolon(cursor);
     }
+}
+
+/// The first unspliced newline ends a preprocessor directive. Inspect source
+/// bytes because the scanner discards backslash-newline pairs and whitespace,
+/// including continuation lines with no tokens. CRLF is spliced as a unit.
+fn directive_end(source: &str, start: usize) -> usize {
+    let bytes = source.as_bytes();
+    for i in start..bytes.len() {
+        if bytes[i] == b'\n' {
+            let before_newline = if i > start && bytes[i - 1] == b'\r' {
+                i - 1
+            } else {
+                i
+            };
+            if before_newline == start || bytes[before_newline - 1] != b'\\' {
+                return i;
+            }
+        }
+    }
+    bytes.len()
 }
 
 /// Recognize a bare `NAME(...)` (optionally storage-qualified), without relying
@@ -768,6 +795,45 @@ mod tests {
 
     fn assert_matches_oracle(source: &str) {
         assert_eq!(sorted(actual(source)), sorted(oracle(source)));
+    }
+
+    #[test]
+    fn continued_defines_do_not_swallow_following_items() {
+        let source = concat!(
+            "#define OBJECT_BODY \\\n",
+            "    loose_identifier + \\\n",
+            "    another_identifier\n",
+            "#define AFTER_OBJECT 1\n",
+            "int after_object(void) { return AFTER_OBJECT; }\n",
+            "#define FUNCTION_BODY(value) \\\n",
+            "    do { \\\n",
+            "        struct Hidden *hidden = (value); \\\n",
+            "        use(hidden); \\\n",
+            "    } while (0)\n",
+            "#define AFTER_FUNCTION 2\n",
+            "int after_function(void) { return AFTER_FUNCTION; }\n",
+            "void after_prototype(struct Context *, union Value *, enum Mode);\n",
+            "int after_variable;\n",
+        );
+        assert_matches_oracle(source);
+        assert_matches_oracle(&source.replace('\n', "\r\n"));
+    }
+
+    #[test]
+    fn continued_directive_boundaries_match_oracle() {
+        for source in [
+            // Token-free continuation lines still belong to the directive.
+            "#define EMPTY_LINES \\\n\\\n loose_token\n#define AFTER_EMPTY 1\nint after_empty;\n",
+            // A blank, unescaped line ends the directive.
+            "#define BLANK_END value \\\n\n#define AFTER_BLANK 1\nint after_blank;\n",
+            // A backslash inside a comment is not a line splice.
+            "#define COMMENT_END 1 /* \\ */\nint after_comment;\n",
+            // Handle EOF both with and without a final newline.
+            "#define AT_EOF \\\n loose_token",
+            "#define AT_EOF \\\n loose_token\n",
+        ] {
+            assert_matches_oracle(source);
+        }
     }
 
     #[test]
