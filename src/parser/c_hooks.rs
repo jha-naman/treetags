@@ -73,7 +73,10 @@ impl TagHooks for CHooks {
                 c::KW_TYPEDEF => self.typedef(&mut cursor, output, token),
                 c::LBRACE => skip_block(&mut cursor),
                 c::IDENTIFIER => self.declaration(&mut cursor, output, token),
-                _ if storage_or_qualifier(token) || size_specifier(token) => {
+                _ if storage_or_qualifier(token)
+                    || size_specifier(token)
+                    || attribute_keyword(token) =>
+                {
                     self.declaration(&mut cursor, output, token)
                 }
                 _ => {}
@@ -132,6 +135,7 @@ impl CHooks {
     /// `enum NAME { A, B = 2, C }` → enum `g` plus enumerators `e` scoped
     /// `enum:NAME`. Bare type references are emitted by the signature scan.
     fn enum_decl(&self, cursor: &mut TokenCursor<'_>, out: &mut TagEmitter<'_>, kw: Tok) {
+        while consume_attribute(cursor) {}
         let name = cursor.consume_if(c::IDENTIFIER);
         if cursor.peek(0).map(|t| t.kind) != Some(c::LBRACE) {
             return;
@@ -173,6 +177,10 @@ impl CHooks {
         // Aggregate return types use the same function/prototype parser.
         let mut i = 0;
         while let Some(t) = cursor.peek(i) {
+            if let Some(end) = attribute_end(cursor, i) {
+                i = end;
+                continue;
+            }
             if t.kind == c::LPAREN {
                 self.declaration(cursor, out, akw);
                 return;
@@ -183,6 +191,7 @@ impl CHooks {
             i += 1;
         }
         let (kind, scope_key) = agg_kind(akw);
+        while consume_attribute(cursor) {}
         let name = cursor.consume_if(c::IDENTIFIER);
         if cursor.peek(0).map(|t| t.kind) == Some(c::LBRACE) {
             let (struct_name, addr, typeref) = match name {
@@ -274,6 +283,7 @@ impl CHooks {
         out: &mut TagEmitter<'_>,
         akw: Tok,
     ) {
+        while consume_attribute(cursor) {}
         let name = cursor.consume_if(c::IDENTIFIER);
         let nested = cursor.peek(0).map(|t| t.kind) == Some(c::LBRACE);
         if nested {
@@ -327,6 +337,7 @@ impl CHooks {
                 return;
             };
             cursor.consume_balanced_pair(c::LPAREN, c::RPAREN);
+            while consume_attribute(cursor) {}
             if cursor.consume_if(c::LBRACE).is_some() {
                 let mut builder = out.tag("f", name, (first, name));
                 builder = head.with_typeref(builder, cursor, "f");
@@ -361,6 +372,7 @@ impl CHooks {
     ) {
         let akw = cursor.next().expect("peeked aggregate keyword");
         let (kind, scope_key) = agg_kind(akw);
+        while consume_attribute(cursor) {}
         let name = cursor.consume_if(c::IDENTIFIER);
         if cursor.peek(0).map(|t| t.kind) == Some(c::LBRACE) {
             // `typedef struct [NAME] { … } ALIAS;`. For an anonymous body cpp.rs
@@ -501,6 +513,10 @@ fn scan_type_references(cursor: &TokenCursor<'_>, out: &mut TagEmitter<'_>, scan
     let mut candidate = None;
     let mut i = 0;
     while let Some(token) = cursor.peek(i) {
+        if let Some(end) = attribute_end(cursor, i) {
+            i = end;
+            continue;
+        }
         match token.kind {
             c::LITERAL | c::SEMI => break,
             c::LPAREN => {
@@ -635,9 +651,18 @@ fn scan_decl_head(cursor: &mut TokenCursor<'_>, first: Tok) -> DeclHead {
         specifier: None,
         pointer: false,
     };
-    let mut tokens = vec![first];
-    absorb(&mut head, first);
+    let mut tokens = Vec::new();
+    if attribute_keyword(first) && cursor.peek(0).is_some_and(|t| t.kind == c::LPAREN) {
+        cursor.consume_balanced_pair(c::LPAREN, c::RPAREN);
+        head.type_start = Some(first);
+    } else {
+        tokens.push(first);
+        absorb(&mut head, first);
+    }
     while let Some(next) = cursor.peek(0) {
+        if consume_attribute(cursor) {
+            continue;
+        }
         if matches!(
             next.kind,
             c::LPAREN | c::SEMI | c::EQ | c::LBRACKET | c::COMMA | c::LBRACE
@@ -654,6 +679,48 @@ fn scan_decl_head(cursor: &mut TokenCursor<'_>, first: Tok) -> DeclHead {
         head.pointer = prefix.iter().any(|t| t.kind == c::STAR);
     }
     head
+}
+
+/// Call-shaped declaration modifiers in the C grammar. Unknown identifiers
+/// remain type/declarator tokens; their spelling is not an attribute heuristic.
+fn attribute_keyword(token: Tok) -> bool {
+    matches!(
+        token.kind,
+        c::KW___ATTRIBUTE | c::KW___ATTRIBUTE__ | c::KW___DECLSPEC | c::KW_ALIGNAS | c::KW__ALIGNAS
+    )
+}
+
+fn attribute_end(cursor: &TokenCursor<'_>, start: usize) -> Option<usize> {
+    if !attribute_keyword(cursor.peek(start)?) || cursor.peek(start + 1)?.kind != c::LPAREN {
+        return None;
+    }
+    let mut depth = 0u32;
+    let mut i = start + 1;
+    while let Some(token) = cursor.peek(i) {
+        match token.kind {
+            c::LPAREN => depth += 1,
+            c::RPAREN => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i + 1);
+                }
+            }
+            c::SEMI => return None,
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+fn consume_attribute(cursor: &mut TokenCursor<'_>) -> bool {
+    let Some(end) = attribute_end(cursor, 0) else {
+        return false;
+    };
+    for _ in 0..end {
+        cursor.next();
+    }
+    true
 }
 
 fn type_qualifier(token: Tok) -> bool {
@@ -751,7 +818,11 @@ fn absorb(head: &mut DeclHead, token: Tok) {
 /// it (the declared name) and whether the declarator was a pointer.
 fn read_declarator(cursor: &mut TokenCursor<'_>) -> (Option<Tok>, bool) {
     let (mut name, mut star, mut depth) = (None, false, 0u32);
-    while let Some(token) = cursor.next() {
+    while cursor.peek(0).is_some() {
+        if depth == 0 && consume_attribute(cursor) {
+            continue;
+        }
+        let token = cursor.next().unwrap();
         match token.kind {
             c::LBRACE | c::LPAREN | c::LBRACKET => depth += 1,
             c::RBRACE | c::RPAREN | c::RBRACKET => depth = depth.saturating_sub(1),
@@ -768,6 +839,9 @@ fn read_declarator(cursor: &mut TokenCursor<'_>) -> (Option<Tok>, bool) {
 fn read_field_declarator(cursor: &mut TokenCursor<'_>) -> (Option<Tok>, bool) {
     let (mut name, mut star) = (None, false);
     while let Some(token) = cursor.peek(0) {
+        if consume_attribute(cursor) {
+            continue;
+        }
         match token.kind {
             c::SEMI | c::RBRACE => {
                 cursor.consume_if(c::SEMI);
@@ -973,6 +1047,29 @@ mod tests {
             "struct Fields { __init int value; unsigned const int sized; };\n",
         ] {
             assert_matches_oracle(source);
+        }
+    }
+
+    #[test]
+    fn attribute_call_boundaries_match_oracle() {
+        for declaration in [
+            "__attribute__((unused)) int prefix(void) {}",
+            "static void __attribute__ ((unused)) middle(void) {}",
+            "int trailing(void) __attribute__((unused)) {}",
+            "struct __attribute__((packed)) Packed { int value; };",
+            "struct Outer { struct __attribute__((packed)) { int inner; } field; int after; };",
+            "__attribute__((aligned(sizeof(union Alignment)))) int refs(enum Mode m) {}",
+            "__declspec(dllexport) int exported(void) {}",
+            "_Alignas(16) int aligned;",
+            "int __attribute__((aligned(16))) aligned;",
+            "int aligned __attribute__((aligned(16)));",
+            "struct Fields { int __attribute__((aligned(16))) aligned; int after; };",
+            "struct Fields { struct Object field __attribute__((aligned(16))); int after; };",
+            "__attribute__((unused)) int refs(union Value *v, enum Mode m, struct Object *p) {}",
+            "void refs(union Value *, enum Mode, struct Object *) __attribute__((noreturn));",
+        ] {
+            let source = format!("{declaration}\n#define AFTER_ATTRIBUTE 1\nint following(void) {{}}\nint after_variable;\n");
+            assert_matches_oracle(&source);
         }
     }
 
