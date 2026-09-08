@@ -150,3 +150,14 @@ Node createLinkedList(int *vals, int len);
 
 #endif
 
+
+// Type references in signatures, including macro invocations.
+void referenced_types(struct Param *, enum Mode, union Value *);
+struct Result *make_result(union Input *, enum State);
+extern union Output *make_output(struct Context *);
+enum Status get_status(struct Request *);
+typedef void (*TypeCallback)(struct Context *, enum Event, union Data *);
+void nested_callback(void (*callback)(struct Nested *, union NestedValue *));
+int with_types(struct Argument *arg, union Payload *p, enum Flag f) { return 0; }
+DECLARE(struct MacroArgument *, enum MacroEnum, union MacroUnion);
+#define TYPE_CAST(x) ((struct OpaqueMacroBody *)(x))

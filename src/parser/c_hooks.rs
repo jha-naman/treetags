@@ -16,6 +16,9 @@ pub(crate) struct CHooks {
     sequence: u16,
     /// djb2 hash of the file name, as cpp.rs computes it.
     hash: String,
+    /// End of the last inspected reference, preventing duplicates when a
+    /// declaration is consumed by more than one handler.
+    references_end: u32,
 }
 
 impl Default for CHooks {
@@ -23,6 +26,7 @@ impl Default for CHooks {
         Self {
             sequence: 1,
             hash: String::new(),
+            references_end: 0,
         }
     }
 }
@@ -46,7 +50,9 @@ impl TagHooks for CHooks {
     ) {
         // The walk always sits at file scope: function bodies are skipped whole,
         // and aggregate bodies are consumed by their handlers.
-        while let Some(token) = cursor.next() {
+        while let Some(token) = cursor.peek(0) {
+            scan_type_references(&cursor, output, &mut self.references_end);
+            cursor.next();
             match token.kind {
                 c::LITERAL => self.directive(&mut cursor, output, token),
                 c::KW_ENUM => self.enum_decl(&mut cursor, output, token),
@@ -106,7 +112,7 @@ impl CHooks {
     }
 
     /// `enum NAME { A, B = 2, C }` → enum `g` plus enumerators `e` scoped
-    /// `enum:NAME`. A bare `enum NAME` type reference is left alone.
+    /// `enum:NAME`. Bare type references are emitted by the signature scan.
     fn enum_decl(&self, cursor: &mut TokenCursor<'_>, out: &mut TagEmitter<'_>, kw: Tok) {
         let name = cursor.consume_if(c::IDENTIFIER);
         if cursor.peek(0).map(|t| t.kind) != Some(c::LBRACE) {
@@ -146,11 +152,27 @@ impl CHooks {
     /// type reference in a variable declaration (`struct NAME var;` → `s` ref +
     /// `v` with a `struct:` typeref).
     fn aggregate(&mut self, cursor: &mut TokenCursor<'_>, out: &mut TagEmitter<'_>, akw: Tok) {
+        // Aggregate return types use the same function/prototype parser.
+        let mut i = 0;
+        while let Some(t) = cursor.peek(i) {
+            if t.kind == c::LPAREN {
+                self.declaration(cursor, out, akw);
+                return;
+            }
+            if matches!(t.kind, c::LBRACE | c::SEMI | c::EQ | c::COMMA) {
+                break;
+            }
+            i += 1;
+        }
         let (kind, scope_key) = agg_kind(akw);
         let name = cursor.consume_if(c::IDENTIFIER);
         if cursor.peek(0).map(|t| t.kind) == Some(c::LBRACE) {
             let (struct_name, addr, typeref) = match name {
-                Some(n) => (cursor.text(n).to_string(), n, Some(cursor.text(n).to_string())),
+                Some(n) => (
+                    cursor.text(n).to_string(),
+                    n,
+                    Some(cursor.text(n).to_string()),
+                ),
                 None => (self.anon(), akw, None),
             };
             self.struct_body(cursor, out, kind, scope_key, struct_name, addr);
@@ -166,7 +188,6 @@ impl CHooks {
             }
         } else if let Some(name) = name {
             // `struct NAME <declarator>;` — reference tag plus the declared var.
-            out.tag(kind, name, (name, name)).emit();
             let struct_name = cursor.text(name).to_string();
             let (var, star) = read_declarator(cursor);
             if let Some(var) = var {
@@ -210,6 +231,7 @@ impl CHooks {
                 }
                 _ => {}
             }
+            scan_type_references(cursor, out, &mut self.references_end);
             let Some(first) = cursor.next() else {
                 return;
             };
@@ -229,8 +251,12 @@ impl CHooks {
 
     /// `struct NAME *field;` inside an aggregate body: a `s` reference tag plus
     /// the member `m` with a `struct:` typeref.
-    fn struct_typed_member(&mut self, cursor: &mut TokenCursor<'_>, out: &mut TagEmitter<'_>, akw: Tok) {
-        let (kind, _) = agg_kind(akw);
+    fn struct_typed_member(
+        &mut self,
+        cursor: &mut TokenCursor<'_>,
+        out: &mut TagEmitter<'_>,
+        _akw: Tok,
+    ) {
         let Some(name) = cursor.consume_if(c::IDENTIFIER) else {
             skip_to_semicolon(cursor);
             return;
@@ -242,7 +268,6 @@ impl CHooks {
             skip_to_semicolon(cursor);
             return;
         }
-        out.tag(kind, name, (name, name)).emit();
         let struct_name = cursor.text(name).to_string();
         let (field, star) = read_declarator(cursor);
         if let Some(field) = field {
@@ -253,7 +278,10 @@ impl CHooks {
                     .emit();
             } else {
                 builder
-                    .typeref_as("typename", TextValue::Owned(format!("struct:{struct_name}")))
+                    .typeref_as(
+                        "typename",
+                        TextValue::Owned(format!("struct:{struct_name}")),
+                    )
                     .emit();
             }
         }
@@ -299,7 +327,12 @@ impl CHooks {
         }
     }
 
-    fn typedef_aggregate(&mut self, cursor: &mut TokenCursor<'_>, out: &mut TagEmitter<'_>, kw: Tok) {
+    fn typedef_aggregate(
+        &mut self,
+        cursor: &mut TokenCursor<'_>,
+        out: &mut TagEmitter<'_>,
+        kw: Tok,
+    ) {
         let akw = cursor.next().expect("peeked aggregate keyword");
         let (kind, scope_key) = agg_kind(akw);
         let name = cursor.consume_if(c::IDENTIFIER);
@@ -323,7 +356,6 @@ impl CHooks {
             }
         } else if let Some(name) = name {
             // `typedef struct NAME ALIAS;` — reference tag plus the alias.
-            out.tag(kind, name, (name, name)).emit();
             let struct_name = cursor.text(name).to_string();
             if let Some(alias) = read_declarator(cursor).0 {
                 out.tag("t", alias, (kw, alias))
@@ -364,6 +396,73 @@ impl CHooks {
                 .emit();
         }
         skip_to_semicolon(cursor);
+    }
+}
+
+/// Inspect a declaration before its handler consumes the signature. References
+/// keep the enclosing scope; named definitions are emitted by their handlers.
+/// Stop at a body or statement boundary so skipped function bodies stay skipped.
+fn scan_type_references(cursor: &TokenCursor<'_>, out: &mut TagEmitter<'_>, scanned_end: &mut u32) {
+    // The oracle puts the entire definition signature in function scope and
+    // suppresses struct references there (but retains enum/union references).
+    let mut function = None;
+    let mut depth = 0u32;
+    let mut previous = None;
+    let mut candidate = None;
+    let mut i = 0;
+    while let Some(token) = cursor.peek(i) {
+        match token.kind {
+            c::LITERAL | c::SEMI => break,
+            c::LPAREN => {
+                if depth == 0 && candidate.is_none() {
+                    candidate = previous;
+                }
+                depth += 1;
+            }
+            c::RPAREN => depth = depth.saturating_sub(1),
+            c::LBRACE => {
+                if depth == 0 {
+                    function = candidate;
+                }
+                break;
+            }
+            _ => {}
+        }
+        previous = Some(token);
+        i += 1;
+    }
+    if let Some(name) = function {
+        out.enter_scope("function", cursor.text(name).to_string());
+    }
+
+    let mut index = 0;
+    while let Some(kw) = cursor.peek(index) {
+        if matches!(kw.kind, c::LBRACE | c::SEMI | c::LITERAL) {
+            break;
+        }
+        let kind = match kw.kind {
+            c::KW_STRUCT => "s",
+            c::KW_UNION => "u",
+            c::KW_ENUM => "g",
+            _ => {
+                index += 1;
+                continue;
+            }
+        };
+        if let Some(name) = cursor.peek(index + 1).filter(|t| t.kind == c::IDENTIFIER) {
+            if cursor.peek(index + 2).map(|t| t.kind) != Some(c::LBRACE) {
+                if name.start >= *scanned_end {
+                    if kind != "s" || function.is_none() {
+                        out.tag(kind, name, (kw, kw)).emit();
+                    }
+                    *scanned_end = name.end;
+                }
+            }
+        }
+        index += 1;
+    }
+    if function.is_some() {
+        out.leave_scope();
     }
 }
 
@@ -528,9 +627,13 @@ pub(crate) fn generate_builtin(
             return None;
         }
     };
-    generate(source, path, super::linear::HookOptions::from_config(kinds, config))
-        .map_err(|error| eprintln!("Warning: Failed to scan {path}: {error}"))
-        .ok()
+    generate(
+        source,
+        path,
+        super::linear::HookOptions::from_config(kinds, config),
+    )
+    .map_err(|error| eprintln!("Warning: Failed to scan {path}: {error}"))
+    .ok()
 }
 
 pub(crate) fn generate(
@@ -555,8 +658,13 @@ pub(crate) fn generate(
     let mut hooks = CHooks {
         sequence: 1,
         hash: filename_hash(path),
+        references_end: 0,
     };
-    hooks.generate(input, TokenCursor::new(source, &stream.tokens), &mut emitter);
+    hooks.generate(
+        input,
+        TokenCursor::new(source, &stream.tokens),
+        &mut emitter,
+    );
     Ok(tags)
 }
 
@@ -604,6 +712,26 @@ mod tests {
 
     fn assert_matches_oracle(source: &str) {
         assert_eq!(sorted(actual(source)), sorted(oracle(source)));
+    }
+
+    #[test]
+    fn signature_type_references_match_oracle() {
+        let source = "void prototype(struct Param *, enum Mode, union Value *);\n\
+            extern struct Result *factory(union Input *, enum State);\n\
+            void multiline(struct\n MultiStruct *, enum\n MultiEnum, union\n MultiUnion *);\n\
+            void repeated(struct Repeat *, struct Repeat *);\n\
+            typedef void (*Callback)(struct Context *, enum Event, union Data *);\n\
+            int defined(struct Argument *arg, union Payload *p, enum Flag f) { return 0; }\n\
+            #define CAST(x) ((struct MacroType *)(x))\n\
+            DECLARE(struct MacroArgument *, enum MacroEnum, union MacroUnion);\n";
+        let refs = |tags: Vec<crate::tag::Tag>| {
+            sorted(
+                tags.into_iter()
+                    .filter(|t| matches!(t.kind.as_deref(), Some("s" | "g" | "u")))
+                    .collect(),
+            )
+        };
+        assert_eq!(refs(actual(source)), refs(oracle(source)));
     }
 
     #[test]

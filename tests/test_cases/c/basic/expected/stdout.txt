@@ -1,20 +1,42 @@
 !_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
 ../my_lib/my_lib_header.h	source.c	/^#include "..\/my_lib\/my_lib_header.h"$/;"	h
 ADD	source.c	/^#define ADD(a, b) ((a) + (b))$/;"	d
+Context	source.c	/^extern union Output *make_output(struct Context *);$/;"	s
+Context	source.c	/^typedef void (*TypeCallback)(struct Context *, enum Event, union Data *);$/;"	s
 DAYS_IN_YEAR	source.c	/^#define DAYS_IN_YEAR 365$/;"	d
+Data	source.c	/^typedef void (*TypeCallback)(struct Context *, enum Event, union Data *);$/;"	u
 EXAMPLE_H	source.c	/^#define EXAMPLE_H$/;"	d	
 EXAMPLE_NAME	source.c	/^#define EXAMPLE_NAME "Dennis Ritchie"$/;"	d
+Event	source.c	/^typedef void (*TypeCallback)(struct Context *, enum Event, union Data *);$/;"	g
 FRI	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	e	enum:days	
+Flag	source.c	/^int with_types(struct Argument *arg, union Payload *p, enum Flag f) { return 0; }$/;"	g	function:with_types
 GREEN	source.c	/^enum traffic_light_state {GREEN, YELLOW, RED};$/;"	e	enum:traffic_light_state	
+Input	source.c	/^struct Result *make_result(union Input *, enum State);$/;"	u
 MON	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	e	enum:days	
+MacroArgument	source.c	/^DECLARE(struct MacroArgument *, enum MacroEnum, union MacroUnion);$/;"	s
+MacroEnum	source.c	/^DECLARE(struct MacroArgument *, enum MacroEnum, union MacroUnion);$/;"	g
+MacroUnion	source.c	/^DECLARE(struct MacroArgument *, enum MacroEnum, union MacroUnion);$/;"	u
+Mode	source.c	/^void referenced_types(struct Param *, enum Mode, union Value *);$/;"	g
+Nested	source.c	/^void nested_callback(void (*callback)(struct Nested *, union NestedValue *));$/;"	s
+NestedValue	source.c	/^void nested_callback(void (*callback)(struct Nested *, union NestedValue *));$/;"	u
 Node	source.c	/^    struct Node *next;$/;"	s	struct:Node
 Node	source.c	/^typedef struct Node$/;"	s	
 Node	source.c	/^typedef struct Node$/;"	t	typeref:struct:Node
+Output	source.c	/^extern union Output *make_output(struct Context *);$/;"	u
+Param	source.c	/^void referenced_types(struct Param *, enum Mode, union Value *);$/;"	s
+Payload	source.c	/^int with_types(struct Argument *arg, union Payload *p, enum Flag f) { return 0; }$/;"	u	function:with_types
 RED	source.c	/^enum traffic_light_state {GREEN, YELLOW, RED};$/;"	e	enum:traffic_light_state	
+Request	source.c	/^enum Status get_status(struct Request *);$/;"	s
+Result	source.c	/^struct Result *make_result(union Input *, enum State);$/;"	s
 SAT	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	e	enum:days	
 SUN	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	e	enum:days	
+State	source.c	/^struct Result *make_result(union Input *, enum State);$/;"	g
+Status	source.c	/^enum Status get_status(struct Request *);$/;"	g
 THU	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	e	enum:days	
 TUE	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	e	enum:days	
+TYPE_CAST	source.c	/^#define TYPE_CAST(x) ((struct OpaqueMacroBody *)(x))$/;"	d
+TypeCallback	source.c	/^typedef void (*TypeCallback)(struct Context *, enum Event, union Data *);$/;"	t	typeref:typename:void (*)(struct Context *, enum Event, union Data *)
+Value	source.c	/^void referenced_types(struct Param *, enum Mode, union Value *);$/;"	u
 WED	source.c	/^enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};$/;"	e	enum:days	
 YELLOW	source.c	/^enum traffic_light_state {GREEN, YELLOW, RED};$/;"	e	enum:traffic_light_state	
 __anon16f8bb470108	source.c	/^struct {$/;"	s
@@ -51,5 +73,6 @@ traffic_light_state	source.c	/^enum traffic_light_state {GREEN, YELLOW, RED};$/;
 val	source.c	/^    int val;$/;"	m	struct:Node	typeref:typename:int	
 width	source.c	/^  int width;$/;"	m	struct:__anon16f8bb470308	typeref:typename:int
 width	source.c	/^  int width;$/;"	m	struct:rectangle	typeref:typename:int
+with_types	source.c	/^int with_types(struct Argument *arg, union Payload *p, enum Flag f) { return 0; }$/;"	f	typeref:typename:int
 x	source.c	/^  int x;$/;"	m	struct:__anon16f8bb470108	typeref:typename:int
 y	source.c	/^  int y;$/;"	m	struct:__anon16f8bb470108	typeref:typename:int
