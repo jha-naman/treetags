@@ -98,7 +98,11 @@ impl CHooks {
     ) {
         let text = cursor.text(token);
         let end = directive_end(source, token.start as usize);
-        if text.starts_with("#define") {
+        // The lexer captures `#`, optional interior whitespace, and the keyword as
+        // one token, so `#  define` / `#  include` reach here verbatim. Compare
+        // against the keyword with that whitespace stripped.
+        let keyword = text.strip_prefix('#').map(str::trim_start).unwrap_or(text);
+        if keyword.starts_with("define") {
             if cursor
                 .peek(0)
                 .is_some_and(|t| t.kind == c::IDENTIFIER && (t.start as usize) < end)
@@ -116,7 +120,7 @@ impl CHooks {
             first.get_or_insert(next);
             last = Some(next);
         }
-        if text.starts_with("#include") {
+        if keyword.starts_with("include") {
             if let (Some(first), Some(last)) = (first, last) {
                 let raw = cursor.span_text(first, last);
                 let delim = |c| matches!(c, '<' | '>' | '"');
@@ -205,21 +209,23 @@ impl CHooks {
             self.struct_body(cursor, out, kind, scope_key, struct_name, addr);
             // A trailing declarator, e.g. `struct { … } var;` (anonymous → no
             // typeref) or `struct Foo { … } var;`.
-            let (var, star) = read_declarator(cursor);
+            let (var, _star) = read_declarator(cursor);
             if let Some(var) = var {
                 let mut builder = out.tag("v", var, (var, var));
                 if let Some(name) = typeref {
-                    builder = builder.typeref_as("struct", struct_ref_value(name, star));
+                    // Variable typerefs omit the pointer star (oracle parity).
+                    builder = builder.typeref_as("struct", TextValue::Owned(name));
                 }
                 builder.emit();
             }
         } else if let Some(name) = name {
             // `struct NAME <declarator>;` — reference tag plus the declared var.
             let struct_name = cursor.text(name).to_string();
-            let (var, star) = read_declarator(cursor);
+            let (var, _star) = read_declarator(cursor);
             if let Some(var) = var {
                 out.tag("v", var, (var, var))
-                    .typeref_as("struct", struct_ref_value(struct_name, star))
+                    // Variable typerefs omit the pointer star (oracle parity).
+                    .typeref_as("struct", TextValue::Owned(struct_name))
                     .emit();
             }
         } else {
@@ -599,10 +605,17 @@ impl DeclHead {
                 return builder;
             }
             let name = cursor.text(last);
-            return if kind == "m" && !self.pointer {
-                builder.typeref(TextValue::Owned(format!("struct:{name}")))
+            return if kind == "m" {
+                // Members spell the pointer as `struct:Name *`; a plain member as
+                // `typename:struct:Name`.
+                if self.pointer {
+                    builder.typeref_as("struct", TextValue::Owned(format!("{name} *")))
+                } else {
+                    builder.typeref(TextValue::Owned(format!("struct:{name}")))
+                }
             } else {
-                builder.typeref_as("struct", struct_ref_value(name.to_owned(), self.pointer))
+                // Variables never carry the pointer star on the struct typeref.
+                builder.typeref_as("struct", TextValue::Owned(name.to_owned()))
             };
         }
         if kind == "m" && self.pointer {
@@ -630,12 +643,6 @@ fn agg_kind(kw: Tok) -> (&'static str, &'static str) {
     } else {
         ("s", "struct")
     }
-}
-
-/// The `struct:` typeref value for a referenced aggregate: the tag name, plus a
-/// ` *` suffix when the declarator is a pointer.
-fn struct_ref_value(name: String, star: bool) -> TextValue<'static> {
-    TextValue::Owned(if star { format!("{name} *") } else { name })
 }
 
 /// Gathers a declaration's type specifier and declarator name from `first` up to
@@ -1030,6 +1037,20 @@ mod tests {
     }
 
     #[test]
+    fn pointer_struct_typerefs_match_oracle() {
+        // A pointer struct *variable* carries no `*` on its typeref (`struct:Foo`),
+        // while a pointer struct *member* does (`struct:Node *`). The oracle only
+        // ever attaches the star to members, so variables must drop it.
+        assert_matches_oracle(
+            "struct Foo *p = init;\n\
+             struct Bar b;\n\
+             struct Node { struct Node *next; int v; } node_var;\n\
+             typedef struct Baz Baz;\n\
+             struct Baz *bp = init;\n",
+        );
+    }
+
+    #[test]
     fn declaration_type_specifiers_match_oracle() {
         for source in [
             "static inline int plain(void) {}\n",
@@ -1205,6 +1226,20 @@ mod tests {
              #include \"../my_lib/my_lib_header.h\"\n\
              enum days {SUN = 1, MON, TUE, WED = 99, THU, FRI, SAT};\n\
              enum traffic_light_state {GREEN, YELLOW, RED};\n",
+        );
+    }
+
+    #[test]
+    fn indented_directives_match_oracle() {
+        // Nested-conditional headers indent directives as `#  define` / `#  include`
+        // with whitespace between `#` and the keyword. The lexer captures this as a
+        // single directive token, so the hook must match past the interior spaces.
+        assert_matches_oracle(
+            "#ifdef CONFIG_FOO\n\
+             #  define GUARDED_MACRO\t\t(1 << 0)\n\
+             #  define GUARDED_VALUE 42\n\
+             #  include <nested/header.h>\n\
+             #endif\n",
         );
     }
 
