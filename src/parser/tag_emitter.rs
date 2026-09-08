@@ -116,6 +116,11 @@ impl<'e, 'a> TagBuilder<'e, 'a> {
         self.typeref = Some((kind, value.into()));
         self
     }
+    /// A complete typeref value, for backends with an unprefixed oracle spelling.
+    pub fn typeref_raw(mut self, value: impl Into<TextValue<'a>>) -> Self {
+        self.typeref = Some(("", value.into()));
+        self
+    }
     pub fn access(mut self, value: impl Into<TextValue<'a>>) -> Self {
         self.access = Some(value.into());
         self
@@ -182,7 +187,14 @@ impl<'e, 'a> TagBuilder<'e, 'a> {
         }
         if let Some((kind, v)) = self.typeref {
             if options.typeref {
-                fields.insert("typeref", format!("{}:{}", kind, v.get(source)))
+                fields.insert(
+                    "typeref",
+                    if kind.is_empty() {
+                        v.get(source).into_owned()
+                    } else {
+                        format!("{}:{}", kind, v.get(source))
+                    },
+                )
             }
         }
         if let Some(v) = self.signature {

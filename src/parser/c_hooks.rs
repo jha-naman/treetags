@@ -7,7 +7,7 @@
 use super::{
     generated::c,
     linear::{BlockMap, HookInput, NoExternalLexer, TagHooks, Tok, TokenCursor, TokenRange},
-    tag_emitter::{TagEmitter, TextValue},
+    tag_emitter::{TagBuilder, TagEmitter, TextValue},
 };
 
 pub(crate) struct CHooks {
@@ -72,12 +72,10 @@ impl TagHooks for CHooks {
                 c::KW_STRUCT | c::KW_UNION => self.aggregate(&mut cursor, output, token),
                 c::KW_TYPEDEF => self.typedef(&mut cursor, output, token),
                 c::LBRACE => skip_block(&mut cursor),
-                c::IDENTIFIER
-                | c::KW_STATIC
-                | c::KW_EXTERN
-                | c::KW_CONST
-                | c::KW_SIGNED
-                | c::KW_UNSIGNED => self.declaration(&mut cursor, output, token),
+                c::IDENTIFIER => self.declaration(&mut cursor, output, token),
+                _ if storage_or_qualifier(token) || size_specifier(token) => {
+                    self.declaration(&mut cursor, output, token)
+                }
                 _ => {}
             }
         }
@@ -260,9 +258,8 @@ impl CHooks {
                 continue;
             }
             let head = scan_decl_head(cursor, first);
-            if let Some((type_start, type_end, name)) = head.named() {
-                out.tag("m", name, (type_start, name))
-                    .typeref(TextValue::Span(type_start.start, type_end.end))
+            if let Some((type_start, _type_end, name)) = head.named() {
+                head.with_typeref(out.tag("m", name, (type_start, name)), cursor, "m")
                     .emit();
             }
             skip_to_semicolon(cursor);
@@ -331,11 +328,8 @@ impl CHooks {
             };
             cursor.consume_balanced_pair(c::LPAREN, c::RPAREN);
             if cursor.consume_if(c::LBRACE).is_some() {
-                let ret_start = head.type_start.unwrap_or(name);
-                let mut builder = out.tag("f", name, (ret_start, name));
-                if let (Some(type_start), Some(type_end)) = (head.type_start, head.type_end) {
-                    builder = builder.typeref(TextValue::Span(type_start.start, type_end.end));
-                }
+                let mut builder = out.tag("f", name, (first, name));
+                builder = head.with_typeref(builder, cursor, "f");
                 builder.emit();
                 skip_block(cursor);
             } else {
@@ -343,9 +337,8 @@ impl CHooks {
             }
             return;
         }
-        if let Some((type_start, type_end, name)) = head.named() {
-            out.tag("v", name, (type_start, name))
-                .typeref(TextValue::Span(type_start.start, type_end.end))
+        if let Some((type_start, _type_end, name)) = head.named() {
+            head.with_typeref(out.tag("v", name, (type_start, name)), cursor, "v")
                 .emit();
         }
         skip_to_semicolon(cursor);
@@ -569,9 +562,43 @@ struct DeclHead {
     type_start: Option<Tok>,
     type_end: Option<Tok>,
     name: Option<Tok>,
+    specifier: Option<(Tok, Tok)>,
+    pointer: bool,
 }
 
 impl DeclHead {
+    /// cpp.rs reads the type-specifier node, not the entire declaration prefix.
+    /// Its member-pointer spelling deliberately omits the `typename:` prefix.
+    fn with_typeref<'e, 'a>(
+        self,
+        builder: TagBuilder<'e, 'a>,
+        cursor: &TokenCursor<'_>,
+        kind: &str,
+    ) -> TagBuilder<'e, 'a> {
+        let Some((first, last)) = self.specifier else {
+            return builder;
+        };
+        if matches!(first.kind, c::KW_STRUCT | c::KW_UNION | c::KW_ENUM) {
+            if first.kind != c::KW_STRUCT || kind == "f" {
+                return builder;
+            }
+            let name = cursor.text(last);
+            return if kind == "m" && !self.pointer {
+                builder.typeref(TextValue::Owned(format!("struct:{name}")))
+            } else {
+                builder.typeref_as("struct", struct_ref_value(name.to_owned(), self.pointer))
+            };
+        }
+        if kind == "m" && self.pointer {
+            builder.typeref_raw(TextValue::Owned(format!(
+                "{} *",
+                cursor.span_text(first, last)
+            )))
+        } else {
+            builder.typeref(TextValue::Span(first.start, last.end))
+        }
+    }
+
     /// A named declaration only when a type precedes the name.
     fn named(self) -> Option<(Tok, Tok, Tok)> {
         match (self.type_start, self.type_end, self.name) {
@@ -605,7 +632,10 @@ fn scan_decl_head(cursor: &mut TokenCursor<'_>, first: Tok) -> DeclHead {
         type_start: None,
         type_end: None,
         name: None,
+        specifier: None,
+        pointer: false,
     };
+    let mut tokens = vec![first];
     absorb(&mut head, first);
     while let Some(next) = cursor.peek(0) {
         if matches!(
@@ -615,9 +645,91 @@ fn scan_decl_head(cursor: &mut TokenCursor<'_>, first: Tok) -> DeclHead {
             break;
         }
         cursor.next();
+        tokens.push(next);
         absorb(&mut head, next);
     }
+    if let Some(name) = head.name {
+        let prefix = &tokens[..tokens.iter().position(|t| t.start == name.start).unwrap()];
+        head.specifier = type_specifier(prefix);
+        head.pointer = prefix.iter().any(|t| t.kind == c::STAR);
+    }
     head
+}
+
+fn type_qualifier(token: Tok) -> bool {
+    matches!(
+        token.kind,
+        c::KW_CONST
+            | c::KW_CONSTEXPR
+            | c::KW_VOLATILE
+            | c::KW_RESTRICT
+            | c::KW___RESTRICT__
+            | c::KW___EXTENSION__
+            | c::KW__NONNULL
+            | c::KW__ATOMIC
+            | c::KW__NORETURN
+            | c::KW_NORETURN
+    )
+}
+
+fn storage_or_qualifier(token: Tok) -> bool {
+    type_qualifier(token)
+        || matches!(
+            token.kind,
+            c::KW_STATIC
+                | c::KW_EXTERN
+                | c::KW_TYPEDEF
+                | c::KW_INLINE
+                | c::KW___INLINE
+                | c::KW___INLINE__
+                | c::KW___FORCEINLINE
+                | c::KW___THREAD
+                | c::KW_THREAD_LOCAL
+                | c::KW_AUTO
+                | c::KW_REGISTER
+        )
+}
+
+fn size_specifier(token: Tok) -> bool {
+    matches!(
+        token.kind,
+        c::KW_SIGNED | c::KW_UNSIGNED | c::KW_LONG | c::KW_SHORT
+    )
+}
+
+/// Mirror C's primitive/type-identifier and sized-type-specifier productions.
+/// An unknown annotation is a type identifier: `__init int` selects `__init`,
+/// while `__init unsigned long` is one sized specifier. Keep the source span
+/// (including internal qualifiers/whitespace) exactly as the oracle does.
+fn type_specifier(tokens: &[Tok]) -> Option<(Tok, Tok)> {
+    let start = tokens.iter().position(|t| !storage_or_qualifier(*t))?;
+    let first = tokens[start];
+    if matches!(first.kind, c::KW_STRUCT | c::KW_UNION | c::KW_ENUM) {
+        return tokens
+            .get(start + 1)
+            .filter(|t| t.kind == c::IDENTIFIER)
+            .map(|last| (first, *last));
+    }
+    if first.kind != c::IDENTIFIER && !size_specifier(first) {
+        return None;
+    }
+    let mut last = first;
+    let mut has_type = first.kind == c::IDENTIFIER;
+    let mut has_size = size_specifier(first);
+    for token in &tokens[start + 1..] {
+        if size_specifier(*token) {
+            has_size = true;
+            last = *token;
+        } else if has_size && !has_type && type_qualifier(*token) {
+            last = *token;
+        } else if has_size && !has_type && token.kind == c::IDENTIFIER {
+            has_type = true;
+            last = *token;
+        } else {
+            break;
+        }
+    }
+    Some((first, last))
 }
 
 fn absorb(head: &mut DeclHead, token: Tok) {
@@ -841,6 +953,48 @@ mod tests {
 
     fn assert_matches_oracle(source: &str) {
         assert_eq!(sorted(actual(source)), sorted(oracle(source)));
+    }
+
+    #[test]
+    fn declaration_type_specifiers_match_oracle() {
+        for source in [
+            "static inline int plain(void) {}\n",
+            "const\nint multiline(void) {}\n",
+            "static\ninline\nint storage(void) {}\n",
+            "__init int prefix(void) {}\nint __init suffix(void) {}\n",
+            "static __attribute_const__ unsigned long sized(void) {}\n",
+            "unsigned const int qualified(void) {}\n",
+            "const struct Object aggregate(void) {}\n",
+            "union Value union_result(void) {}\n",
+            "static const int value;\nvolatile unsigned long count;\n",
+            "const struct Object object;\n",
+            "struct Fields { const int value; volatile unsigned long count; int *pointer; };\n",
+            "struct Fields { volatile unsigned long csr __attribute__((aligned(16))); };\n",
+            "struct Fields { __init int value; unsigned const int sized; };\n",
+        ] {
+            assert_matches_oracle(source);
+        }
+    }
+
+    #[test]
+    fn normalized_member_typeref_respects_disabled_field() {
+        let kinds = TagKindConfig::from_string("", C_KIND_DEFAULTS, C_KIND_OPTIONALS);
+        let config = crate::config::Config::for_test();
+        let mut options = super::super::linear::HookOptions::from_config(&kinds, &config);
+        options.typeref = false;
+        let tags = generate(
+            "struct Fields { const int *pointer; };",
+            "source.c",
+            options,
+        )
+        .unwrap();
+        let member = tags.iter().find(|tag| tag.name == "pointer").unwrap();
+        assert!(member
+            .extension_fields
+            .as_ref()
+            .unwrap()
+            .get("typeref")
+            .is_none());
     }
 
     #[test]

@@ -40,6 +40,7 @@ NestedValue	source.c	/^void nested_callback(void (*callback)(struct Nested *, un
 Node	source.c	/^    struct Node *next;$/;"	s	struct:Node
 Node	source.c	/^typedef struct Node$/;"	s	
 Node	source.c	/^typedef struct Node$/;"	t	typeref:struct:Node
+NormalizedFields	source.c	/^struct NormalizedFields {$/;"	s
 Output	source.c	/^extern union Output *make_output(struct Context *);$/;"	u
 Param	source.c	/^void referenced_types(struct Param *, enum Mode, union Value *);$/;"	s
 Payload	source.c	/^int after_macro_calls(union Payload *p, enum Flag f) { return 0; }$/;"	u	function:after_macro_calls
@@ -74,6 +75,8 @@ after_free	source.c	/^int after_free(void) { return AFTER_FREE; }$/;"	f	typeref:
 after_macro_calls	source.c	/^int after_macro_calls(union Payload *p, enum Flag f) { return 0; }$/;"	f	typeref:typename:int
 after_nested	source.c	/^    int after_nested;$/;"	m	struct:NestedContainer	typeref:typename:int
 after_nested_aggregates	source.c	/^int after_nested_aggregates(void) { return 0; }$/;"	f	typeref:typename:int
+aligned_member	source.c	/^    volatile unsigned long aligned_member __attribute__((aligned(16)));$/;"	m	struct:NormalizedFields	typeref:typename:unsigned long
+annotated_member	source.c	/^    __init int annotated_member;$/;"	m	struct:NormalizedFields	typeref:typename:__init
 anonymous_member	source.c	/^        int anonymous_member;$/;"	m	struct:__anon16f8bb470408	typeref:typename:int
 anonymous_struct_var	source.c	/^} anonymous_struct_var;$/;"	v
 area	source.c	/^int area(rect r)$/;"	f	typeref:typename:int
@@ -99,8 +102,18 @@ my_type_var	source.c	/^my_type my_type_var = 0;$/;"	v	typeref:typename:my_type
 named_member	source.c	/^        int named_member;$/;"	m	struct:NamedChild	typeref:typename:int
 nested	source.c	/^    struct { int typedef_child; } nested;$/;"	m	struct:__anon16f8bb470808
 next	source.c	/^    struct Node *next;$/;"	m	struct:Node	typeref:struct:Node *	
+normalized_aggregate	source.c	/^struct Node normalized_aggregate(void) { }$/;"	f
+normalized_count	source.c	/^volatile unsigned long normalized_count;$/;"	v	typeref:typename:unsigned long
+normalized_inline	source.c	/^static inline int normalized_inline(void) { return 0; }$/;"	f	typeref:typename:int
+normalized_internal_qualifier	source.c	/^unsigned const int normalized_internal_qualifier(void) { return 0; }$/;"	f	typeref:typename:unsigned const int
+normalized_prefix	source.c	/^__init int normalized_prefix(void) { return 0; }$/;"	f	typeref:typename:__init
+normalized_sized	source.c	/^static __attribute_const__ unsigned long normalized_sized(void) { return 0; }$/;"	f	typeref:typename:__attribute_const__ unsigned long
+normalized_suffix	source.c	/^int __init normalized_suffix(void) { return 0; }$/;"	f	typeref:typename:int
+normalized_variable	source.c	/^static const int normalized_variable;$/;"	v	typeref:typename:int
 payload	source.c	/^    union {$/;"	m	struct:NestedContainer
+primitive_pointer	source.c	/^    int *primitive_pointer;$/;"	m	struct:NormalizedFields	typeref:int *
 promoted_member	source.c	/^        struct { int promoted_member; };$/;"	m	struct:__anon16f8bb470608	typeref:typename:int
+qualified_member	source.c	/^    const int qualified_member;$/;"	m	struct:NormalizedFields	typeref:typename:int
 r	source.c	/^rect r;$/;"	v	typeref:typename:rect
 r	source.c	/^struct rectangle r;$/;"	v	typeref:struct:rectangle
 rect	source.c	/^typedef struct rectangle rect;$/;"	t	typeref:struct:rectangle	
@@ -109,6 +122,7 @@ rectangle	source.c	/^struct rectangle r;$/;"	s
 rectangle	source.c	/^struct rectangle {$/;"	s	
 rectangle	source.c	/^typedef struct rectangle rect;$/;"	s
 selected	source.c	/^        union NamedChoice { int choice_member; } selected;$/;"	m	struct:NamedChild
+sized_member	source.c	/^    unsigned const int sized_member;$/;"	m	struct:NormalizedFields	typeref:typename:unsigned const int
 stdlib.h	source.c	/^#include <stdlib.h>$/;"	h
 str_reverse_through_pointer	source.c	/^void str_reverse_through_pointer(char *str_in) {$/;"	f	typeref:typename:void
 string.h	source.c	/^#include <string.h>$/;"	h

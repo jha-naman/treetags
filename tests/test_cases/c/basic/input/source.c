@@ -219,3 +219,20 @@ typedef struct {
     struct { int typedef_child; } nested;
 } NestedAlias;
 int after_nested_aggregates(void) { return 0; }
+
+// Type-specifier normalization, including unexpanded section annotations.
+static inline int normalized_inline(void) { return 0; }
+__init int normalized_prefix(void) { return 0; }
+int __init normalized_suffix(void) { return 0; }
+static __attribute_const__ unsigned long normalized_sized(void) { return 0; }
+unsigned const int normalized_internal_qualifier(void) { return 0; }
+struct Node normalized_aggregate(void) { }
+static const int normalized_variable;
+volatile unsigned long normalized_count;
+struct NormalizedFields {
+    const int qualified_member;
+    volatile unsigned long aligned_member __attribute__((aligned(16)));
+    int *primitive_pointer;
+    __init int annotated_member;
+    unsigned const int sized_member;
+};
