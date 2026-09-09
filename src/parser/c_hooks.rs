@@ -7,8 +7,8 @@
 use super::{
     generated::c,
     linear::{
-        BalancedUntil, BlockMap, HookInput, NoExternalLexer, TagHooks, Tok, TokenCursor, TokenKind,
-        TokenRange,
+        BalancedUntil, BlockMap, HookInput, NoExternalLexer, SeparatedRange, TagHooks, Tok,
+        TokenCursor, TokenKind, TokenRange,
     },
     tag_emitter::{TagBuilder, TagEmitter, TextValue},
 };
@@ -370,6 +370,29 @@ impl CHooks {
         if let Some((type_start, _type_end, name)) = head.named() {
             head.with_typeref(out.tag("v", name, (type_start, name)), cursor, "v")
                 .emit();
+            // Only plain names belong in this range. A declarator with an
+            // initializer, array suffix, or parameter list needs its own parser.
+            let start = cursor.mark();
+            while cursor.peek(0).is_some_and(|t| t.kind == c::COMMA)
+                && cursor.peek(1).is_some_and(|t| t.kind == c::IDENTIFIER)
+                && cursor
+                    .peek(2)
+                    .is_some_and(|t| matches!(t.kind, c::COMMA | c::SEMI))
+            {
+                cursor.next(); // `,`
+                cursor.next(); // name
+            }
+            let names = SeparatedRange {
+                range: TokenRange {
+                    start,
+                    end: cursor.mark(),
+                },
+                item: c::IDENTIFIER,
+            };
+            for name in names.items(cursor).expect("range from this cursor") {
+                head.with_typeref(out.tag("v", name, (name, name)), cursor, "v")
+                    .emit();
+            }
         }
         skip_to_semicolon(cursor);
     }
@@ -1035,6 +1058,24 @@ mod tests {
 
     fn assert_matches_oracle(source: &str) {
         assert_eq!(sorted(actual(source)), sorted(oracle(source)));
+    }
+
+    #[test]
+    fn comma_separated_variables_match_oracle() {
+        for source in [
+            "int x, y;\n",
+            "unsigned long x, y, z;\nint following;\n",
+            "const int x,\n y,\n z;\n",
+            "int x, y, function(void);\n",
+            "int x, y, array[3];\n",
+        ] {
+            assert_matches_oracle(source);
+        }
+        let tags = actual("int x, y;\n");
+        assert_eq!(
+            tags.iter().map(|tag| tag.name.as_str()).collect::<Vec<_>>(),
+            ["x", "y"]
+        );
     }
 
     #[test]
