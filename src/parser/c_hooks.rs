@@ -6,7 +6,10 @@
 
 use super::{
     generated::c,
-    linear::{BlockMap, HookInput, NoExternalLexer, TagHooks, Tok, TokenCursor, TokenRange},
+    linear::{
+        BalancedUntil, BlockMap, HookInput, NoExternalLexer, TagHooks, Tok, TokenCursor, TokenKind,
+        TokenRange,
+    },
     tag_emitter::{TagBuilder, TagEmitter, TextValue},
 };
 
@@ -834,18 +837,19 @@ fn absorb(head: &mut DeclHead, token: Tok) {
 /// Consumes through the next top-level `;`, reporting the final identifier before
 /// it (the declared name) and whether the declarator was a pointer.
 fn read_declarator(cursor: &mut TokenCursor<'_>) -> (Option<Tok>, bool) {
-    let (mut name, mut star, mut depth) = (None, false, 0u32);
+    let (mut name, mut star) = (None, false);
     while cursor.peek(0).is_some() {
-        if depth == 0 && consume_attribute(cursor) {
+        if consume_attribute(cursor) {
             continue;
         }
         let token = cursor.next().unwrap();
         match token.kind {
-            c::LBRACE | c::LPAREN | c::LBRACKET => depth += 1,
-            c::RBRACE | c::RPAREN | c::RBRACKET => depth = depth.saturating_sub(1),
-            c::SEMI if depth == 0 => break,
-            c::STAR if depth == 0 => star = true,
-            c::IDENTIFIER if depth == 0 => name = Some(token),
+            c::LBRACE => consume_until(cursor, c::RBRACE, None),
+            c::LPAREN => consume_until(cursor, c::RPAREN, None),
+            c::LBRACKET => consume_until(cursor, c::RBRACKET, None),
+            c::SEMI => break,
+            c::STAR => star = true,
+            c::IDENTIFIER => name = Some(token),
             _ => {}
         }
     }
@@ -887,52 +891,39 @@ fn read_field_declarator(cursor: &mut TokenCursor<'_>) -> (Option<Tok>, bool) {
     (name, star)
 }
 
+/// Consume through a top-level separator, leaving an optional owner close for
+/// the caller. C statements continue across newlines.
+fn consume_until(
+    cursor: &mut TokenCursor<'_>,
+    separator: TokenKind,
+    owner_close: Option<TokenKind>,
+) {
+    cursor.consume_balanced_until(BalancedUntil {
+        delimiters: super::linear::DelimiterKinds {
+            semicolon: separator,
+            ..c::DELIMITERS
+        },
+        owner_close,
+        logical_line: false,
+        can_terminate_line: |_| false,
+    });
+}
+
 /// Consumes to the `}` matching an already-consumed `{`.
 fn skip_block(cursor: &mut TokenCursor<'_>) {
-    let mut depth = 1u32;
-    while let Some(token) = cursor.next() {
-        match token.kind {
-            c::LBRACE => depth += 1,
-            c::RBRACE => {
-                depth -= 1;
-                if depth == 0 {
-                    return;
-                }
-            }
-            _ => {}
-        }
-    }
+    consume_until(cursor, c::RBRACE, None);
 }
 
 /// Consumes through the next top-level `;`, skipping balanced groups so a `;`
 /// inside an initializer does not end the statement early.
 fn skip_to_semicolon(cursor: &mut TokenCursor<'_>) {
-    let mut depth = 0u32;
-    while let Some(token) = cursor.next() {
-        match token.kind {
-            c::LBRACE | c::LPAREN | c::LBRACKET => depth += 1,
-            c::RBRACE | c::RPAREN | c::RBRACKET => depth = depth.saturating_sub(1),
-            c::SEMI if depth == 0 => return,
-            _ => {}
-        }
-    }
+    consume_until(cursor, c::SEMI, None);
 }
 
-/// Advances to the next top-level `,` or `}` (both left unconsumed), skipping any
-/// balanced initializer expression after `=`.
+/// Advances through the next top-level `,` or up to `}` (left unconsumed),
+/// skipping any balanced initializer expression after `=`.
 fn skip_to_enum_separator(cursor: &mut TokenCursor<'_>) {
-    let mut depth = 0u32;
-    while let Some(token) = cursor.peek(0) {
-        match token.kind {
-            c::LPAREN | c::LBRACKET => depth += 1,
-            c::RPAREN | c::RBRACKET => depth = depth.saturating_sub(1),
-            c::RBRACE if depth == 0 => return,
-            c::RBRACE => depth -= 1,
-            c::COMMA if depth == 0 => return,
-            _ => {}
-        }
-        cursor.next();
-    }
+    consume_until(cursor, c::COMMA, Some(c::RBRACE));
 }
 
 fn filename_hash(path: &str) -> String {
@@ -1044,6 +1035,32 @@ mod tests {
 
     fn assert_matches_oracle(source: &str) {
         assert_eq!(sorted(actual(source)), sorted(oracle(source)));
+    }
+
+    #[test]
+    fn balanced_declaration_boundaries_match_oracle() {
+        assert_matches_oracle(
+            "enum Values { A = sizeof((int[]){1, 2}), B = (3 + (4)), C };\n\
+             typedef struct { int member; } Alias;\n\
+             void body(void) { if (1) { int hidden; } }\n\
+             int following;\n",
+        );
+    }
+
+    #[test]
+    fn statement_boundaries_skip_nested_groups() {
+        for source in [
+            "int values[] = {1, 2}; following",
+            "int computed = ({ int local = 1; local; }); following",
+            "int value = call(\n1, array[index]);\nfollowing",
+        ] {
+            let stream = c::scan::<NoExternalLexer>(source).unwrap();
+            let mut cursor = TokenCursor::new(source, &stream.tokens);
+            skip_to_semicolon(&mut cursor);
+            let next = cursor.next().unwrap();
+            assert_eq!(cursor.text(next), "following");
+            assert!(cursor.next().is_none());
+        }
     }
 
     #[test]
