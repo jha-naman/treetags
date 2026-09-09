@@ -147,12 +147,13 @@ impl CHooks {
         if cursor.peek(0).map(|t| t.kind) != Some(c::LBRACE) {
             return;
         }
-        if let Some(name) = name {
+        // Compute the scope name before the closure borrows the cursor.
+        let scope_name = name.map(|name| {
             out.tag("g", name, (kw, name)).emit();
-            out.enter_scope("enum", cursor.text(name).to_string());
-        }
+            cursor.text(name).to_string()
+        });
         cursor.next(); // consume `{`
-        loop {
+        let mut scan_members = |out: &mut TagEmitter<'_>| loop {
             while matches!(
                 cursor.peek(0).map(|t| t.kind),
                 Some(c::COMMA) | Some(c::SEMI)
@@ -171,9 +172,10 @@ impl CHooks {
                 out.tag("e", member, (member, member)).emit();
             }
             skip_to_enum_separator(cursor);
-        }
-        if name.is_some() {
-            out.leave_scope();
+        };
+        match scope_name {
+            Some(name) => out.in_scope("enum", name, scan_members),
+            None => scan_members(out),
         }
     }
 
@@ -250,12 +252,14 @@ impl CHooks {
         out.tag(kind, TextValue::Owned(name.clone()), (addr, addr))
             .emit();
         cursor.next(); // consume `{`
-        out.enter_scope(scope_key, name);
-        self.members(cursor, out);
-        out.leave_scope();
+        out.in_scope(scope_key, name, |out| self.members(cursor, out));
     }
 
-    /// Aggregate members up to and including the closing `}`.
+    /// Aggregate members up to and including the closing `}`. Unlike Go's
+    /// `TokenCursor::members`, C bodies are not cleanly fragmentable: a `#define`
+    /// inside a body is line-terminated with no `;`, so pre-bounding each member
+    /// at the next top-level `;` would merge a directive with the member after
+    /// it. The framing therefore stays hand-written and handlers consume inline.
     fn members(&mut self, cursor: &mut TokenCursor<'_>, out: &mut TagEmitter<'_>) {
         loop {
             while cursor.consume_if(c::SEMI).is_some() {}
@@ -513,34 +517,21 @@ fn standalone_macro_call(cursor: &TokenCursor<'_>) -> Option<TokenRange> {
     if cursor.peek(i)?.kind != c::IDENTIFIER || cursor.peek(i + 1)?.kind != c::LPAREN {
         return None;
     }
-    i += 2;
-    let mut depth = 1u32;
-    while let Some(token) = cursor.peek(i) {
-        match token.kind {
-            c::LPAREN => depth += 1,
-            c::RPAREN => {
-                depth -= 1;
-                if depth == 0 {
-                    let end = i + 1;
-                    if cursor.peek(end).is_some_and(|t| {
-                        matches!(
-                            t.kind,
-                            c::LBRACE | c::EQ | c::COMMA | c::LPAREN | c::LBRACKET
-                        )
-                    }) {
-                        return None;
-                    }
-                    return Some(TokenRange {
-                        start: cursor.mark(),
-                        end: cursor.mark() + end,
-                    });
-                }
-            }
-            _ => {}
-        }
-        i += 1;
+    // Jump the argument `(...)`; `range.end` is one past the matching `)`.
+    let range = cursor.peek_balanced(i + 1)?;
+    let after = range.end - cursor.mark();
+    if cursor.peek(after).is_some_and(|t| {
+        matches!(
+            t.kind,
+            c::LBRACE | c::EQ | c::COMMA | c::LPAREN | c::LBRACKET
+        )
+    }) {
+        return None;
     }
-    None
+    Some(TokenRange {
+        start: cursor.mark(),
+        end: range.end,
+    })
 }
 
 /// Inspect a declaration before its handler consumes the signature. References
@@ -550,7 +541,6 @@ fn scan_type_references(cursor: &TokenCursor<'_>, out: &mut TagEmitter<'_>, scan
     // The oracle puts the entire definition signature in function scope and
     // suppresses struct references there (but retains enum/union references).
     let mut function = None;
-    let mut depth = 0u32;
     let mut previous = None;
     let mut candidate = None;
     let mut i = 0;
@@ -562,16 +552,21 @@ fn scan_type_references(cursor: &TokenCursor<'_>, out: &mut TagEmitter<'_>, scan
         match token.kind {
             c::LITERAL | c::SEMI => break,
             c::LPAREN => {
-                if depth == 0 && candidate.is_none() {
+                // The identifier before the first top-level group is the function
+                // name candidate; jump the group rather than counting depth.
+                if candidate.is_none() {
                     candidate = previous;
                 }
-                depth += 1;
-            }
-            c::RPAREN => depth = depth.saturating_sub(1),
-            c::LBRACE => {
-                if depth == 0 {
-                    function = candidate;
+                match cursor.peek_balanced(i) {
+                    Some(range) => {
+                        i = range.end - cursor.mark();
+                        continue;
+                    }
+                    None => break,
                 }
+            }
+            c::LBRACE => {
+                function = candidate;
                 break;
             }
             _ => {}
@@ -737,23 +732,10 @@ fn attribute_end(cursor: &TokenCursor<'_>, start: usize) -> Option<usize> {
     if !attribute_keyword(cursor.peek(start)?) || cursor.peek(start + 1)?.kind != c::LPAREN {
         return None;
     }
-    let mut depth = 0u32;
-    let mut i = start + 1;
-    while let Some(token) = cursor.peek(i) {
-        match token.kind {
-            c::LPAREN => depth += 1,
-            c::RPAREN => {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(i + 1);
-                }
-            }
-            c::SEMI => return None,
-            _ => {}
-        }
-        i += 1;
-    }
-    None
+    // Jump the whole `(...)` group; `range.end` is the absolute index just past
+    // the matching `)`, which we return as a peek offset from the cursor.
+    let range = cursor.peek_balanced(start + 1)?;
+    Some(range.end - cursor.mark())
 }
 
 fn consume_attribute(cursor: &mut TokenCursor<'_>) -> bool {
@@ -861,22 +843,46 @@ fn absorb(head: &mut DeclHead, token: Tok) {
 /// it (the declared name) and whether the declarator was a pointer.
 fn read_declarator(cursor: &mut TokenCursor<'_>) -> (Option<Tok>, bool) {
     let (mut name, mut star) = (None, false);
-    while cursor.peek(0).is_some() {
+    while let Some(token) = cursor.peek(0) {
         if consume_attribute(cursor) {
             continue;
         }
-        let token = cursor.next().unwrap();
         match token.kind {
-            c::LBRACE => consume_until(cursor, c::RBRACE, None),
-            c::LPAREN => consume_until(cursor, c::RPAREN, None),
-            c::LBRACKET => consume_until(cursor, c::RBRACKET, None),
-            c::SEMI => break,
-            c::STAR => star = true,
-            c::IDENTIFIER => name = Some(token),
-            _ => {}
+            c::LBRACE | c::LPAREN | c::LBRACKET => skip_group(cursor, token),
+            c::SEMI => {
+                cursor.next();
+                break;
+            }
+            c::STAR => {
+                cursor.next();
+                star = true;
+            }
+            c::IDENTIFIER => {
+                cursor.next();
+                name = Some(token);
+            }
+            _ => {
+                cursor.next();
+            }
         }
     }
     (name, star)
+}
+
+/// Consumes the balanced group opened by `open` whole. Falls back to consuming
+/// the opener and scanning to its close family when no [`BlockMap`] is available
+/// or the group is unmatched, keeping the walk total either way.
+fn skip_group(cursor: &mut TokenCursor<'_>, open: Tok) {
+    if cursor.skip_balanced() {
+        return;
+    }
+    let close = match open.kind {
+        c::LBRACE => c::RBRACE,
+        c::LPAREN => c::RPAREN,
+        _ => c::RBRACKET,
+    };
+    cursor.next(); // opener
+    consume_until(cursor, close, None);
 }
 
 /// The oracle ignores array field declarators, including aggregate arrays.
@@ -892,12 +898,11 @@ fn read_field_declarator(cursor: &mut TokenCursor<'_>) -> (Option<Tok>, bool) {
                 break;
             }
             c::LBRACKET => {
+                // The oracle ignores array declarators, so drop the name.
                 name = None;
-                cursor.consume_balanced_pair(c::LBRACKET, c::RBRACKET);
+                skip_group(cursor, token);
             }
-            c::LPAREN => {
-                cursor.consume_balanced_pair(c::LPAREN, c::RPAREN);
-            }
+            c::LPAREN => skip_group(cursor, token),
             c::IDENTIFIER => {
                 name = Some(token);
                 cursor.next();
@@ -1000,7 +1005,7 @@ pub(crate) fn generate(
     };
     let blocks = BlockMap::new(&stream.tokens, c::DELIMITERS);
     let mut tags = Vec::new();
-    let mut emitter = TagEmitter::new(input, &mut tags, blocks);
+    let mut emitter = TagEmitter::new(input, &mut tags, &blocks);
     let mut hooks = CHooks {
         sequence: 1,
         hash: filename_hash(path),
@@ -1008,7 +1013,7 @@ pub(crate) fn generate(
     };
     hooks.generate(
         input,
-        TokenCursor::new(source, &stream.tokens),
+        TokenCursor::with_blocks(source, &stream.tokens, &blocks),
         &mut emitter,
     );
     Ok(tags)

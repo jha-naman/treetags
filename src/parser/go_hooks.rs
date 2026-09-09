@@ -6,7 +6,7 @@ use super::{
         next_value_spec, parse_function, GoDeclGroup, GoInterfaceMember, GoStructField,
         GoTypeSpecRhs, DELIMITERS,
     },
-    linear::{BlockMap, HookInput, TagHooks, Tok, TokenCursor},
+    linear::{BlockMap, HookInput, MemberRule, TagHooks, Tok, TokenCursor},
     tag_emitter::{TagEmitter, TextValue},
 };
 
@@ -101,12 +101,11 @@ impl GoHooks {
                     out.tag(if is_struct { "s" } else { "i" }, name, (name, open))
                         .body(open)
                         .emit();
-                    out.enter_scope(
+                    out.in_scope(
                         if is_struct { "struct" } else { "interface" },
                         format!("{}.{}", self.package, cursor.text(name)),
+                        |out| self.members(cursor, out, is_struct),
                     );
-                    self.members(cursor, out, is_struct);
-                    out.leave_scope();
                 }
                 GoTypeSpecRhs::Type(span) => {
                     if spec.type_params.is_none() {
@@ -123,40 +122,33 @@ impl GoHooks {
     }
 
     fn members(&self, cursor: &mut TokenCursor<'_>, out: &mut TagEmitter<'_>, is_struct: bool) {
-        loop {
-            while cursor.consume_if(go::SEMI).is_some() {}
-            if cursor.consume_if(go::RBRACE).is_some() || cursor.peek(0).is_none() {
-                return;
-            }
-
-            let range = cursor.consume_balanced_until(member_until());
+        let rule = MemberRule {
+            close: go::RBRACE,
+            skip: &[go::SEMI],
+            fragment: member_until(),
+        };
+        cursor.members(rule, |member| {
             if is_struct {
-                let mut member = cursor.view(range).expect("syntax-produced range");
-                let Some(field) = next_struct_field(&mut member) else {
-                    continue;
+                let Some(GoStructField::Named { names, ty }) = next_struct_field(member) else {
+                    return;
                 };
-                if let GoStructField::Named { names, ty } = field {
-                    let Some(names) = names.items(&member) else {
-                        continue;
-                    };
-                    for name in names {
-                        let mut b = out.tag("m", name, (name, ty.map_or(name, |s| s.last)));
-                        if let Some(s) = ty {
-                            if s.is_direct_named_family() {
-                                let (a, z) = s.byte_range();
-                                b = b.typeref(TextValue::Span(a, z));
-                            }
+                let Some(names) = names.items(member) else {
+                    return;
+                };
+                for name in names {
+                    let mut b = out.tag("m", name, (name, ty.map_or(name, |s| s.last)));
+                    if let Some(s) = ty {
+                        if s.is_direct_named_family() {
+                            let (a, z) = s.byte_range();
+                            b = b.typeref(TextValue::Span(a, z));
                         }
-                        b.emit();
                     }
+                    b.emit();
                 }
-            } else {
-                let mut member_cursor = cursor.view(range).expect("syntax-produced range");
-                if let Some(member) = next_interface_member(&mut member_cursor) {
-                    self.emit_interface_member(out, member);
-                }
+            } else if let Some(member) = next_interface_member(member) {
+                self.emit_interface_member(out, member);
             }
-        }
+        });
     }
 
     fn emit_interface_member(&self, out: &mut TagEmitter<'_>, member: GoInterfaceMember) {
@@ -227,10 +219,10 @@ pub(crate) fn generate(
     };
     let blocks = BlockMap::new(&stream.tokens, DELIMITERS);
     let mut tags = Vec::new();
-    let mut emitter = TagEmitter::new(input, &mut tags, blocks);
+    let mut emitter = TagEmitter::new(input, &mut tags, &blocks);
     GoHooks::default().generate(
         input,
-        TokenCursor::new(source, &stream.tokens),
+        TokenCursor::with_blocks(source, &stream.tokens, &blocks),
         &mut emitter,
     );
     Ok(tags)

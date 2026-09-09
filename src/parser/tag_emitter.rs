@@ -36,7 +36,7 @@ impl From<Tok> for TextValue<'_> {
 pub(crate) struct TagEmitter<'a> {
     input: HookInput<'a>,
     tags: &'a mut Vec<Tag>,
-    blocks: BlockMap,
+    blocks: &'a BlockMap,
     /// C retains the innermost enclosing scope of each kind.
     inherit_all_scopes: bool,
     /// Innermost-last stack of enclosing scope frames. A tag with no explicit
@@ -45,7 +45,7 @@ pub(crate) struct TagEmitter<'a> {
     scopes: Vec<(&'static str, String)>,
 }
 impl<'a> TagEmitter<'a> {
-    pub fn new(input: HookInput<'a>, tags: &'a mut Vec<Tag>, blocks: BlockMap) -> Self {
+    pub fn new(input: HookInput<'a>, tags: &'a mut Vec<Tag>, blocks: &'a BlockMap) -> Self {
         Self {
             input,
             tags,
@@ -66,6 +66,21 @@ impl<'a> TagEmitter<'a> {
     }
     pub fn leave_scope(&mut self) {
         self.scopes.pop();
+    }
+    /// Runs `f` with `(kind, name)` pushed as the enclosing scope, popping it
+    /// afterwards. The pop is automatic on every path out of `f`, so hooks no
+    /// longer have to pair [`enter_scope`](Self::enter_scope) with
+    /// [`leave_scope`](Self::leave_scope) by hand across early returns.
+    pub fn in_scope<R>(
+        &mut self,
+        kind: &'static str,
+        name: String,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        self.enter_scope(kind, name);
+        let result = f(self);
+        self.leave_scope();
+        result
     }
     pub fn tag<'e>(
         &'e mut self,
