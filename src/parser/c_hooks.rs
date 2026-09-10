@@ -7,11 +7,13 @@
 use super::{
     generated::c,
     linear::{
-        BalancedUntil, BlockMap, HookInput, NoExternalLexer, SeparatedRange, TagHooks, Tok,
-        TokenCursor, TokenKind, TokenRange,
+        BalancedUntil, BlockMap, ExternalLexInput, ExternalLexemeSink, ExternalLexer, ExternalScan,
+        HookInput, MemberRule, SeparatedRange, TagHooks, Tok, TokenCursor, TokenFlags, TokenKind,
+        TokenRange,
     },
     tag_emitter::{TagBuilder, TagEmitter, TextValue},
 };
+use std::num::NonZeroU32;
 
 pub(crate) struct CHooks {
     /// Anonymous aggregate counter, mirroring cpp.rs: starts at 1, read then
@@ -47,7 +49,7 @@ impl CHooks {
 impl TagHooks for CHooks {
     fn generate(
         &mut self,
-        input: HookInput<'_>,
+        _input: HookInput<'_>,
         mut cursor: TokenCursor<'_>,
         output: &mut TagEmitter<'_>,
     ) {
@@ -70,7 +72,7 @@ impl TagHooks for CHooks {
             scan_type_references(&cursor, output, &mut self.references_end);
             cursor.next();
             match token.kind {
-                c::LITERAL => self.directive(input.source, &mut cursor, output, token),
+                c::LITERAL => self.directive(&mut cursor, output, token),
                 c::KW_ENUM => self.enum_decl(&mut cursor, output, token),
                 c::KW_STRUCT | c::KW_UNION => self.aggregate(&mut cursor, output, token),
                 c::KW_TYPEDEF => self.typedef(&mut cursor, output, token),
@@ -89,54 +91,34 @@ impl TagHooks for CHooks {
 }
 
 impl CHooks {
-    /// `#define NAME …` → macro `d`; `#include <h>`/`"h"` → header `h`. Every
-    /// directive consumes its whole logical line, including backslash-newline
-    /// continuations, so macro bodies and guard operands stay opaque.
-    fn directive(
-        &self,
-        source: &str,
-        cursor: &mut TokenCursor<'_>,
-        out: &mut TagEmitter<'_>,
-        token: Tok,
-    ) {
-        let text = cursor.text(token);
-        let end = directive_end(source, token.start as usize);
-        // The lexer captures `#`, optional interior whitespace, and the keyword as
-        // one token, so `#  define` / `#  include` reach here verbatim. Compare
-        // against the keyword with that whitespace stripped.
+    /// A preprocessor directive, pre-tokenized by [`CPreprocLexer`] into the
+    /// `#keyword` introducer, an optional name/path operand, and a virtual `;`
+    /// terminator. `#define NAME …` → macro `d`; `#include <h>`/`"h"` → header `h`.
+    fn directive(&self, cursor: &mut TokenCursor<'_>, out: &mut TagEmitter<'_>, introducer: Tok) {
+        let text = cursor.text(introducer);
         let keyword = text.strip_prefix('#').map(str::trim_start).unwrap_or(text);
         if keyword.starts_with("define") {
-            if cursor
-                .peek(0)
-                .is_some_and(|t| t.kind == c::IDENTIFIER && (t.start as usize) < end)
-            {
-                let name = cursor.next().expect("peeked macro name");
-                out.tag("d", name, (token, name)).emit();
+            if let Some(name) = cursor.consume_if(c::IDENTIFIER) {
+                out.tag("d", name, (introducer, name)).emit();
             }
-        }
-        let (mut first, mut last) = (None, None);
-        while let Some(next) = cursor.peek(0) {
-            if next.start as usize >= end {
-                break;
-            }
-            cursor.next();
-            first.get_or_insert(next);
-            last = Some(next);
-        }
-        if keyword.starts_with("include") {
-            if let (Some(first), Some(last)) = (first, last) {
-                let raw = cursor.span_text(first, last);
+        } else if keyword.starts_with("include") {
+            if let Some(path) = cursor.peek(0).filter(|t| t.kind != c::SEMI) {
+                cursor.next();
+                let raw = cursor.text(path);
                 let delim = |c| matches!(c, '<' | '>' | '"');
                 let lead = (raw.len() - raw.trim_start_matches(delim).len()) as u32;
                 let trail = (raw.len() - raw.trim_end_matches(delim).len()) as u32;
                 out.tag(
                     "h",
-                    TextValue::Span(first.start + lead, last.end - trail),
-                    (token, first),
+                    TextValue::Span(path.start + lead, path.end - trail),
+                    (introducer, path),
                 )
                 .emit();
             }
         }
+        // Consume the virtual terminator at the top level; inside a bounded member
+        // fragment it was already consumed as the fragment separator.
+        cursor.consume_if(c::SEMI);
     }
 
     /// `enum NAME { A, B = 2, C }` → enum `g` plus enumerators `e` scoped
@@ -255,46 +237,41 @@ impl CHooks {
         out.in_scope(scope_key, name, |out| self.members(cursor, out));
     }
 
-    /// Aggregate members up to and including the closing `}`. Unlike Go's
-    /// `TokenCursor::members`, C bodies are not cleanly fragmentable: a `#define`
-    /// inside a body is line-terminated with no `;`, so pre-bounding each member
-    /// at the next top-level `;` would merge a directive with the member after
-    /// it. The framing therefore stays hand-written and handlers consume inline.
+    /// Aggregate members up to and including the closing `}`. Each member is a
+    /// top-level-`;`-delimited fragment; because `CPreprocLexer` self-terminates
+    /// directives with a virtual `;`, a `#define` inside a body is now one clean
+    /// fragment too, so C can share the [`TokenCursor::members`] combinator.
     fn members(&mut self, cursor: &mut TokenCursor<'_>, out: &mut TagEmitter<'_>) {
-        loop {
-            while cursor.consume_if(c::SEMI).is_some() {}
-            match cursor.peek(0).map(|t| t.kind) {
-                None => return,
-                Some(c::RBRACE) => {
-                    cursor.next();
-                    return;
-                }
-                _ => {}
-            }
-            scan_type_references(cursor, out, &mut self.references_end);
-            let Some(first) = cursor.next() else {
-                return;
-            };
-            if first.kind == c::LITERAL {
-                // A preprocessor directive inside the body (e.g. `#define FLAG 1`)
-                // is a macro/header, not a member. Route it through the directive
-                // handler so it emits `d`/`h` (inheriting the aggregate scope) and
-                // consumes its whole logical line — a `#define` has no terminating
-                // `;`, so falling through would swallow the following member.
-                let source = cursor.source();
-                self.directive(source, cursor, out, first);
-                continue;
-            }
-            if matches!(first.kind, c::KW_STRUCT | c::KW_UNION) {
-                self.struct_typed_member(cursor, out, first);
-                continue;
-            }
+        let rule = MemberRule {
+            close: c::RBRACE,
+            skip: &[c::SEMI],
+            fragment: BalancedUntil {
+                delimiters: c::DELIMITERS,
+                owner_close: Some(c::RBRACE),
+                logical_line: false,
+                can_terminate_line: |_| false,
+            },
+        };
+        cursor.members(rule, |member| self.member(member, out));
+    }
+
+    /// One aggregate member, bounded to its own fragment: a directive (`d`/`h`),
+    /// a nested/typed aggregate field, or a plain typed field (`m`).
+    fn member(&mut self, cursor: &mut TokenCursor<'_>, out: &mut TagEmitter<'_>) {
+        scan_type_references(cursor, out, &mut self.references_end);
+        let Some(first) = cursor.next() else {
+            return;
+        };
+        if first.kind == c::LITERAL {
+            self.directive(cursor, out, first);
+        } else if matches!(first.kind, c::KW_STRUCT | c::KW_UNION) {
+            self.struct_typed_member(cursor, out, first);
+        } else {
             let head = scan_decl_head(cursor, first);
             if let Some((type_start, _type_end, name)) = head.named() {
                 head.with_typeref(out.tag("m", name, (type_start, name)), cursor, "m")
                     .emit();
             }
-            skip_to_semicolon(cursor);
         }
     }
 
@@ -962,6 +939,113 @@ fn filename_hash(path: &str) -> String {
     format!("{hash:08x}")
 }
 
+/// C preprocessor lexer: the engine-level home for directive boundaries, the
+/// treetags analog of tree-sitter's external scanner. At the beginning of a line
+/// it claims a whole `#...` directive — including backslash-newline continuations,
+/// via [`directive_end`] — and emits a self-delimited token run: the `#keyword`
+/// introducer, the macro name (`#define`) or header path (`#include`), and a
+/// virtual `;` terminator. The body is consumed opaquely, so macro bodies never
+/// reach the tag hook or the delimiter map, and a directive (which has no real
+/// `;`) still terminates like a statement.
+#[derive(Default)]
+pub(crate) struct CPreprocLexer;
+
+impl ExternalLexer for CPreprocLexer {
+    fn scan(
+        &mut self,
+        input: ExternalLexInput<'_>,
+        out: &mut ExternalLexemeSink<'_>,
+    ) -> ExternalScan {
+        if !input.beginning_of_line {
+            return ExternalScan::NoMatch;
+        }
+        let source = input.source;
+        let bytes = source.as_bytes();
+        let base = input.offset as usize;
+        let is_space = |b: u8| matches!(b, b' ' | b'\t');
+        let is_ident = |b: u8| b.is_ascii_alphanumeric() || b == b'_';
+
+        // Optional indentation, then the directive's `#`.
+        let mut i = base;
+        while bytes.get(i).is_some_and(|&b| is_space(b)) {
+            i += 1;
+        }
+        if bytes.get(i) != Some(&b'#') {
+            return ExternalScan::NoMatch;
+        }
+        let hash = i;
+        let end = directive_end(source, hash);
+
+        // Introducer: `#`, interior whitespace, and the keyword as one token, so
+        // `#  define` reaches the hook verbatim (matching the previous lexer).
+        i += 1;
+        while bytes.get(i).is_some_and(|&b| is_space(b)) {
+            i += 1;
+        }
+        let keyword_start = i;
+        while bytes.get(i).is_some_and(|&b| is_ident(b)) {
+            i += 1;
+        }
+        let keyword = &source[keyword_start..i];
+        out.emit(Tok {
+            kind: c::LITERAL,
+            flags: TokenFlags(0),
+            start: hash as u32,
+            end: i as u32,
+            row: input.row,
+        });
+
+        // The name/path operand follows on the same physical line.
+        while i < end && bytes.get(i).is_some_and(|&b| is_space(b)) {
+            i += 1;
+        }
+        if keyword == "define" {
+            if bytes
+                .get(i)
+                .is_some_and(|&b| b.is_ascii_alphabetic() || b == b'_')
+            {
+                let name_start = i;
+                while i < end && bytes.get(i).is_some_and(|&b| is_ident(b)) {
+                    i += 1;
+                }
+                out.emit(Tok {
+                    kind: c::IDENTIFIER,
+                    flags: TokenFlags(0),
+                    start: name_start as u32,
+                    end: i as u32,
+                    row: input.row,
+                });
+            }
+        } else if keyword == "include" {
+            let mut path_end = end;
+            while path_end > i
+                && bytes
+                    .get(path_end - 1)
+                    .is_some_and(|&b| matches!(b, b' ' | b'\t' | b'\r'))
+            {
+                path_end -= 1;
+            }
+            if path_end > i {
+                out.emit(Tok {
+                    kind: c::LITERAL,
+                    flags: TokenFlags(0),
+                    start: i as u32,
+                    end: path_end as u32,
+                    row: input.row,
+                });
+            }
+        }
+
+        // A virtual `;` at the logical-line end lets every `;`-based path
+        // (top-level dispatch, member fragmenting) treat a directive as a
+        // complete statement without knowing anything about directives.
+        out.emit_virtual(c::SEMI, end as u32, input.row);
+        ExternalScan::Consumed(
+            NonZeroU32::new((end - base) as u32).expect("directive_end lies past the offset"),
+        )
+    }
+}
+
 /// Adapter matching `BuiltinGenerateFn` so the C row can select this backend
 /// behind the `native-c` feature. Mirrors `go::generate`.
 pub(crate) fn generate_builtin(
@@ -996,7 +1080,7 @@ pub(crate) fn generate(
     // `kind:`/`file:` as extension fields.
     options.kind = false;
     options.file = false;
-    let stream = c::scan::<NoExternalLexer>(source)?;
+    let stream = c::scan::<CPreprocLexer>(source)?;
     let input = HookInput {
         source,
         path,
@@ -1100,7 +1184,7 @@ mod tests {
             "int computed = ({ int local = 1; local; }); following",
             "int value = call(\n1, array[index]);\nfollowing",
         ] {
-            let stream = c::scan::<NoExternalLexer>(source).unwrap();
+            let stream = c::scan::<CPreprocLexer>(source).unwrap();
             let mut cursor = TokenCursor::new(source, &stream.tokens);
             skip_to_semicolon(&mut cursor);
             let next = cursor.next().unwrap();
@@ -1456,5 +1540,58 @@ mod tests {
         assert_matches_oracle(include_str!(
             "../../tests/test_cases/c/langmap_custom_ext/input/widget.qc"
         ));
+    }
+
+    fn preproc_texts(source: &str) -> Vec<(TokenKind, &str)> {
+        c::scan::<CPreprocLexer>(source)
+            .unwrap()
+            .tokens
+            .iter()
+            .map(|t| (t.kind, &source[t.start as usize..t.end as usize]))
+            .collect()
+    }
+
+    #[test]
+    fn preproc_lexer_self_delimits_define_and_keeps_body_opaque() {
+        let source = "#define ADD(a, b) ((a) + (b))\nint x;\n";
+        let stream = c::scan::<CPreprocLexer>(source).unwrap();
+        let view = preproc_texts(source);
+        // Introducer, macro name, a zero-width virtual `;`, then the next stmt.
+        assert_eq!(view[0], (c::LITERAL, "#define"));
+        assert_eq!(view[1], (c::IDENTIFIER, "ADD"));
+        assert_eq!(stream.tokens[2].kind, c::SEMI);
+        assert_ne!(stream.tokens[2].flags.0 & TokenFlags::VIRTUAL, 0);
+        assert_eq!(view[2].1, "");
+        // The replacement list never becomes tokens.
+        assert!(!view
+            .iter()
+            .any(|(_, text)| matches!(*text, "(" | "+" | "a")));
+        assert_eq!(
+            view[3..].iter().map(|(_, t)| *t).collect::<Vec<_>>(),
+            ["int", "x", ";"]
+        );
+    }
+
+    #[test]
+    fn preproc_lexer_emits_include_path_as_one_token() {
+        assert_eq!(
+            preproc_texts("#include <stdlib.h>\n"),
+            [
+                (c::LITERAL, "#include"),
+                (c::LITERAL, "<stdlib.h>"),
+                (c::SEMI, ""),
+            ]
+        );
+    }
+
+    #[test]
+    fn preproc_lexer_spans_indentation_and_line_continuations() {
+        // `#  define` interior whitespace, and a body spliced across two lines,
+        // collapse to introducer + name + virtual `;` before the next statement.
+        let texts: Vec<&str> = preproc_texts("#  define A \\\n  1 + \\\n  2\nint y;\n")
+            .into_iter()
+            .map(|(_, text)| text)
+            .collect();
+        assert_eq!(texts, ["#  define", "A", "", "int", "y", ";"]);
     }
 }
