@@ -33,10 +33,10 @@ pub(crate) fn generate(
             return None;
         }
     };
-    super::go_hooks::generate(
+    super::tree_free::go::generate(
         source,
         path,
-        super::linear::HookOptions::from_config(kinds, config),
+        super::tree_free::common::linear::HookOptions::from_config(kinds, config),
     )
     .map_err(|error| eprintln!("Warning: Failed to scan {path}: {error}"))
     .ok()

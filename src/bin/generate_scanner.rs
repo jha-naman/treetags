@@ -956,7 +956,7 @@ fn render(
 // grammar.js sha256: {hash}
 // evaluated with: {cli}
 
-use crate::parser::linear::{{DelimiterKinds,ExternalLexer,GeneratedLexeme,GeneratedLexicon,TokenKind,TokenStream}};
+use crate::parser::tree_free::common::linear::{{DelimiterKinds,ExternalLexer,GeneratedLexeme,GeneratedLexicon,TokenKind,TokenStream}};
 pub const IDENTIFIER:TokenKind=TokenKind(1);pub const LITERAL:TokenKind=TokenKind(2);pub const UNKNOWN:TokenKind=TokenKind(3);
 {constants}
 pub const WORD_TOKEN_RULE:&str={word:?};pub const DECLARED_EXTERNAL_COUNT:usize={externals};
@@ -998,7 +998,7 @@ fn lex(source:&str,at:usize)->GeneratedLexeme{{
  if best.0>0{{let kind=if best.2==IDENTIFIER{{keyword(&rest[..best.0])}}else{{best.2}};return item(best.0,kind,best.3,false)}}
  let ch=rest.chars().next().unwrap();item(ch.len_utf8(),UNKNOWN,false,true)
 }}
-pub fn scan<E:ExternalLexer>(source:&str)->Result<TokenStream,String>{{crate::parser::linear_scanner::scan::<E,Lexicon>(source)}}
+pub fn scan<E:ExternalLexer>(source:&str)->Result<TokenStream,String>{{crate::parser::tree_free::common::scanner::scan::<E,Lexicon>(source)}}
 "#,
         list(r),
         keyword_match(k, &kw_names),

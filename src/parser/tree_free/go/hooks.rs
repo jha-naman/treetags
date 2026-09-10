@@ -1,13 +1,13 @@
 #![allow(dead_code)]
-use super::{
-    generated::go,
-    go_syntax::{
-        member_until, next_import_spec, next_interface_member, next_struct_field, next_type_spec,
-        next_value_spec, parse_function, GoDeclGroup, GoInterfaceMember, GoStructField,
-        GoTypeSpecRhs, DELIMITERS,
-    },
+use super::super::common::{
     linear::{BlockMap, HookInput, MemberRule, TagHooks, Tok, TokenCursor},
     tag_emitter::{TagEmitter, TextValue},
+};
+use super::generated as go;
+use super::syntax::{
+    member_until, next_import_spec, next_interface_member, next_struct_field, next_type_spec,
+    next_value_spec, parse_function, GoDeclGroup, GoInterfaceMember, GoStructField, GoTypeSpecRhs,
+    DELIMITERS,
 };
 
 #[derive(Default)]
@@ -204,13 +204,13 @@ impl GoHooks {
 pub(crate) fn generate(
     source: &str,
     path: &str,
-    mut options: super::linear::HookOptions<'_>,
+    mut options: crate::parser::tree_free::common::linear::HookOptions<'_>,
 ) -> Result<Vec<crate::tag::Tag>, String> {
     // The existing Go backend intentionally never emits `kind:` or `file:` as
     // extension fields; it retains the shorthand kind column instead.
     options.kind = false;
     options.file = false;
-    let stream = go::scan::<super::linear::NoExternalLexer>(source)?;
+    let stream = go::scan::<crate::parser::tree_free::common::linear::NoExternalLexer>(source)?;
     let input = HookInput {
         source,
         path,
@@ -246,8 +246,10 @@ mod tests {
         TagKindConfig,
     };
     use clap::Parser as _;
-    fn options<'a>(kinds: &'a TagKindConfig) -> super::super::linear::HookOptions<'a> {
-        super::super::linear::HookOptions {
+    fn options<'a>(
+        kinds: &'a TagKindConfig,
+    ) -> crate::parser::tree_free::common::linear::HookOptions<'a> {
+        crate::parser::tree_free::common::linear::HookOptions {
             tag_config: kinds,
             line: true,
             kind: false,
@@ -299,7 +301,7 @@ mod tests {
 
     #[test]
     fn basic_fixture_matches_production_path_with_default_fields() {
-        let source = include_str!("../../tests/test_cases/go/basic/input/source.go");
+        let source = include_str!("../../../../tests/test_cases/go/basic/input/source.go");
         let config = crate::config::Config::parse_from(["treetags"]);
         let kinds = TagKindConfig::from_string("", KIND_DEFAULTS, KIND_OPTIONALS);
         let expected = production_generate(
@@ -313,7 +315,7 @@ mod tests {
         let actual = generate(
             source,
             "source.go",
-            super::super::linear::HookOptions::from_config(&kinds, &config),
+            crate::parser::tree_free::common::linear::HookOptions::from_config(&kinds, &config),
         )
         .unwrap();
         assert_eq!(actual, expected);
@@ -321,7 +323,7 @@ mod tests {
 
     #[test]
     fn basic_fixture_matches_production_path_with_all_go_fields() {
-        let source = include_str!("../../tests/test_cases/go/basic/input/source.go");
+        let source = include_str!("../../../../tests/test_cases/go/basic/input/source.go");
         let mut config = crate::config::Config::parse_from(["treetags"]);
         for field in ["line", "kind", "file", "signature", "access", "end"] {
             config.fields_config.enabled_fields.insert(field.into());
@@ -339,7 +341,7 @@ mod tests {
         let actual = generate(
             source,
             "source.go",
-            super::super::linear::HookOptions::from_config(&kinds, &config),
+            crate::parser::tree_free::common::linear::HookOptions::from_config(&kinds, &config),
         )
         .unwrap();
         assert_eq!(actual, expected);
@@ -387,7 +389,7 @@ var raw = `func Fake() {}`
         let actual = generate(
             source,
             "corpus.go",
-            super::super::linear::HookOptions::from_config(&kinds, &config),
+            crate::parser::tree_free::common::linear::HookOptions::from_config(&kinds, &config),
         )
         .unwrap();
         assert_eq!(actual, expected);
@@ -421,7 +423,7 @@ func Free() {}
         let actual = generate(
             source,
             "receivers.go",
-            super::super::linear::HookOptions::from_config(&kinds, &config),
+            crate::parser::tree_free::common::linear::HookOptions::from_config(&kinds, &config),
         )
         .unwrap();
         assert_eq!(actual, expected);
@@ -459,7 +461,7 @@ var (
         let actual = generate(
             source,
             "balanced.go",
-            super::super::linear::HookOptions::from_config(&kinds, &config),
+            crate::parser::tree_free::common::linear::HookOptions::from_config(&kinds, &config),
         )
         .unwrap();
         assert_eq!(actual, expected);
@@ -480,7 +482,7 @@ var (
         let actual = generate(
             source,
             "prototypes.go",
-            super::super::linear::HookOptions::from_config(&kinds, &config),
+            crate::parser::tree_free::common::linear::HookOptions::from_config(&kinds, &config),
         )
         .unwrap();
         assert_eq!(actual, expected);
@@ -533,7 +535,7 @@ type Constraint interface {
         let actual = generate(
             source,
             "members.go",
-            super::super::linear::HookOptions::from_config(&kinds, &config),
+            crate::parser::tree_free::common::linear::HookOptions::from_config(&kinds, &config),
         )
         .unwrap();
         assert_eq!(actual, expected);
@@ -577,7 +579,7 @@ type (
         let actual = generate(
             source,
             "types.go",
-            super::super::linear::HookOptions::from_config(&kinds, &config),
+            crate::parser::tree_free::common::linear::HookOptions::from_config(&kinds, &config),
         )
         .unwrap();
         assert_eq!(actual, expected);
@@ -607,7 +609,7 @@ type (
         let actual = generate(
             source,
             "x.go",
-            super::super::linear::HookOptions::from_config(&kinds, &config),
+            crate::parser::tree_free::common::linear::HookOptions::from_config(&kinds, &config),
         )
         .unwrap();
         assert_eq!(actual, expected);
@@ -625,7 +627,7 @@ type (
             let result = generate(
                 source,
                 "broken.go",
-                super::super::linear::HookOptions::from_config(&kinds, &config),
+                crate::parser::tree_free::common::linear::HookOptions::from_config(&kinds, &config),
             );
             assert!(result.is_ok(), "failed on {source:?}: {result:?}");
         }

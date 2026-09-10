@@ -1,4 +1,4 @@
 # Scanner-generation manifest consumed by `cargo run --bin generate-scanner`.
 name = "go"
 grammar = "grammar/go/grammar.js"
-output = "src/parser/generated/go.rs"
+output = "src/parser/tree_free/go/generated.rs"

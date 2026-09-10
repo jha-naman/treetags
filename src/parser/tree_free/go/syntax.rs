@@ -2,14 +2,14 @@
 
 #![allow(dead_code)] // Consumers are migrated independently from this foundation.
 
-use super::{
-    generated::go,
-    linear::{BalancedPair, BalancedUntil, SeparatedRange, Tok, TokenCursor, TokenRange},
+use super::super::common::linear::{
+    BalancedPair, BalancedUntil, SeparatedRange, Tok, TokenCursor, TokenRange,
 };
+use super::generated as go;
 
 // The generator emits a ready-made `DelimiterKinds` from the grammar's bracket
 // tokens; re-export it so hooks share one source of truth.
-pub(crate) use super::generated::go::DELIMITERS;
+pub(crate) use super::generated::DELIMITERS;
 
 pub(crate) fn member_until() -> BalancedUntil {
     BalancedUntil {
@@ -22,7 +22,7 @@ pub(crate) fn member_until() -> BalancedUntil {
 
 pub(crate) fn consume_declaration(
     cursor: &mut TokenCursor<'_>,
-    owner_close: Option<super::linear::TokenKind>,
+    owner_close: Option<crate::parser::tree_free::common::linear::TokenKind>,
     logical_line: bool,
 ) -> TokenRange {
     cursor.consume_balanced_until(BalancedUntil {
@@ -36,7 +36,9 @@ pub(crate) fn consume_declaration(
 /// Go's semicolon-insertion eligibility for the preceding significant token.
 /// Scanner extras are absent from the token stream, so this can be applied
 /// directly at a row transition.
-pub(crate) fn can_terminate_line(kind: super::linear::TokenKind) -> bool {
+pub(crate) fn can_terminate_line(
+    kind: crate::parser::tree_free::common::linear::TokenKind,
+) -> bool {
     matches!(
         kind,
         go::IDENTIFIER
@@ -126,7 +128,7 @@ impl GoTypeSpan {
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct GoTypeUntil {
     pub context: GoTypeContext,
-    pub owner_close: Option<super::linear::TokenKind>,
+    pub owner_close: Option<crate::parser::tree_free::common::linear::TokenKind>,
     pub logical_line: bool,
     pub comma: bool,
     pub equals: bool,
@@ -246,7 +248,7 @@ impl GoDeclGroup {
         }
     }
 
-    pub fn owner_close(self) -> Option<super::linear::TokenKind> {
+    pub fn owner_close(self) -> Option<crate::parser::tree_free::common::linear::TokenKind> {
         self.grouped.then_some(go::RPAREN)
     }
 
@@ -749,7 +751,7 @@ fn skip_semicolons(cursor: &mut TokenCursor<'_>) {
     while cursor.consume_if(go::SEMI).is_some() {}
 }
 
-fn starts_type(kind: super::linear::TokenKind) -> bool {
+fn starts_type(kind: crate::parser::tree_free::common::linear::TokenKind) -> bool {
     matches!(
         kind,
         go::IDENTIFIER
@@ -797,7 +799,7 @@ fn array_after_bracket(cursor: &TokenCursor<'_>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::linear::NoExternalLexer;
+    use crate::parser::tree_free::common::linear::NoExternalLexer;
 
     fn range_text(cursor: &TokenCursor<'_>, range: TokenRange) -> String {
         let mut view = cursor.view(range).expect("syntax-produced range");
@@ -813,7 +815,7 @@ mod tests {
 
     fn declaration(
         source: &str,
-        owner: Option<super::super::linear::TokenKind>,
+        owner: Option<crate::parser::tree_free::common::linear::TokenKind>,
     ) -> (String, String) {
         let stream = go::scan::<NoExternalLexer>(source).unwrap();
         let mut cursor = TokenCursor::new(source, &stream.tokens);
@@ -829,7 +831,7 @@ mod tests {
 
     fn ty_in(
         source: &str,
-        owner: Option<super::super::linear::TokenKind>,
+        owner: Option<crate::parser::tree_free::common::linear::TokenKind>,
         struct_tag: bool,
         context: GoTypeContext,
     ) -> (GoTypeSpan, String, String) {
@@ -858,7 +860,7 @@ mod tests {
 
     fn ty(
         source: &str,
-        owner: Option<super::super::linear::TokenKind>,
+        owner: Option<crate::parser::tree_free::common::linear::TokenKind>,
         struct_tag: bool,
     ) -> (GoTypeSpan, String, String) {
         ty_in(source, owner, struct_tag, GoTypeContext::Type)

@@ -143,11 +143,9 @@ fn advance(bytes: &[u8], start: usize, end: usize, row: &mut u32, lines: &mut Ve
 
 #[cfg(test)]
 mod tests {
+    use super::super::linear::{ExternalScan, NoExternalLexer};
     use super::*;
-    use crate::parser::{
-        generated::go,
-        linear::{ExternalScan, NoExternalLexer},
-    };
+    use crate::parser::tree_free::go::generated as go;
     use std::num::NonZeroU32;
 
     fn texts<'a>(source: &'a str, stream: &TokenStream) -> Vec<&'a str> {

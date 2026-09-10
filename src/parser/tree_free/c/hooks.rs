@@ -4,8 +4,7 @@
 //! construct-by-construct against the tree-sitter C oracle (`cpp::generate` with
 //! the C kind set), including its anonymous-struct naming and `typeref` quirks.
 
-use super::{
-    generated::c,
+use super::super::common::{
     linear::{
         BalancedUntil, BlockMap, ExternalLexInput, ExternalLexemeSink, ExternalLexer, ExternalScan,
         HookInput, MemberRule, SeparatedRange, TagHooks, Tok, TokenCursor, TokenFlags, TokenKind,
@@ -13,6 +12,7 @@ use super::{
     },
     tag_emitter::{TagBuilder, TagEmitter, TextValue},
 };
+use super::generated as c;
 use std::num::NonZeroU32;
 
 pub(crate) struct CHooks {
@@ -904,7 +904,7 @@ fn consume_until(
     owner_close: Option<TokenKind>,
 ) {
     cursor.consume_balanced_until(BalancedUntil {
-        delimiters: super::linear::DelimiterKinds {
+        delimiters: crate::parser::tree_free::common::linear::DelimiterKinds {
             semicolon: separator,
             ..c::DELIMITERS
         },
@@ -1052,7 +1052,7 @@ pub(crate) fn generate_builtin(
     _ts_parser: &mut tree_sitter::Parser,
     code: &[u8],
     path: &str,
-    kinds: &super::TagKindConfig,
+    kinds: &crate::parser::TagKindConfig,
     config: &crate::config::Config,
 ) -> Option<Vec<crate::tag::Tag>> {
     let source = match std::str::from_utf8(code) {
@@ -1065,7 +1065,7 @@ pub(crate) fn generate_builtin(
     generate(
         source,
         path,
-        super::linear::HookOptions::from_config(kinds, config),
+        crate::parser::tree_free::common::linear::HookOptions::from_config(kinds, config),
     )
     .map_err(|error| eprintln!("Warning: Failed to scan {path}: {error}"))
     .ok()
@@ -1074,7 +1074,7 @@ pub(crate) fn generate_builtin(
 pub(crate) fn generate(
     source: &str,
     path: &str,
-    mut options: super::linear::HookOptions<'_>,
+    mut options: crate::parser::tree_free::common::linear::HookOptions<'_>,
 ) -> Result<Vec<crate::tag::Tag>, String> {
     // The tree-sitter C backend keeps the shorthand kind column and never emits
     // `kind:`/`file:` as extension fields.
@@ -1129,7 +1129,7 @@ mod tests {
         generate(
             source,
             "source.c",
-            super::super::linear::HookOptions::from_config(&kinds, &config),
+            crate::parser::tree_free::common::linear::HookOptions::from_config(&kinds, &config),
         )
         .unwrap()
     }
@@ -1290,7 +1290,8 @@ mod tests {
     fn normalized_member_typeref_respects_disabled_field() {
         let kinds = TagKindConfig::from_string("", C_KIND_DEFAULTS, C_KIND_OPTIONALS);
         let config = crate::config::Config::for_test();
-        let mut options = super::super::linear::HookOptions::from_config(&kinds, &config);
+        let mut options =
+            crate::parser::tree_free::common::linear::HookOptions::from_config(&kinds, &config);
         options.typeref = false;
         let tags = generate(
             "struct Fields { const int *pointer; };",
@@ -1519,7 +1520,7 @@ mod tests {
             let actual = generate(
                 source,
                 "source.c",
-                super::super::linear::HookOptions::from_config(&kinds, &config),
+                crate::parser::tree_free::common::linear::HookOptions::from_config(&kinds, &config),
             )
             .unwrap();
             assert_eq!(sorted(actual), sorted(expected));
@@ -1528,17 +1529,17 @@ mod tests {
 
     #[test]
     fn basic_fixture_matches_oracle() {
-        let source = include_str!("../../tests/test_cases/c/basic/input/source.c");
+        let source = include_str!("../../../../tests/test_cases/c/basic/input/source.c");
         assert_eq!(sorted(actual(source)), sorted(oracle(source)));
     }
 
     #[test]
     fn header_and_guard_fixture_matches_oracle() {
         assert_matches_oracle(include_str!(
-            "../../tests/test_cases/c/header_selector/input/api.h"
+            "../../../../tests/test_cases/c/header_selector/input/api.h"
         ));
         assert_matches_oracle(include_str!(
-            "../../tests/test_cases/c/langmap_custom_ext/input/widget.qc"
+            "../../../../tests/test_cases/c/langmap_custom_ext/input/widget.qc"
         ));
     }
 

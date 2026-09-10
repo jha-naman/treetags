@@ -1,7 +1,7 @@
 //! Tree-free runtime for generated builtin scanners.
 #![allow(dead_code)] // API surface is intentionally ahead of the first consumer.
 
-pub(crate) use super::linear_scanner::{GeneratedLexeme, GeneratedLexicon};
+pub(crate) use super::scanner::{GeneratedLexeme, GeneratedLexicon};
 use std::num::NonZeroU32;
 
 #[repr(transparent)]
@@ -528,7 +528,7 @@ impl Iterator for SeparatedItems<'_> {
 
 #[derive(Clone, Copy)]
 pub(crate) struct HookOptions<'a> {
-    pub tag_config: &'a super::TagKindConfig,
+    pub tag_config: &'a crate::parser::TagKindConfig,
     pub line: bool,
     pub kind: bool,
     pub file: bool,
@@ -541,7 +541,7 @@ pub(crate) struct HookOptions<'a> {
 }
 impl<'a> HookOptions<'a> {
     pub fn from_config(
-        tag_config: &'a super::TagKindConfig,
+        tag_config: &'a crate::parser::TagKindConfig,
         config: &crate::config::Config,
     ) -> Self {
         let f = &config.fields_config;

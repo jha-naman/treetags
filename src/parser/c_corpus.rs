@@ -19,7 +19,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 
 use crate::parser::cpp::{C_KIND_DEFAULTS, C_KIND_OPTIONALS};
-use crate::parser::linear::HookOptions;
+use crate::parser::tree_free::common::linear::HookOptions;
 use crate::parser::TagKindConfig;
 use crate::tag::Tag;
 use clap::Parser as _;
@@ -34,7 +34,7 @@ fn oracle(code: &[u8], path: &str) -> Vec<Tag> {
 fn native(source: &str, path: &str) -> Vec<Tag> {
     let kinds = TagKindConfig::from_string("", C_KIND_DEFAULTS, C_KIND_OPTIONALS);
     let config = crate::config::Config::parse_from(["treetags"]);
-    crate::parser::c_hooks::generate(source, path, HookOptions::from_config(&kinds, &config))
+    crate::parser::tree_free::c::generate(source, path, HookOptions::from_config(&kinds, &config))
         .unwrap_or_default()
 }
 

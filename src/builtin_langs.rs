@@ -14,7 +14,7 @@ pub(crate) type BuiltinGenerateFn = fn(
 /// linear-scanner hook under `--features native-c` (byte-identical on the
 /// in-repo C fixtures; pending broad-corpus validation before it becomes default).
 #[cfg(feature = "native-c")]
-const C_GENERATE_FN: BuiltinGenerateFn = crate::parser::c_hooks::generate_builtin;
+const C_GENERATE_FN: BuiltinGenerateFn = crate::parser::tree_free::c::generate_builtin;
 #[cfg(not(feature = "native-c"))]
 const C_GENERATE_FN: BuiltinGenerateFn = cpp::generate;
 

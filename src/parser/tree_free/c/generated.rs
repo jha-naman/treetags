@@ -3,7 +3,7 @@
 // grammar.js sha256: cdec2d67fc898700eb80056ee9a84f54f8771488f249e884dadfa757c8020d7e
 // evaluated with: tree-sitter 0.25.10; node v22.17.0
 
-use crate::parser::linear::{
+use crate::parser::tree_free::common::linear::{
     DelimiterKinds, ExternalLexer, GeneratedLexeme, GeneratedLexicon, TokenKind, TokenStream,
 };
 pub const IDENTIFIER: TokenKind = TokenKind(1);
@@ -3435,5 +3435,5 @@ fn lex(source: &str, at: usize) -> GeneratedLexeme {
     item(ch.len_utf8(), UNKNOWN, false, true)
 }
 pub fn scan<E: ExternalLexer>(source: &str) -> Result<TokenStream, String> {
-    crate::parser::linear_scanner::scan::<E, Lexicon>(source)
+    crate::parser::tree_free::common::scanner::scan::<E, Lexicon>(source)
 }
