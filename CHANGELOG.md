@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- [0.18.0]
+
+### Added
+- Add extension fields support for C#
+
+- [0.17.0]
+
 ### Added
 - Add Terraform support via WASM plugin
 - Add Zig support via WASM plugin
