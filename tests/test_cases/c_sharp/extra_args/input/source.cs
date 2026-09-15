@@ -3,10 +3,7 @@ namespace Tests {
 	public class TestClass {
 		TestClass() {}
 		public static void Foo() {}
-		public record Record(string Name) {
-			public int RecordField;
-			public void RecordMethod() {}
-		}
+		public record Record(string: Foo)
 		public void Foobar() {
 				int local_var = 1;
 		}

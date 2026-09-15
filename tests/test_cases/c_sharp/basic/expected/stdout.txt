@@ -1,17 +1,20 @@
 !_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
-AnotherEnumEntity	source.cs	/^			AnotherEnumEntity,$/;"	
-DelegateTest	source.cs	/^		public delegate int DelegateTest();$/;"	
-Enum	source.cs	/^		public enum Enum {$/;"	
-EnumEntity	source.cs	/^			EnumEntity,$/;"	
-Foo	source.cs	/^			void Foo();$/;"	
-Foo	source.cs	/^		public static void Foo() {}$/;"	
-Function	source.cs	/^public void Function() {}$/;"	
-IInterface	source.cs	/^		interface IInterface {$/;"	
-IntMember	source.cs	/^		public static int IntMember { get; set; }$/;"	
-Record	source.cs	/^		public record Record(string: Foo)$/;"	
-TestClass	source.cs	/^		TestClass() {}$/;"	
-TestClass	source.cs	/^	public class TestClass {$/;"	
-TestEvent	source.cs	/^		public static event DelegateTest TestEvent;$/;"	
-Tests	source.cs	/^namespace Tests {$/;"	
-Tests.Qualified	source.cs	/^namespace Tests.Qualified {}$/;"	
-count	source.cs	/^		public static int count = 0;$/;"	
+AnotherEnumEntity	source.cs	/^			AnotherEnumEntity,$/;"	e	enum:Tests.TestClass.Enum	file:
+DelegateTest	source.cs	/^		public delegate int DelegateTest();$/;"	m	class:Tests.TestClass
+Enum	source.cs	/^		public enum Enum {$/;"	g	class:Tests.TestClass
+EnumEntity	source.cs	/^			EnumEntity,$/;"	e	enum:Tests.TestClass.Enum	file:
+Foo	source.cs	/^			void Foo();$/;"	m	interface:Tests.TestClass.IInterface
+Foo	source.cs	/^		public static void Foo() {}$/;"	m	class:Tests.TestClass
+Foobar	source.cs	/^		public void Foobar() {$/;"	m	class:Tests.TestClass
+Function	source.cs	/^public void Function() {}$/;"	m
+IInterface	source.cs	/^		interface IInterface {$/;"	i	class:Tests.TestClass
+IntMember	source.cs	/^		public static int IntMember { get; set; }$/;"	p	class:Tests.TestClass
+Record	source.cs	/^		public record Record(string Name) {$/;"	r	class:Tests.TestClass
+RecordField	source.cs	/^			public int RecordField;$/;"	f	record:Tests.TestClass.Record
+RecordMethod	source.cs	/^			public void RecordMethod() {}$/;"	m	record:Tests.TestClass.Record
+TestClass	source.cs	/^		TestClass() {}$/;"	m	class:Tests.TestClass	file:
+TestClass	source.cs	/^	public class TestClass {$/;"	c	namespace:Tests
+TestEvent	source.cs	/^		public static event DelegateTest TestEvent;$/;"	E	class:Tests.TestClass
+Tests	source.cs	/^namespace Tests {$/;"	n
+Tests.Qualified	source.cs	/^namespace Tests.Qualified {}$/;"	n
+count	source.cs	/^		public static int count = 0;$/;"	f	class:Tests.TestClass

@@ -103,18 +103,6 @@ pub fn load() -> Vec<BuiltinGrammar> {
             ),
         },
         BuiltinGrammar {
-            lang: "c#",
-            aliases: &["csharp"],
-            extensions: &["cs"],
-            patterns: &[],
-            interpreters: &[],
-            config: get_tags_config(
-                tree_sitter_c_sharp::LANGUAGE.into(),
-                queries::C_SHARP_TAGS_QUERY,
-                "c#",
-            ),
-        },
-        BuiltinGrammar {
             lang: "shell",
             aliases: &["sh", "bash"],
             extensions: &["sh", "bash"],

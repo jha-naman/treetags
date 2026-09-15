@@ -1,0 +1,10 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+DelegateTest	source.cs	/^		public delegate int DelegateTest();$/;"	m
+Foo	source.cs	/^			void Foo();$/;"	m
+Foo	source.cs	/^		public static void Foo() {}$/;"	m
+Foobar	source.cs	/^		public void Foobar() {$/;"	m
+Function	source.cs	/^public void Function() {}$/;"	m
+TestClass	source.cs	/^		TestClass() {}$/;"	m	file:
+Tests	source.cs	/^namespace Tests {$/;"	n
+Tests.Qualified	source.cs	/^namespace Tests.Qualified {}$/;"	n
+local_var	source.cs	/^				int local_var = 1;$/;"	l

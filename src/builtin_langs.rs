@@ -1,4 +1,4 @@
-use crate::parser::{cpp, go, js, python, rust, typescript, TagKindConfig};
+use crate::parser::{c_sharp, cpp, go, js, python, rust, typescript, TagKindConfig};
 use crate::tag::Tag;
 
 /// Function pointer type for builtin language tag generators.
@@ -36,6 +36,17 @@ pub(crate) struct BuiltinLangDesc {
 /// All builtin languages. Priority in tag generation follows array order.
 /// Adding a new builtin language requires exactly one new entry here.
 pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
+    BuiltinLangDesc {
+        lang: c_sharp::LANG_NAME,
+        aliases: &["csharp"],
+        extensions: c_sharp::LANG_EXTENSIONS,
+        patterns: &[],
+        interpreters: &[],
+        kind_defaults: c_sharp::KIND_DEFAULTS,
+        kind_optionals: c_sharp::KIND_OPTIONALS,
+        disambiguation: &[],
+        generate_fn: c_sharp::generate,
+    },
     BuiltinLangDesc {
         lang: rust::LANG_NAME,
         aliases: &[],
