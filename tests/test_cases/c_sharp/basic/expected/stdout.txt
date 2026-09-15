@@ -9,6 +9,9 @@ Foobar	source.cs	/^		public void Foobar() {$/;"	m	class:Tests.TestClass
 Function	source.cs	/^public void Function() {}$/;"	m
 IInterface	source.cs	/^		interface IInterface {$/;"	i	class:Tests.TestClass
 IntMember	source.cs	/^		public static int IntMember { get; set; }$/;"	p	class:Tests.TestClass
+Record	source.cs	/^		public record Record(string Name) {$/;"	r	class:Tests.TestClass
+RecordField	source.cs	/^			public int RecordField;$/;"	f	record:Tests.TestClass.Record
+RecordMethod	source.cs	/^			public void RecordMethod() {}$/;"	m	record:Tests.TestClass.Record
 TestClass	source.cs	/^		TestClass() {}$/;"	m	class:Tests.TestClass	file:
 TestClass	source.cs	/^	public class TestClass {$/;"	c	namespace:Tests
 TestEvent	source.cs	/^		public static event DelegateTest TestEvent;$/;"	E	class:Tests.TestClass

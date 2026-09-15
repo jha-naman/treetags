@@ -16,6 +16,7 @@ pub(crate) const KIND_DEFAULTS: &[(&[&str], &str)] = &[
     (&["m", "method"], "m"),
     (&["n", "namespace"], "n"),
     (&["p", "property"], "p"),
+    (&["r", "record"], "r"),
     (&["s", "struct"], "s"),
     (&["t", "typedef"], "t"),
 ];
@@ -57,6 +58,7 @@ enum ScopeType {
     Struct,
     Interface,
     Enum,
+    Record,
     Method,
 }
 
@@ -104,11 +106,11 @@ impl CSharpContext<'_> {
                     ScopeType::Struct => Some(("s", "struct")),
                     ScopeType::Interface => Some(("i", "interface")),
                     ScopeType::Enum => Some(("g", "enum")),
+                    ScopeType::Record => Some(("r", "record")),
                     // Universal ctags does not attach method scopes to C# locals.
                     ScopeType::Method => None,
                 };
                 if let Some((scope_kind, key)) = scope {
-                    // A scope whose kind was excluded is not emitted by ctags.
                     if self.base.tag_config.is_kind_enabled(scope_kind) {
                         fields.insert(key, scope_name.clone());
                     }
@@ -178,6 +180,7 @@ fn process_node(
         "struct_declaration" => declaration(cursor, context, "s", ScopeType::Struct),
         "interface_declaration" => declaration(cursor, context, "i", ScopeType::Interface),
         "enum_declaration" => declaration(cursor, context, "g", ScopeType::Enum),
+        "record_declaration" => declaration(cursor, context, "r", ScopeType::Record),
         "method_declaration" | "local_function_statement" => {
             let name = helper::get_node_name(cursor, &context.base, &["identifier"])?;
             context.add_tag(name.clone(), "m", node, false);
@@ -247,13 +250,15 @@ fn process_node(
             }
             None
         }
-        // Error recovery for an incomplete record declaration. The grammar can
-        // attach a following method's body as the record's declaration list;
-        // ctags still recognizes that method and its locals.
+        // Error recovery for an incomplete record declaration. When a record has
+        // no body, the grammar can attach a following method's body as the
+        // record's declaration list.
+        // A well-formed record body is walked normally (this branch is
+        // skipped), so its members are scoped to the record instead.
         "declaration_list"
-            if node
-                .parent()
-                .is_some_and(|parent| parent.kind() == "record_declaration") =>
+            if node.parent().is_some_and(|parent| {
+                parent.kind() == "record_declaration" && parent.has_error()
+            }) =>
         {
             let line = context.base.lines[node.start_position().row];
             let line = String::from_utf8_lossy(line);

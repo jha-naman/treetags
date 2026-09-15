@@ -26,6 +26,7 @@ c#
     m  method
     n  namespace
     p  property
+    r  record
     s  struct
     t  typedef
     l  local [off]
