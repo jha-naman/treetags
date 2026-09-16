@@ -235,6 +235,16 @@ pub struct Config {
     #[arg(long = "suggest-plugins")]
     pub suggest_plugins: bool,
 
+    /// Suggest missing WASM grammars for the selected project files, then exit.
+    #[arg(long, conflicts_with = "suggest_plugins")]
+    pub suggest_grammars: bool,
+
+    #[arg(skip)]
+    pub wasm_grammar_languages: Vec<String>,
+
+    #[arg(skip = paths::get_wasm_grammars_dir())]
+    pub wasm_grammars_dir: std::path::PathBuf,
+
     /// Kinds filter map keyed by language name, populated from `--kinds-{lang}` args.
     #[clap(skip)]
     pub kinds_map: HashMap<String, String>,
@@ -337,7 +347,9 @@ impl Config {
 
         config.extras_config = ExtrasConfig::from_string(&config.extras);
         config.fields_config = FieldsConfig::from_string(&config.fields);
-        config.user_grammars = user_grammars::load(config.user_languages_config.as_ref());
+        let language_config = user_grammars::load(config.user_languages_config.as_ref());
+        config.user_grammars = language_config.user_grammars;
+        config.wasm_grammar_languages = language_config.wasm_grammars.languages;
         config.plugins_dir = config
             .plugins_dir_arg
             .clone()

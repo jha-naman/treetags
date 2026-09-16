@@ -1,0 +1,1 @@
+-f - --extras=+q --fields=+n,+S,+a,+e,+l,+t source.zig

@@ -159,8 +159,9 @@ impl TagProcessor {
 
     pub fn process_files(&self, file_names: Vec<String>) -> Vec<Tag> {
         // Build registry once; share Arc across workers.
-        // LanguageParserRegistry::new also JIT-compiles WASM plugins once.
+        // WASM grammars and plugins compile lazily and share their compiled code.
         let lang_registry = Arc::new(LanguageParserRegistry::new(&self.config));
+        lang_registry.check_requested_grammars(&self.config);
 
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let tag_file_dir = if self.tag_file_path == "-" {

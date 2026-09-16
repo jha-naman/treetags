@@ -1,9 +1,11 @@
 use std::path::Path;
+use tree_sitter::wasmtime;
 use wasmtime::component::{Component, Linker, ResourceTable};
 use wasmtime::Store;
-use wasmtime_wasi::{DirPerms, FilePerms};
+use wasmtime_wasi::FsPerms;
 
 wasmtime::component::bindgen!({
+    wasmtime_crate: tree_sitter::wasmtime,
     world: "plugin-world",
     path: "wit",
 });
@@ -35,7 +37,8 @@ impl WasmInstance {
         component: &Component,
         linker: &Linker<PluginState>,
     ) -> anyhow::Result<Self> {
-        let plugin = PluginWorld::instantiate(&mut store, component, linker)?;
+        let plugin = PluginWorld::instantiate(&mut store, component, linker)
+            .map_err(|e| anyhow::anyhow!("{e:#}"))?;
         Ok(Self { store, plugin })
     }
 
@@ -58,7 +61,7 @@ pub fn new_store(engine: &wasmtime::Engine, cache_dir: Option<&Path>) -> Store<P
     if let Some(dir) = cache_dir {
         if let Err(e) = std::fs::create_dir_all(dir) {
             eprintln!("treetags: cannot create cache dir {}: {e}", dir.display());
-        } else if let Err(e) = builder.preopened_dir(dir, ".", DirPerms::all(), FilePerms::all()) {
+        } else if let Err(e) = builder.preopened_dir(dir, ".", FsPerms::ReadWrite) {
             eprintln!("treetags: cannot preopen cache dir {}: {e}", dir.display());
         }
     }

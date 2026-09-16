@@ -11,7 +11,7 @@ julia
 kotlin            [plugin]
 lua
 objc              [plugin]
-ocaml
+ocaml             [wasm grammar]
 php
 python
 ruby
@@ -22,3 +22,4 @@ swift             [plugin]
 terraform         [plugin]
 typescript
 zig               [plugin]
+zig               [wasm grammar, overridden]

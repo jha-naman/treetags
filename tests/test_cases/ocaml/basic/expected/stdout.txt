@@ -1,0 +1,12 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+++	source.ml	/^  let ( ++ ) x y = x + y$/;"	
+Math	source.ml	/^module Math = struct$/;"	
+Printable	source.ml	/^module type Printable = sig val print : unit -> unit end$/;"	
+apply	source.ml	/^  let apply = fun f x -> f x$/;"	
+choose	source.ml	/^  let choose = function Some x -> x | None -> 0$/;"	
+counter	source.ml	/^class counter = object$/;"	
+double	source.ml	/^  let double x = x * 2$/;"	
+increment	source.ml	/^  method increment = count <- count + 1$/;"	
+length	source.ml	/^external length : string -> int = "string_length"$/;"	
+use	source.ml	/^let use x = Math.double x$/;"	
+value	source.ml	/^  method value = count$/;"	

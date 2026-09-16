@@ -81,3 +81,20 @@ happens only once on the first call to `try_generate`. Each worker thread that
 processes a file handled by the plugin creates a `WasmInstance` from the
 `SharedPlugin`.
 
+
+## Host runtime and external grammars
+
+The host uses Tree-sitter's re-exported Wasmtime runtime for both grammar modules
+and plugin components. Plugin ABI 3, manifests, installation commands, and cache
+permissions are unchanged. WASI preview 2 is enabled; the host never exposed
+preview 1 imports directly to plugin components.
+
+An external grammar is a Tree-sitter WASM parser module. A plugin is a component
+implementing the treetags WIT interface. They use separate directories and are
+loaded through separate APIs. See [external grammars](README.md#external-wasm-grammars)
+for the Zig and OCaml host implementations. The existing Zig plugin is retained
+for compatibility and still overrides the host implementation when installed.
+
+When upgrading Tree-sitter, align `tree-sitter-tags` and `wasmtime-wasi` with its
+runtime, and verify there is only one Wasmtime version in the host dependency
+graph. Guest plugin builds use Tree-sitter without its host-only `wasm` feature.

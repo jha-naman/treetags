@@ -32,3 +32,7 @@ pub fn get_cache_dir() -> PathBuf {
         }
     }
 }
+
+pub fn get_wasm_grammars_dir() -> PathBuf {
+    get_treetags_dir().join("wasm_grammars")
+}

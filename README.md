@@ -12,6 +12,7 @@ ctags see [here](#what-does-treetags-do).
 
 - [Installation](#installation)
 - [Natively Supported Languages](#natively-supported-languages)
+- [Languages with external WASM grammars](#external-wasm-grammars)
 - [Languages supported by WASM plugins](#wasm-plugins)
 - [Recommended usage](#recommended-usage)
 
@@ -39,10 +40,61 @@ for more about extension fields.
 - [x] Java
 - [x] Julia
 - [x] Lua
-- [x] Ocaml
 - [x] PHP
 - [x] Ruby
 - [x] Scala
+
+## External WASM grammars
+
+Treetags includes a Rust walker for **Zig** (with extension fields) and tag
+queries for **OCaml** (`.ml` files). Their Tree-sitter grammars are installed
+separately to keep the executable smaller. Existing Zig plugins continue to
+work and take priority when installed.
+
+Find missing grammars for your project:
+
+```sh
+treetags --suggest-grammars
+```
+
+This respects input paths, exclusions, language maps, and `--language-force`.
+It prints each required grammar once with its installation path and does not
+write a tags file or access the network.
+
+### Manual installation
+
+For this version, install these pinned upstream grammar artifacts manually:
+
+| Language | Grammar version | Grammar file |
+| --- | --- | --- |
+| Zig | 1.1.2 | [tree-sitter-zig.wasm](https://github.com/tree-sitter-grammars/tree-sitter-zig/releases/download/v1.1.2/tree-sitter-zig.wasm) |
+| OCaml | 0.24.0 | [tree-sitter-ocaml.wasm](https://github.com/tree-sitter/tree-sitter-ocaml/releases/download/v0.24.0/tree-sitter-ocaml.wasm) |
+
+Place them under `${XDG_CONFIG_HOME:-$HOME/.config}/treetags/wasm_grammars/14/`.
+The directory number is the **grammar ABI**, not the Tree-sitter crate version;
+both of these pinned grammars use ABI 14. Checksums and licenses are recorded in
+[the grammar fixtures](tests/grammars/wasm/README.md).
+
+Optionally declare grammars you want available in the existing
+`treetags/config.toml`:
+
+```toml
+[wasm_grammars]
+languages = ["zig", "ocaml"]
+```
+
+This section can coexist with `[[user_grammars]]`. An empty or omitted list
+still permits automatic use of installed grammars. `--user-languages-config`
+selects an alternate TOML file; grammar storage continues to use the normal
+Treetags configuration directory.
+
+During tag generation, Treetags checks configured grammars and loads other
+grammars when needed. A missing or invalid grammar produces one stderr warning
+per language per run with the required file path. Affected files are skipped;
+other languages still generate tags and the command retains its best-effort
+exit status. Language and kind listings work without installed grammars.
+
+Automatic grammar downloads and hosting infrastructure will be added separately.
 
 ## WASM plugins
 

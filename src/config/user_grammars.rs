@@ -17,19 +17,28 @@ pub struct UserGrammar {
     pub query_file_path: Option<PathBuf>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub struct TOMLConfig {
+    #[serde(default)]
     pub user_grammars: Vec<UserGrammar>,
+    #[serde(default)]
+    pub wasm_grammars: WasmGrammarConfig,
 }
 
-pub fn load(config_path_override: Option<&PathBuf>) -> Vec<UserGrammar> {
+#[derive(Debug, Default, Deserialize)]
+pub struct WasmGrammarConfig {
+    #[serde(default)]
+    pub languages: Vec<String>,
+}
+
+pub fn load(config_path_override: Option<&PathBuf>) -> TOMLConfig {
     let config_path = match config_path_override {
         Some(path) => path.clone(),
         None => get_config_path(),
     };
 
     if !config_path.exists() {
-        return vec![];
+        return TOMLConfig::default();
     }
 
     match fs::read_to_string(&config_path) {
@@ -42,7 +51,7 @@ pub fn load(config_path_override: Option<&PathBuf>) -> Vec<UserGrammar> {
                         config_path.display(),
                         e
                     );
-                    return vec![];
+                    return TOMLConfig::default();
                 }
             };
 
@@ -55,7 +64,7 @@ pub fn load(config_path_override: Option<&PathBuf>) -> Vec<UserGrammar> {
                 }
             }
 
-            toml_config.user_grammars
+            toml_config
         }
         Err(e) => {
             eprintln!(
@@ -63,7 +72,7 @@ pub fn load(config_path_override: Option<&PathBuf>) -> Vec<UserGrammar> {
                 config_path.display(),
                 e
             );
-            vec![]
+            TOMLConfig::default()
         }
     }
 }

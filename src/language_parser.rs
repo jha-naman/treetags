@@ -18,6 +18,7 @@ use crate::tag::Tag;
 pub enum SourceKind {
     Plugin,
     Native,
+    WasmGrammar,
     User,
 }
 
@@ -27,6 +28,7 @@ impl SourceKind {
         match self {
             SourceKind::Plugin => "plugin",
             SourceKind::Native => "native",
+            SourceKind::WasmGrammar => "wasm grammar",
             SourceKind::User => "user provided grammar",
         }
     }
@@ -67,6 +69,11 @@ pub trait LanguageParser: Send + Sync {
 
     /// Canonical language name, matching the `--kinds-{lang}` CLI argument.
     fn language_name(&self) -> &str;
+
+    /// External grammar needed by this source, independent of installation state.
+    fn wasm_grammar_name(&self, _registry: &LanguageParserRegistry) -> Option<&str> {
+        None
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -79,7 +86,7 @@ pub(crate) struct BuiltinLanguageParser {
     kind_config: TagKindConfig,
     kind_defaults: &'static [(&'static [&'static str], &'static str)],
     kind_optionals: &'static [(&'static [&'static str], &'static str)],
-    generate_fn: crate::builtin_langs::BuiltinGenerateFn,
+    desc: &'static BuiltinLangDesc,
 }
 
 impl BuiltinLanguageParser {
@@ -92,12 +99,15 @@ impl BuiltinLanguageParser {
             kind_config,
             kind_defaults: desc.kind_defaults,
             kind_optionals: desc.kind_optionals,
-            generate_fn: desc.generate_fn,
+            desc,
         }
     }
 }
 
 impl LanguageParser for BuiltinLanguageParser {
+    fn wasm_grammar_name(&self, _registry: &LanguageParserRegistry) -> Option<&str> {
+        self.desc.grammar.external().map(|g| g.name)
+    }
     fn generate_tags(
         &self,
         parser: &mut Parser,
@@ -106,8 +116,7 @@ impl LanguageParser for BuiltinLanguageParser {
         config: &Config,
         _absolute_path: &Path,
     ) -> Vec<Tag> {
-        (self.generate_fn)(&mut parser.ts_parser, code, path, &self.kind_config, config)
-            .unwrap_or_default()
+        parser.generate_builtin(self.desc, code, path, &self.kind_config, config)
     }
 
     fn kinds(&self) -> Vec<KindInfo> {
@@ -165,6 +174,18 @@ pub(crate) struct QueryLanguageParser {
 }
 
 impl LanguageParser for QueryLanguageParser {
+    fn wasm_grammar_name(&self, registry: &LanguageParserRegistry) -> Option<&str> {
+        // User-provided query grammars can replace the effective extension config.
+        let index = registry
+            .grammar_store
+            .extension_config_map
+            .get(&self.extension)?;
+        match &registry.grammar_store.grammar_configs[*index] {
+            crate::built_in_grammars::QueryConfig::Wasm(grammar) => Some(grammar.name),
+            crate::built_in_grammars::QueryConfig::Bundled(_) => None,
+        }
+    }
+
     fn generate_tags(
         &self,
         parser: &mut Parser,
@@ -294,7 +315,7 @@ fn resolve_forced_language(
 }
 
 impl LanguageParserRegistry {
-    /// Build the full registry, loading and JIT-compiling WASM plugins.
+    /// Build the registry metadata; WASM grammars and plugins compile on first use.
     /// Call this once at startup and share the result via `Arc`.
     pub fn new(config: &Config) -> Self {
         // Load once and share with the GrammarStore , so the built-in grammars
@@ -411,7 +432,11 @@ impl LanguageParserRegistry {
                 claimed = true;
             }
             sources.push(LangSource {
-                kind: SourceKind::Native,
+                kind: if desc.grammar.external().is_some() {
+                    SourceKind::WasmGrammar
+                } else {
+                    SourceKind::Native
+                },
                 name: desc.lang.to_string(),
                 extensions: desc.extensions.iter().map(|e| e.to_string()).collect(),
                 won: claimed,
@@ -472,7 +497,14 @@ impl LanguageParserRegistry {
                 claimed = true;
             }
             sources.push(LangSource {
-                kind: SourceKind::Native,
+                kind: if matches!(
+                    grammar.config,
+                    crate::built_in_grammars::QueryConfig::Wasm(_)
+                ) {
+                    SourceKind::WasmGrammar
+                } else {
+                    SourceKind::Native
+                },
                 name: grammar.lang.to_string(),
                 extensions: grammar.extensions.iter().map(|e| e.to_string()).collect(),
                 won: claimed,
@@ -838,7 +870,14 @@ impl LanguageParserRegistry {
         })
     }
 
-    /// Creates a per-thread `Parser` that shares this registry's compiled WASM modules.
+    /// Check explicitly configured grammars before starting tag-generation workers.
+    pub fn check_requested_grammars(&self, config: &Config) {
+        self.grammar_store
+            .wasm
+            .check_requested(&config.wasm_grammar_languages);
+    }
+
+    /// Creates a per-thread `Parser` sharing immutable grammar and plugin data.
     pub fn create_parser(&self) -> Parser {
         Parser::with_store_and_registry(
             Arc::clone(&self.grammar_store),

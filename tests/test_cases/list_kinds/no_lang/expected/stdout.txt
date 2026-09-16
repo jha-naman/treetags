@@ -119,3 +119,20 @@ typescript
     a  alias
     z  function parameter [off]
     l  local variable [off]
+zig
+    s  struct
+    u  union
+    g  enum
+    e  enumerator
+    o  opaque
+    r  errorSet
+    E  error
+    f  function
+    m  method
+    F  field
+    c  constant
+    v  variable
+    n  namespace
+    t  test
+    l  local [off]
+    z  parameter [off]

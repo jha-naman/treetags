@@ -40,3 +40,5 @@ pub use config::Config;
 pub use language_parser::LanguageParserRegistry;
 pub use parser::Parser;
 pub use tag::{parse_tag_file, Tag};
+
+mod wasm_grammars;

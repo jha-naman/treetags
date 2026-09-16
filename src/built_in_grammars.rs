@@ -3,7 +3,7 @@ use crate::tags_config::get_tags_config;
 use tree_sitter_tags::TagsConfiguration;
 
 /// A built-in query-based grammar: its canonical language name, `--language-force`
-/// aliases, file extensions, and compiled tags configuration.
+/// aliases, file extensions, and bundled or external tags configuration.
 pub struct BuiltinGrammar {
     pub lang: &'static str,
     pub aliases: &'static [&'static str],
@@ -13,7 +13,20 @@ pub struct BuiltinGrammar {
     pub patterns: &'static [&'static str],
     /// Interpreter names matched against a `#!` shebang line, e.g. `ruby`.
     pub interpreters: &'static [&'static str],
-    pub config: Result<TagsConfiguration, tree_sitter_tags::Error>,
+    pub config: QueryConfig,
+}
+
+pub enum QueryConfig {
+    Bundled(Result<TagsConfiguration, tree_sitter_tags::Error>),
+    Wasm(&'static crate::wasm_grammars::WasmGrammar),
+}
+impl QueryConfig {
+    pub fn is_err(&self) -> bool {
+        matches!(self, Self::Bundled(Err(_)))
+    }
+}
+fn get_query_config(language: tree_sitter::Language, query: &str, name: &str) -> QueryConfig {
+    QueryConfig::Bundled(get_tags_config(language, query, name))
 }
 
 pub fn load() -> Vec<BuiltinGrammar> {
@@ -36,7 +49,7 @@ pub fn load() -> Vec<BuiltinGrammar> {
                 "*.rake",
             ],
             interpreters: &["ruby"],
-            config: get_tags_config(
+            config: get_query_config(
                 tree_sitter_ruby::LANGUAGE.into(),
                 tree_sitter_ruby::TAGS_QUERY,
                 "ruby",
@@ -48,7 +61,7 @@ pub fn load() -> Vec<BuiltinGrammar> {
             extensions: &["java"],
             patterns: &[],
             interpreters: &[],
-            config: get_tags_config(
+            config: get_query_config(
                 tree_sitter_java::LANGUAGE.into(),
                 tree_sitter_java::TAGS_QUERY,
                 "java",
@@ -60,11 +73,7 @@ pub fn load() -> Vec<BuiltinGrammar> {
             extensions: &["ml"],
             patterns: &[],
             interpreters: &[],
-            config: get_tags_config(
-                tree_sitter_ocaml::LANGUAGE_OCAML.into(),
-                tree_sitter_ocaml::TAGS_QUERY,
-                "ocaml",
-            ),
+            config: QueryConfig::Wasm(&crate::wasm_grammars::OCAML),
         },
         BuiltinGrammar {
             lang: "php",
@@ -72,7 +81,7 @@ pub fn load() -> Vec<BuiltinGrammar> {
             extensions: &["php"],
             patterns: &[],
             interpreters: &["php"],
-            config: get_tags_config(
+            config: get_query_config(
                 tree_sitter_php::LANGUAGE_PHP.into(),
                 tree_sitter_php::TAGS_QUERY,
                 "php",
@@ -84,7 +93,7 @@ pub fn load() -> Vec<BuiltinGrammar> {
             extensions: &["ex"],
             patterns: &[],
             interpreters: &[],
-            config: get_tags_config(
+            config: get_query_config(
                 tree_sitter_elixir::LANGUAGE.into(),
                 tree_sitter_elixir::TAGS_QUERY,
                 "elixir",
@@ -96,7 +105,7 @@ pub fn load() -> Vec<BuiltinGrammar> {
             extensions: &["lua"],
             patterns: &[],
             interpreters: &["lua"],
-            config: get_tags_config(
+            config: get_query_config(
                 tree_sitter_lua::LANGUAGE.into(),
                 tree_sitter_lua::TAGS_QUERY,
                 "lua",
@@ -118,7 +127,7 @@ pub fn load() -> Vec<BuiltinGrammar> {
                 "*.zsh",
             ],
             interpreters: &["sh", "bash", "dash", "zsh", "ksh"],
-            config: get_tags_config(
+            config: get_query_config(
                 tree_sitter_bash::LANGUAGE.into(),
                 queries::BASH_TAGS_QUERY,
                 "shell",
@@ -130,7 +139,7 @@ pub fn load() -> Vec<BuiltinGrammar> {
             extensions: &["scala"],
             patterns: &[],
             interpreters: &["scala"],
-            config: get_tags_config(
+            config: get_query_config(
                 tree_sitter_scala::LANGUAGE.into(),
                 queries::SCALA_TAGS_QUERY,
                 "scala",
@@ -142,7 +151,7 @@ pub fn load() -> Vec<BuiltinGrammar> {
             extensions: &["jl"],
             patterns: &[],
             interpreters: &["julia"],
-            config: get_tags_config(
+            config: get_query_config(
                 tree_sitter_julia::LANGUAGE.into(),
                 queries::JULIA_TAGS_QUERY,
                 "julia",
