@@ -398,7 +398,7 @@ pub(crate) fn generate(
     source: &[u8],
     path: &str,
     kinds: &TagKindConfig,
-    _config: &crate::config::Config,
+    config: &crate::config::Config,
 ) -> Option<Vec<OutputTag>> {
     parser.set_language(&language).ok()?;
     let tree = parser.parse(source, None)?;
@@ -420,12 +420,31 @@ pub(crate) fn generate(
             .into_iter()
             .map(|mut tag| {
                 let mut fields = ExtensionFields::new();
-                if let Some(end) = tag.end_line {
-                    fields.insert("end", end.to_string());
+                let field_config = &config.fields_config;
+                if field_config.is_field_enabled("kind") {
+                    fields.insert("kind", tag.kind.clone());
+                }
+                if field_config.is_field_enabled("line") {
+                    fields.insert("line", tag.line.to_string());
+                }
+                if field_config.is_field_enabled("end") {
+                    if let Some(end) = tag.end_line {
+                        fields.insert("end", end.to_string());
+                    }
                 }
                 tag.extension_fields.sort_unstable_by(|a, b| a.0.cmp(&b.0));
                 for (key, value) in tag.extension_fields {
-                    fields.insert(key, value);
+                    let enabled = match key.as_str() {
+                        "access" | "signature" | "typeref" => field_config.is_field_enabled(&key),
+                        "struct" | "union" | "enum" | "opaque" | "errorSet" | "function"
+                        | "test" => {
+                            field_config.is_field_enabled("scope") || config.extras_config.qualified
+                        }
+                        _ => true,
+                    };
+                    if enabled {
+                        fields.insert(key, value);
+                    }
                 }
                 OutputTag {
                     name: tag.name,

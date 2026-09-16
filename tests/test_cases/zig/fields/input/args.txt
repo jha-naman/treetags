@@ -1,1 +1,1 @@
--f - --extras=+q --fields=+n,+S,+a,+e,+l,+t source.zig
+-f - --extras=+q --fields=+k,+n,+S,+a,+e,+l,+t source.zig
