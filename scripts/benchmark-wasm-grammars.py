@@ -5,6 +5,10 @@ Requires GNU time (uses a small wrapper process for accurate peak RSS). Run from
   python3 scripts/benchmark-wasm-grammars.py --baseline dist/wasm-grammar-baseline/treetags \
       --plugins dist/wasm-grammar-baseline/plugins --current target/release/treetags
 Both binaries must have been built with the same toolchain, target and profile.
+Caches are isolated per binary; use --cache cold for empty-cache processes or
+--cache disabled for uncached compilation. The default primes the disk cache.
+Zig and mixed cases explicitly request access, end, and signature fields from
+both binaries to match the old plugin's unconditional Zig field emission.
 """
 import argparse
 import hashlib
@@ -42,6 +46,8 @@ def main():
     parser.add_argument("--current", type=Path, required=True)
     parser.add_argument("--plugins", type=Path, required=True, help="Preserved plugin directory")
     parser.add_argument("--runs", type=int, default=7)
+    parser.add_argument("--cache", choices=["disabled", "cold", "warm"], default="warm",
+                        help="Isolated compilation cache state (default: warm)")
     parser.add_argument("--output", type=Path, default=Path("dist/wasm-grammar-benchmark.json"))
     args = parser.parse_args()
     if args.runs < 2:
@@ -54,8 +60,9 @@ def main():
         "zig": ("zig", (repo / "tests/test_cases/zig/basic/input/source.zig").read_bytes()),
         "ocaml": ("ml", (repo / "tests/test_cases/ocaml/basic/input/source.ml").read_bytes()),
     }
-    result = {"platform": platform.platform(), "runs": args.runs,
+    result = {"platform": platform.platform(), "runs": args.runs, "cache": args.cache,
               "warmups": 1, "large_files_per_language": 40, "copies_per_large_file": 50,
+              "fields_for_zig_workloads": "+a,+e,+S",
               "binaries": {}, "workloads": []}
     for label, binary in binaries.items():
         result["binaries"][label] = {"path": str(binary), "bytes": binary.stat().st_size,
@@ -65,6 +72,10 @@ def main():
         config = root / "config"
         shutil.copytree(repo / "tests/grammars/wasm/14", config / "treetags/wasm_grammars/14")
         env = dict(os.environ, XDG_CONFIG_HOME=str(config))
+        caches = {label: root / f"cache-{label}" for label in binaries}
+        if args.cache == "disabled":
+            for cache in caches.values():
+                cache.write_text("cache unavailable")
         empty_config = root / "empty.toml"
         empty_config.write_text("user_grammars = []\n")
         cases = [("startup", [])]
@@ -88,12 +99,19 @@ def main():
                                        "--workers", str(workers), "-f", "-", "."]
                     if label == "before" and "zig" in langs:
                         commands[label] += ["--plugin-dir", str(plugins / "zig")]
+                    if "zig" in langs:
+                        # The old Zig plugin emitted these unconditionally.
+                        commands[label] += ["--fields", "+a,+e,+S"]
                 samples = {label: [] for label in binaries}
                 hashes = set()
                 # Alternate order to reduce systematic thermal/cache bias.
                 for iteration in range(args.runs + 1):
                     for label in list(binaries)[::1 if iteration % 2 == 0 else -1]:
-                        seconds, rss, digest = measure(commands[label], root / name, env, root)
+                        cache = caches[label]
+                        if args.cache == "cold" and cache.exists():
+                            shutil.rmtree(cache)
+                        run_env = dict(env, XDG_CACHE_HOME=str(cache))
+                        seconds, rss, digest = measure(commands[label], root / name, run_env, root)
                         hashes.add(digest)
                         if iteration:
                             samples[label].append({"seconds": seconds, "peak_rss_kib": rss})
