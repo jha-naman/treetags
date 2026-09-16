@@ -17,6 +17,7 @@ use crate::tag;
 use crate::user_grammars;
 use crate::wasm_grammars::{self, WasmGrammars};
 use libloading::Library;
+use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::fs;
 use std::sync::Arc;
@@ -90,8 +91,8 @@ impl GrammarStore {
 pub struct Parser {
     pub(crate) grammar_store: Arc<GrammarStore>,
     pub tags_context: TagsContext,
-    walker_wasm_ready: bool,
-    query_wasm_ready: bool,
+    walker_wasm_store: OnceCell<Result<(), String>>,
+    query_wasm_store: OnceCell<Result<(), String>>,
     /// Exposed `pub(crate)` so `BuiltinLanguageParser` can pass it to language
     /// free-functions without going through an extra method call.
     pub(crate) ts_parser: TSParser,
@@ -121,8 +122,8 @@ impl Parser {
         Self {
             grammar_store: store,
             tags_context: TagsContext::new(),
-            walker_wasm_ready: false,
-            query_wasm_ready: false,
+            walker_wasm_store: OnceCell::new(),
+            query_wasm_store: OnceCell::new(),
             ts_parser: TSParser::new(),
             shared_registry: if registry.is_empty() {
                 None
@@ -144,12 +145,19 @@ impl Parser {
         let Some(language) = desc.grammar.language(&self.grammar_store.wasm) else {
             return vec![];
         };
-        if language.is_wasm() && !self.walker_wasm_ready {
-            if let Err(error) = wasm_grammars::attach_store(&mut self.ts_parser) {
-                eprintln!("treetags: cannot initialize walker WASM store: {error}");
-                return vec![];
-            }
-            self.walker_wasm_ready = true;
+        if language.is_wasm()
+            && self
+                .walker_wasm_store
+                .get_or_init(|| {
+                    let result = wasm_grammars::attach_store(&mut self.ts_parser);
+                    if let Err(error) = &result {
+                        eprintln!("treetags: cannot initialize walker WASM store: {error}");
+                    }
+                    result
+                })
+                .is_err()
+        {
+            return vec![];
         }
         (desc.generate_fn)(&mut self.ts_parser, language, code, path, kinds, config)
             .unwrap_or_default()
@@ -208,12 +216,19 @@ impl Parser {
             return tags;
         };
 
-        if tags_config.language.is_wasm() && !self.query_wasm_ready {
-            if let Err(error) = wasm_grammars::attach_store(&mut self.tags_context.parser) {
-                eprintln!("treetags: cannot initialize query WASM store: {error}");
-                return tags;
-            }
-            self.query_wasm_ready = true;
+        if tags_config.language.is_wasm()
+            && self
+                .query_wasm_store
+                .get_or_init(|| {
+                    let result = wasm_grammars::attach_store(&mut self.tags_context.parser);
+                    if let Err(error) = &result {
+                        eprintln!("treetags: cannot initialize query WASM store: {error}");
+                    }
+                    result
+                })
+                .is_err()
+        {
+            return tags;
         }
         let result = self.tags_context.generate_tags(tags_config, code, None);
 
@@ -298,6 +313,42 @@ impl Parser {
 #[cfg(test)]
 mod wasm_tests {
     use super::*;
+
+    #[test]
+    fn cached_store_failures_skip_wasm_but_allow_native_languages() {
+        let mut config = Config::for_test();
+        config.wasm_grammars_dir =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/grammars/wasm");
+        let mut parser = Parser::new(&config);
+        parser
+            .walker_wasm_store
+            .set(Err("test failure".into()))
+            .unwrap();
+        parser
+            .query_wasm_store
+            .set(Err("test failure".into()))
+            .unwrap();
+        let files = tempfile::tempdir().unwrap();
+        for _ in 0..2 {
+            for (extension, source, expected_name) in [
+                ("zig", "pub fn zig_one() void {}", None),
+                ("ml", "let ocaml_one x = x + 1", None),
+                ("rs", "pub fn rust_one() {}", Some("rust_one")),
+                ("rb", "def ruby_one\nend", Some("ruby_one")),
+            ] {
+                let path = files.path().join(format!("source.{extension}"));
+                fs::write(&path, source).unwrap();
+                let tags = parser
+                    .parse_file("source", path.to_str().unwrap(), extension, &config)
+                    .unwrap();
+                if let Some(name) = expected_name {
+                    assert!(tags.iter().any(|tag| tag.name == name), "missing {name}");
+                } else {
+                    assert!(tags.is_empty(), "cached failure ignored for {extension}");
+                }
+            }
+        }
+    }
 
     #[test]
     fn direct_parser_switches_between_native_and_wasm_languages() {
