@@ -362,3 +362,47 @@ fn user_query_override_does_not_suggest_an_unused_wasm_grammar() {
     assert_eq!(stderr(&out), "");
     assert!(stdout(&out).lines().count() > 1);
 }
+
+#[test]
+fn zig_emitter_filters_names_and_preserves_disabled_parent_scopes() {
+    let p = Project::new();
+    p.install("zig");
+    p.write(
+        "source.zig",
+        r#"const Container = struct {
+    value: u32,
+    fn consume(_: u32, named: u32) void {
+        const _ = named;
+        const local = named;
+    }
+};
+const Choice = enum(u8) { first, _ };
+test "" {}
+test "_" {}
+"#,
+    );
+    let out = p.run(&["-f", "-", "--kinds-zig=+z,+l", "source.zig"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    let tags = stdout(&out);
+    for line in tags.lines().filter(|line| !line.starts_with('!')) {
+        let name = line.split('\t').next().unwrap();
+        assert!(!name.is_empty() && name != "_", "{line}");
+    }
+    assert!(
+        tags.lines().any(|line| line.starts_with("named\t")),
+        "{tags}"
+    );
+    assert!(
+        tags.lines().any(|line| line.starts_with("first\t")),
+        "{tags}"
+    );
+
+    let out = p.run(&["-f", "-", "--kinds-zig=z", "--fields=+s,+t", "source.zig"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    let tags = stdout(&out);
+    let tags: Vec<_> = tags.lines().filter(|line| !line.starts_with('!')).collect();
+    assert_eq!(tags.len(), 1, "{tags:?}");
+    assert!(tags[0].starts_with("named\t"), "{tags:?}");
+    assert!(tags[0].contains("function:Container.consume"), "{tags:?}");
+    assert!(tags[0].contains("typeref:typename:u32"), "{tags:?}");
+}

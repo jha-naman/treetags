@@ -59,6 +59,7 @@ impl ScopeKey for ScopeKind {
 }
 
 struct ZigWalker<'src> {
+    config: &'src crate::config::Config,
     source: &'src [u8],
     lines: Vec<&'src [u8]>,
     file_name: Arc<str>,
@@ -77,20 +78,50 @@ impl WalkContext for ZigWalker<'_> {
     }
 }
 
-fn make_tag(
-    w: &ZigWalker,
+fn emit_tag(
+    w: &mut ZigWalker,
     name: String,
     line: u32,
     kind: &'static str,
-    scope: Option<(&str, &str)>,
-) -> Tag {
+    extra_fields: impl FnOnce(&mut ExtensionFields),
+) {
+    if name.is_empty() || name == "_" || !w.kinds.is_kind_enabled(kind) {
+        return;
+    }
     let mut fields = ExtensionFields::new();
     fields.insert("kind", kind);
     fields.insert("line", line.to_string());
-    if let Some((key, value)) = scope {
+    if let Some((key, value)) = w.scopes.current_field() {
         fields.insert(key.to_string(), value.to_string());
     }
-    Tag {
+    extra_fields(&mut fields);
+    let mut fields: Vec<_> = fields.into_iter().collect();
+    // Keep standard fields first, followed by the language fields alphabetically.
+    fields.sort_unstable_by(|a, b| {
+        let order = |key: &str| match key {
+            "kind" => 0,
+            "line" => 1,
+            "end" => 2,
+            _ => 3,
+        };
+        order(&a.0).cmp(&order(&b.0)).then_with(|| a.0.cmp(&b.0))
+    });
+    let mut enabled_fields = ExtensionFields::new();
+    for (key, value) in fields {
+        let enabled = match key.as_ref() {
+            "kind" | "line" | "end" | "access" | "signature" | "typeref" => {
+                w.config.fields_config.is_field_enabled(&key)
+            }
+            "struct" | "union" | "enum" | "opaque" | "errorSet" | "function" | "test" => {
+                w.config.fields_config.is_field_enabled("scope") || w.config.extras_config.qualified
+            }
+            _ => true,
+        };
+        if enabled {
+            enabled_fields.insert(key, value);
+        }
+    }
+    w.tags.push(Tag {
         name,
         file_name: w.file_name.clone(),
         address: Tag::address_from_line(
@@ -100,20 +131,26 @@ fn make_tag(
                 .unwrap_or(b""),
         ),
         kind: Some(kind.into()),
-        extension_fields: Some(fields),
-    }
+        extension_fields: if enabled_fields.is_empty() {
+            None
+        } else {
+            Some(enabled_fields)
+        },
+    });
 }
 
-fn add_field(tag: &mut Tag, key: &'static str, value: Option<String>) {
+fn add_field(fields: &mut ExtensionFields, key: &'static str, value: Option<String>) {
     if let Some(value) = value {
-        tag.extension_fields
-            .get_or_insert_with(ExtensionFields::new)
-            .insert(key, value);
+        fields.insert(key, value);
     }
 }
 
-fn add_end_line(tag: &mut Tag, node: Node) {
-    add_field(tag, "end", Some((node.end_position().row + 1).to_string()));
+fn add_end_line(fields: &mut ExtensionFields, node: Node) {
+    add_field(
+        fields,
+        "end",
+        Some((node.end_position().row + 1).to_string()),
+    );
 }
 
 fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, w: &mut ZigWalker) -> bool {
@@ -188,9 +225,6 @@ fn emit_variable(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalker) -> b
     let Some((name, line)) = child_ident(cursor, source, &["identifier"]) else {
         return false;
     };
-    if name == "_" {
-        return false;
-    }
     let container = initializer_kind(cursor);
     let local = is_local(w);
     let initializer = initializer_text(node, source);
@@ -219,23 +253,21 @@ fn emit_variable(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalker) -> b
         }
     };
 
-    if w.kinds.is_kind_enabled(letter) {
-        let mut tag = make_tag(w, name.clone(), line, letter, w.scopes.current_field());
+    emit_tag(w, name.clone(), line, letter, |fields| {
         if !local {
-            add_field(&mut tag, "access", Some(access_of(node, source)));
+            add_field(fields, "access", Some(access_of(node, source)));
         }
         if container.is_none() {
             add_field(
-                &mut tag,
+                fields,
                 "typeref",
                 declared_type(cursor, source).map(|ty| format!("typename:{ty}")),
             );
         }
         if container.is_some() {
-            add_end_line(&mut tag, node);
+            add_end_line(fields, node);
         }
-        w.tags.push(tag);
-    }
+    });
 
     if let Some((_, scope_kind)) = container {
         w.scopes.push(scope_kind, &name);
@@ -261,15 +293,8 @@ fn emit_function(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalker) -> b
         "f"
     };
 
-    if w.kinds.is_kind_enabled(letter) {
-        let mut tag = make_tag(
-            w,
-            name.clone(),
-            line_of(name_node),
-            letter,
-            w.scopes.current_field(),
-        );
-        add_field(&mut tag, "access", Some(access_of(node, source)));
+    emit_tag(w, name.clone(), line_of(name_node), letter, |fields| {
+        add_field(fields, "access", Some(access_of(node, source)));
         let mut signature = None;
         for_each_child!(cursor, {
             if cursor.node().kind() == "parameters" {
@@ -277,17 +302,16 @@ fn emit_function(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalker) -> b
                 break;
             }
         });
-        add_field(&mut tag, "signature", signature);
+        add_field(fields, "signature", signature);
         add_field(
-            &mut tag,
+            fields,
             "typeref",
             node.child_by_field_name("type")
                 .map(|ty| format!("typename:{}", node_text(ty, source))),
         );
-        add_field(&mut tag, "implementation", implementation_of(node, source));
-        add_end_line(&mut tag, node);
-        w.tags.push(tag);
-    }
+        add_field(fields, "implementation", implementation_of(node, source));
+        add_end_line(fields, node);
+    });
 
     if node.child_by_field_name("body").is_some() {
         w.scopes.push(ScopeKind::Function, &name);
@@ -325,12 +349,10 @@ fn emit_test(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalker) -> bool 
         return false;
     };
 
-    if w.kinds.is_kind_enabled("t") {
-        let mut tag = make_tag(w, name.clone(), line, "t", w.scopes.current_field());
-        add_field(&mut tag, "access", Some(access_of(node, source)));
-        add_end_line(&mut tag, node);
-        w.tags.push(tag);
-    }
+    emit_tag(w, name.clone(), line, "t", |fields| {
+        add_field(fields, "access", Some(access_of(node, source)));
+        add_end_line(fields, node);
+    });
     w.scopes.push(ScopeKind::Test, &name);
     true
 }
@@ -341,75 +363,60 @@ fn emit_container_field(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalke
         Some(ScopeKind::Struct | ScopeKind::Union) => "F",
         _ => return,
     };
-    if !w.kinds.is_kind_enabled(letter) {
-        return;
-    }
     let node = cursor.node();
     let Some(name_node) = node.child_by_field_name("name") else {
         return;
     };
     let name = node_text(name_node, source).to_string();
-    if name == "_" {
-        return;
-    }
-    let mut tag = make_tag(
-        w,
-        name,
-        line_of(name_node),
-        letter,
-        w.scopes.current_field(),
-    );
-    if letter == "F" {
-        add_field(
-            &mut tag,
-            "typeref",
-            node.child_by_field_name("type")
-                .map(|ty| format!("typename:{}", node_text(ty, source))),
-        );
-    }
-    w.tags.push(tag);
+    emit_tag(w, name, line_of(name_node), letter, |fields| {
+        if letter == "F" {
+            add_field(
+                fields,
+                "typeref",
+                node.child_by_field_name("type")
+                    .map(|ty| format!("typename:{}", node_text(ty, source))),
+            );
+        }
+    });
 }
 
 fn emit_errors(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalker) {
-    if !w.kinds.is_kind_enabled("E") || w.scopes.last_key() != Some(ScopeKind::ErrorSet) {
+    if w.scopes.last_key() != Some(ScopeKind::ErrorSet) {
         return;
     }
     for_each_child!(cursor, {
         if cursor.node().kind() == "identifier" {
             let name_node = cursor.node();
-            w.tags.push(make_tag(
+            emit_tag(
                 w,
                 node_text(name_node, source).to_string(),
                 line_of(name_node),
                 "E",
-                w.scopes.current_field(),
-            ));
+                |_| {},
+            );
         }
     });
 }
 
 fn emit_parameter(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalker) {
-    if !w.kinds.is_kind_enabled("z") {
-        return;
-    }
     let node = cursor.node();
     let Some(name_node) = node.child_by_field_name("name") else {
         return;
     };
-    let mut tag = make_tag(
+    emit_tag(
         w,
         node_text(name_node, source).to_string(),
         line_of(name_node),
         "z",
-        w.scopes.current_field(),
+        |fields| {
+            add_field(
+                fields,
+                "typeref",
+                node.child_by_field_name("type")
+                    .map(|ty| format!("typename:{}", node_text(ty, source))),
+            );
+        },
     );
-    add_field(
-        &mut tag,
-        "typeref",
-        node.child_by_field_name("type")
-            .map(|ty| format!("typename:{}", node_text(ty, source))),
-    );
-    w.tags.push(tag);
 }
 
 pub(crate) fn generate(
@@ -423,6 +430,7 @@ pub(crate) fn generate(
     parser.set_language(&language).ok()?;
     let tree = parser.parse(source, None)?;
     let mut walker = ZigWalker {
+        config,
         source,
         lines: crate::split_by_newlines::split_by_newlines(source),
         file_name: path.into(),
@@ -433,44 +441,6 @@ pub(crate) fn generate(
     let mut cursor = tree.walk();
     if cursor.goto_first_child() {
         walk_tree(&mut cursor, &mut walker);
-    }
-    for tag in &mut walker.tags {
-        let mut fields: Vec<_> = tag
-            .extension_fields
-            .take()
-            .unwrap_or_default()
-            .into_iter()
-            .collect();
-        // Keep standard fields first, followed by the language fields alphabetically.
-        fields.sort_unstable_by(|a, b| {
-            let order = |key: &str| match key {
-                "kind" => 0,
-                "line" => 1,
-                "end" => 2,
-                _ => 3,
-            };
-            order(&a.0).cmp(&order(&b.0)).then_with(|| a.0.cmp(&b.0))
-        });
-        let mut enabled_fields = ExtensionFields::new();
-        for (key, value) in fields {
-            let enabled = match key.as_ref() {
-                "kind" | "line" | "end" | "access" | "signature" | "typeref" => {
-                    config.fields_config.is_field_enabled(&key)
-                }
-                "struct" | "union" | "enum" | "opaque" | "errorSet" | "function" | "test" => {
-                    config.fields_config.is_field_enabled("scope") || config.extras_config.qualified
-                }
-                _ => true,
-            };
-            if enabled {
-                enabled_fields.insert(key, value);
-            }
-        }
-        tag.extension_fields = if enabled_fields.is_empty() {
-            None
-        } else {
-            Some(enabled_fields)
-        };
     }
     Some(walker.tags)
 }
