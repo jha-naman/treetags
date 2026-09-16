@@ -80,7 +80,3 @@ path = "src/bin/build_plugin.rs"
 [[bin]]
 name = "treetags-build-site"
 path = "src/bin/build_site.rs"
-
-[lib]
-name = "treetags"
-path = "src/lib.rs"

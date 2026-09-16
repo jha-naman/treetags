@@ -30,8 +30,15 @@
 use clap::Parser;
 use std::path::{Path, PathBuf};
 
-use treetags::plugin::index::{sha256_hex, AbisFile, IndexEntry, PluginIndex};
-use treetags::plugin::manifest::PluginManifest;
+// Share the distribution schema with the CLI without compiling the full host.
+#[path = "../plugin/index.rs"]
+mod index;
+#[allow(dead_code)]
+#[path = "../plugin/manifest.rs"]
+mod manifest;
+
+use index::{sha256_hex, AbisFile, IndexEntry, PluginIndex};
+use manifest::PluginManifest;
 
 #[derive(Parser)]
 #[command(
