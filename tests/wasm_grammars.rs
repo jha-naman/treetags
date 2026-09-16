@@ -42,6 +42,7 @@ impl Project {
         Command::new(env!("CARGO_BIN_EXE_treetags"))
             .current_dir(self.dir.path())
             .env("XDG_CONFIG_HOME", self.dir.path().join("config"))
+            .env("XDG_CACHE_HOME", self.dir.path().join("cache"))
             .args(["--plugins-dir", "empty-plugins"])
             .args(args)
             .output()
@@ -53,6 +54,112 @@ fn stdout(output: &Output) -> String {
 }
 fn stderr(output: &Output) -> String {
     String::from_utf8(output.stderr.clone()).unwrap()
+}
+
+fn compiled_entries(project: &Project) -> Vec<PathBuf> {
+    walkdir::WalkDir::new(
+        project
+            .dir
+            .path()
+            .join("cache/treetags/wasm_grammars/modules"),
+    )
+    .into_iter()
+    .filter_map(Result::ok)
+    .filter(|entry| entry.file_type().is_file() && entry.path().extension().is_none())
+    .map(|entry| entry.into_path())
+    .collect()
+}
+
+#[test]
+fn compiled_grammar_cache_survives_processes_and_recovers_from_corruption() {
+    let p = Project::new();
+    p.install("ocaml");
+    let args = ["-f", "-", "source.ml"];
+    let cold = p.run(&args);
+    assert!(cold.status.success());
+    assert_eq!(stderr(&cold), "");
+    assert!(stdout(&cold).contains("double"));
+    let entries = compiled_entries(&p);
+    assert!(
+        !entries.is_empty(),
+        "compilation must populate the disk cache"
+    );
+    let timestamps: Vec<_> = entries
+        .iter()
+        .map(|path| fs::metadata(path).unwrap().modified().unwrap())
+        .collect();
+    let warm = p.run(&args);
+    assert!(warm.status.success());
+    assert_eq!(stderr(&warm), "");
+    assert_eq!(cold.stdout, warm.stdout);
+    for (path, timestamp) in entries.iter().zip(timestamps) {
+        assert_eq!(
+            fs::metadata(path).unwrap().modified().unwrap(),
+            timestamp,
+            "a cache hit should not rewrite compiled code"
+        );
+        fs::write(path, b"broken cache entry").unwrap();
+    }
+    let recovered = p.run(&args);
+    assert!(recovered.status.success());
+    assert_eq!(stderr(&recovered), "");
+    assert_eq!(cold.stdout, recovered.stdout);
+    for path in entries {
+        assert_ne!(fs::read(path).unwrap(), b"broken cache entry");
+    }
+
+    // A populated cache must never hide a changed or missing grammar file.
+    let grammar = p
+        .config_dir()
+        .join("wasm_grammars/14/tree-sitter-ocaml.wasm");
+    let previous_count = compiled_entries(&p).len();
+    let mut changed = fs::read(&grammar).unwrap();
+    // Append a valid, inert custom section so the module still parses identically.
+    changed.extend_from_slice(&[0, 2, 1, b'x']);
+    fs::write(&grammar, changed).unwrap();
+    let replaced = p.run(&args);
+    assert!(replaced.status.success());
+    assert_eq!(stderr(&replaced), "");
+    assert_eq!(cold.stdout, replaced.stdout);
+    assert!(compiled_entries(&p).len() > previous_count);
+    fs::write(&grammar, b"invalid replacement").unwrap();
+    assert!(stderr(&p.run(&args)).contains("grammar 'ocaml'"));
+    fs::remove_file(grammar).unwrap();
+    assert!(stderr(&p.run(&args)).contains("cannot read grammar"));
+}
+
+#[test]
+fn unavailable_cache_does_not_prevent_grammar_loading() {
+    let p = Project::new();
+    p.install("ocaml");
+    fs::write(p.dir.path().join("cache"), b"not a directory").unwrap();
+    let out = p.run(&["-f", "-", "source.ml"]);
+    assert!(out.status.success());
+    assert_eq!(stderr(&out), "");
+    assert!(stdout(&out).contains("double"));
+}
+
+#[test]
+fn concurrent_processes_can_populate_the_same_cache() {
+    let p = Project::new();
+    p.install("zig");
+    let outputs = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..4)
+            .map(|_| scope.spawn(|| p.run(&["-f", "-", "source.zig"])))
+            .collect();
+        handles
+            .into_iter()
+            .map(|h| h.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+    assert!(!compiled_entries(&p).is_empty());
+    let warm = p.run(&["-f", "-", "source.zig"]);
+    for out in outputs.iter().chain(std::iter::once(&warm)) {
+        assert!(out.status.success());
+        assert_eq!(stderr(out), "");
+        assert!(stdout(out).contains("greet"));
+        assert_eq!(out.stdout, warm.stdout);
+    }
 }
 
 #[test]

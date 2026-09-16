@@ -18,6 +18,7 @@ exclude = ["tests/", ".github/", "plugins/"]
 
 [dependencies]
 anyhow = "1"
+wasmtime = { version = "48.0.1", default-features = false, features = ["cache"] }
 wasmtime-wasi = { version = "48.0.1", default-features = false, features = ["p2"] }
 encoding_rs = "0.8"
 chardetng = "1"

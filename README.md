@@ -94,6 +94,14 @@ per language per run with the required file path. Affected files are skipped;
 other languages still generate tags and the command retains its best-effort
 exit status. Language and kind listings work without installed grammars.
 
+Compiled WASM grammars are cached persistently under
+`${XDG_CACHE_HOME:-$HOME/.cache}/treetags/wasm_grammars/`. The first use compiles
+the grammar; subsequent runs reuse compiled code. Wasmtime invalidates entries
+when grammar contents, compiler version, or compilation settings change and
+manages cache cleanup. Missing or corrupt entries are rebuilt; an unavailable
+cache falls back to normal compilation. You can delete this directory to clear
+the cache. The original `.wasm` grammar files must remain installed.
+
 Automatic grammar downloads and hosting infrastructure will be added separately.
 
 ## WASM plugins

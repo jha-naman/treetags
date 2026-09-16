@@ -2,12 +2,29 @@
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
-use tree_sitter::{wasmtime::Engine, Language, WasmStore};
+use tree_sitter::{
+    wasmtime::{Cache, CacheConfig, Config, Engine},
+    Language, WasmStore,
+};
 use tree_sitter_tags::TagsConfiguration;
 
 pub(crate) fn engine() -> &'static Engine {
     static ENGINE: OnceLock<Engine> = OnceLock::new();
-    ENGINE.get_or_init(Engine::default)
+    ENGINE
+        .get_or_init(|| cached_engine(&crate::config::paths::get_cache_dir().join("wasm_grammars")))
+}
+
+fn cached_engine(directory: &Path) -> Engine {
+    let mut config = Config::new();
+    let mut cache_config = CacheConfig::new();
+    cache_config.with_directory(directory);
+    // Caching is best-effort. Wasmtime handles content/compiler/CPU cache keys,
+    // atomic writes, corrupt entries, and cleanup. Never deserialize artifacts
+    // alongside the user-supplied grammar ourselves.
+    if let Ok(cache) = Cache::new(cache_config) {
+        config.cache(Some(cache));
+    }
+    Engine::new(&config).unwrap_or_else(|_| Engine::default())
 }
 
 #[derive(Clone, Copy)]
