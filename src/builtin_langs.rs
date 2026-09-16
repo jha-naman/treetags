@@ -40,9 +40,9 @@ pub(crate) struct BuiltinLangDesc {
 /// Adding a new builtin language requires exactly one new entry here.
 pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
     BuiltinLangDesc {
-        lang: "zig",
+        lang: zig::LANG_NAME,
         aliases: &[],
-        extensions: &["zig"],
+        extensions: zig::LANG_EXTENSIONS,
         patterns: &[],
         interpreters: &[],
         kind_defaults: zig::KIND_DEFAULTS,
