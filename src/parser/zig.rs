@@ -3,11 +3,11 @@ use super::common::{
     cursor::{child_ident, line_of, node_text},
     scope::{ScopeKey, ScopeStack},
     scope_walker::{walk_tree, WalkContext},
+    tree_walker::{generate_tags_with_config, Context},
 };
 use super::TagKindConfig;
 use crate::for_each_child;
 use crate::tag::{ExtensionFields, Tag};
-use std::sync::Arc;
 use tree_sitter::{Node, Parser as TsParser, TreeCursor};
 
 pub(crate) const LANG_NAME: &'static str = "zig";
@@ -59,18 +59,13 @@ impl ScopeKey for ScopeKind {
 }
 
 struct ZigWalker<'src> {
-    config: &'src crate::config::Config,
-    source: &'src [u8],
-    lines: Vec<&'src [u8]>,
-    file_name: Arc<str>,
+    base: Context<'src>,
     scopes: ScopeStack<ScopeKind>,
-    kinds: TagKindConfig,
-    tags: Vec<Tag>,
 }
 
 impl WalkContext for ZigWalker<'_> {
     fn process_node(&mut self, cursor: &mut TreeCursor) -> bool {
-        process_node_inner(self.source, cursor, self)
+        process_node_inner(self.base.source_code.as_bytes(), cursor, self)
     }
 
     fn pop_scope(&mut self) {
@@ -85,7 +80,7 @@ fn emit_tag(
     kind: &'static str,
     extra_fields: impl FnOnce(&mut ExtensionFields),
 ) {
-    if name.is_empty() || name == "_" || !w.kinds.is_kind_enabled(kind) {
+    if name.is_empty() || name == "_" || !w.base.tag_config.is_kind_enabled(kind) {
         return;
     }
     let mut fields = ExtensionFields::new();
@@ -110,10 +105,11 @@ fn emit_tag(
     for (key, value) in fields {
         let enabled = match key.as_ref() {
             "kind" | "line" | "end" | "access" | "signature" | "typeref" => {
-                w.config.fields_config.is_field_enabled(&key)
+                w.base.user_config.fields_config.is_field_enabled(&key)
             }
             "struct" | "union" | "enum" | "opaque" | "errorSet" | "function" | "test" => {
-                w.config.fields_config.is_field_enabled("scope") || w.config.extras_config.qualified
+                w.base.user_config.fields_config.is_field_enabled("scope")
+                    || w.base.user_config.extras_config.qualified
             }
             _ => true,
         };
@@ -121,11 +117,12 @@ fn emit_tag(
             enabled_fields.insert(key, value);
         }
     }
-    w.tags.push(Tag {
+    w.base.tags.push(Tag {
         name,
-        file_name: w.file_name.clone(),
+        file_name: w.base.file_name.clone(),
         address: Tag::address_from_line(
-            w.lines
+            w.base
+                .lines
                 .get(line.saturating_sub(1) as usize)
                 .copied()
                 .unwrap_or(b""),
@@ -427,20 +424,74 @@ pub(crate) fn generate(
     kinds: &TagKindConfig,
     config: &crate::config::Config,
 ) -> Option<Vec<Tag>> {
-    parser.set_language(&language).ok()?;
-    let tree = parser.parse(source, None)?;
-    let mut walker = ZigWalker {
-        config,
+    generate_tags_with_config(
+        parser,
+        language,
         source,
-        lines: crate::split_by_newlines::split_by_newlines(source),
-        file_name: path.into(),
-        scopes: ScopeStack::new(),
-        kinds: kinds.clone(),
-        tags: Vec::new(),
-    };
-    let mut cursor = tree.walk();
-    if cursor.goto_first_child() {
-        walk_tree(&mut cursor, &mut walker);
+        path,
+        |source_code, lines, cursor, tags| {
+            let mut walker = ZigWalker {
+                base: Context {
+                    source_code,
+                    lines,
+                    file_name: path.into(),
+                    tags,
+                    tag_config: kinds,
+                    user_config: config,
+                },
+                scopes: ScopeStack::new(),
+            };
+            walk_tree(cursor, &mut walker);
+        },
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    fn zig_language() -> tree_sitter::Language {
+        let engine = tree_sitter::wasmtime::Engine::default();
+        let mut store = tree_sitter::WasmStore::new(&engine).unwrap();
+        store
+            .load_language(
+                "zig",
+                include_bytes!("../../tests/grammars/wasm/14/tree-sitter-zig.wasm"),
+            )
+            .unwrap()
     }
-    Some(walker.tags)
+
+    #[test]
+    fn invalid_utf8_is_rejected_before_grammar_setup() {
+        // A WASM grammar without a parser store would fail setup if validation
+        // did not reject the source first.
+        let mut parser = TsParser::new();
+        let kinds = TagKindConfig::from_string("", KIND_DEFAULTS, KIND_OPTIONALS);
+        let tags = generate(
+            &mut parser,
+            zig_language(),
+            b"const valid = 1;\n//\xff\n",
+            "invalid.zig",
+            &kinds,
+            &crate::config::Config::parse_from(["treetags"]),
+        );
+        assert!(tags.is_none());
+        assert!(parser.language().is_none());
+    }
+
+    #[test]
+    #[should_panic(expected = "Error loading grammar")]
+    fn grammar_setup_failure_uses_shared_policy() {
+        let mut parser = TsParser::new();
+        let kinds = TagKindConfig::from_string("", KIND_DEFAULTS, KIND_OPTIONALS);
+        generate(
+            &mut parser,
+            zig_language(),
+            b"const valid = 1;\n",
+            "valid.zig",
+            &kinds,
+            &crate::config::Config::parse_from(["treetags"]),
+        );
+    }
 }
