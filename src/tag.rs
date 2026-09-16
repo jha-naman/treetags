@@ -146,23 +146,9 @@ impl Tag {
             )
         })?;
 
-        let mut address = String::with_capacity(line_content.len() + 16);
-        address.push_str("/^");
-        let prefix_len = address.len();
-        Self::escape_address_into(&line_content, &mut address);
-
-        // Truncate the escaped content to 96 bytes maximum
-        if address.len() - prefix_len > 96 {
-            let limit = prefix_len + 96;
-            let at = (prefix_len..=limit)
-                .rev()
-                .find(|&i| address.is_char_boundary(i))
-                .unwrap_or(prefix_len);
-            address.truncate(at);
-            address.push_str("/;\"\t"); // No '$' if truncated
-        } else {
-            address.push_str("$/;\"\t");
-        }
+        let mut address = Self::address_from_line(line_content.as_bytes());
+        // Preserve the legacy separator for query-generated tags.
+        address.push('\t');
 
         Ok(Tag {
             name,
@@ -302,6 +288,13 @@ impl Tag {
                 .rev()
                 .find(|&i| address.is_char_boundary(i))
                 .unwrap_or(prefix_len);
+            // An odd trailing run of backslashes means the cut split an escape.
+            let trailing_backslashes = address[..at]
+                .bytes()
+                .rev()
+                .take_while(|&byte| byte == b'\\')
+                .count();
+            let at = at - trailing_backslashes % 2;
             address.truncate(at);
             address.push_str("/;\""); // No '$' anchor when truncated.
         } else {
@@ -619,6 +612,39 @@ mod tests {
 
         let expected = "MyEnum\ttypes.rs\t/^enum MyEnum {$/\tenum\n";
         assert_eq!(String::from_utf8(tag.bytes()).unwrap(), expected);
+    }
+
+    #[test]
+    fn address_limit_counts_escaped_bytes() {
+        for len in [95, 96, 97] {
+            let line = "a".repeat(len);
+            let anchor = if len <= 96 { "$" } else { "" };
+            assert_eq!(
+                Tag::address_from_line(line.as_bytes()),
+                format!("/^{}{anchor}/;\"", "a".repeat(len.min(96)))
+            );
+        }
+        assert_eq!(
+            Tag::address_from_line("/".repeat(49).as_bytes()),
+            format!("/^{}/;\"", "\\/".repeat(48))
+        );
+        assert_eq!(Tag::address_from_line(b""), "/^$/;\"");
+    }
+
+    #[test]
+    fn address_limit_preserves_utf8_and_escape_sequences() {
+        for tail in ["é", "界", "🦀", "/", "\\", "^", "$"] {
+            let line = format!("{}{tail}suffix", "a".repeat(95));
+            assert_eq!(
+                Tag::address_from_line(line.as_bytes()),
+                format!("/^{}/;\"", "a".repeat(95))
+            );
+        }
+        // A complete escaped backslash must remain at the boundary.
+        assert_eq!(
+            Tag::address_from_line(format!("{}\\tail", "a".repeat(94)).as_bytes()),
+            format!("/^{}\\\\/;\"", "a".repeat(94))
+        );
     }
 
     #[test]
