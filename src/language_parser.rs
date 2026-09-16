@@ -870,7 +870,7 @@ impl LanguageParserRegistry {
         })
     }
 
-    /// Check explicitly configured grammars before starting tag-generation workers.
+    /// Validate configured grammar names without loading them.
     pub fn check_requested_grammars(&self, config: &Config) {
         self.grammar_store
             .wasm

@@ -203,17 +203,30 @@ fn missing_grammars_warn_once_including_config_requests_and_continue() {
 }
 
 #[test]
-fn configured_grammar_is_checked_without_matching_inputs() {
+fn configured_grammars_load_only_for_matching_inputs() {
     let p = Project::new();
     fs::write(
         p.config_dir().join("config.toml"),
-        "[wasm_grammars]\nlanguages = ['zig']\n",
+        "[wasm_grammars]\nlanguages = ['zig', 'ocaml']\n",
     )
     .unwrap();
     let out = p.run(&["-f", "-", "source.rs"]);
     assert!(out.status.success());
-    assert_eq!(stderr(&out).matches("grammar 'zig'").count(), 1);
-    assert!(!stderr(&out).contains("ocaml"));
+    assert_eq!(stderr(&out), "");
+    assert!(stdout(&out).contains("native"));
+
+    p.install("zig");
+    p.install("ocaml");
+    let out = p.run(&["-f", "-", "source.rs"]);
+    assert!(out.status.success());
+    assert_eq!(stderr(&out), "");
+    assert!(compiled_entries(&p).is_empty());
+
+    let out = p.run(&["-f", "-", "source.ml"]);
+    assert!(out.status.success());
+    assert_eq!(stderr(&out), "");
+    assert!(stdout(&out).contains("double"));
+    assert!(!compiled_entries(&p).is_empty());
 }
 
 #[test]
@@ -310,14 +323,15 @@ fn existing_plugin_overrides_host_and_suppresses_suggestions() {
     assert!(stdout(&out).contains("greet"));
     let out = p.run(&["--suggest-grammars", "--plugin-dir", plugins, "source.zig"]);
     assert!(!stdout(&out).contains("tree-sitter-zig.wasm"));
-    // An explicit request still checks the host grammar, even with a plugin installed.
+    // Configuring a host grammar does not load it when a plugin handles the file.
     fs::write(
         p.config_dir().join("config.toml"),
         "[wasm_grammars]\nlanguages=['zig']\n",
     )
     .unwrap();
     let out = p.run(&["-f", "-", "--plugin-dir", plugins, "source.zig"]);
-    assert_eq!(stderr(&out).matches("grammar 'zig'").count(), 1);
+    assert!(out.status.success());
+    assert_eq!(stderr(&out), "");
     assert!(stdout(&out).contains("greet"));
 }
 

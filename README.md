@@ -88,8 +88,9 @@ still permits automatic use of installed grammars. `--user-languages-config`
 selects an alternate TOML file; grammar storage continues to use the normal
 Treetags configuration directory.
 
-During tag generation, Treetags checks configured grammars and loads other
-grammars when needed. A missing or invalid grammar produces one stderr warning
+During tag generation, Treetags validates configured grammar names and loads
+grammars only when needed to parse a matching file, including configured grammars.
+A missing or invalid grammar produces one stderr warning
 per language per run with the required file path. Affected files are skipped;
 other languages still generate tags and the command retains its best-effort
 exit status. Language and kind listings work without installed grammars.

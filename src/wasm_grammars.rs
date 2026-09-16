@@ -109,19 +109,15 @@ impl WasmGrammars {
         Ok(LoadedGrammar { language, tags })
     }
 
+    /// Validate configured names without loading grammars before they are used.
     pub fn check_requested(&self, languages: &[String]) {
         for name in languages
             .iter()
             .map(|s| s.trim().to_ascii_lowercase())
             .collect::<BTreeSet<_>>()
         {
-            match GRAMMARS.iter().find(|g| g.name == name) {
-                Some(grammar) => {
-                    self.get(grammar);
-                }
-                None => {
-                    eprintln!("treetags: unknown external grammar '{name}'; supported: ocaml, zig")
-                }
+            if !GRAMMARS.iter().any(|g| g.name == name) {
+                eprintln!("treetags: unknown external grammar '{name}'; supported: ocaml, zig")
             }
         }
     }
