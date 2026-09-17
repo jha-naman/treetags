@@ -46,20 +46,15 @@ for more about extension fields.
 
 ## External WASM grammars
 
-Treetags includes a Rust walker for **Zig** (with extension fields) and tag
-queries for **OCaml** (`.ml` files). Their Tree-sitter grammars are installed
-separately to keep the executable smaller. Existing Zig plugins continue to
-work and take priority when installed.
+Treetags does not include the tree-sitter grammars for all languages it supports
+due to binary size constraints. Currently these languages are **Zig** (with extension fields)
+and  **OCaml** (`.ml` files).
 
 Find missing grammars for your project:
 
 ```sh
 treetags --suggest-grammars
 ```
-
-This respects input paths, exclusions, language maps, and `--language-force`.
-It prints each required grammar once with its installation path and does not
-write a tags file or access the network.
 
 ### Manual installation
 
@@ -82,28 +77,7 @@ Optionally declare grammars you want available in the existing
 [wasm_grammars]
 languages = ["zig", "ocaml"]
 ```
-
-This section can coexist with `[[user_grammars]]`. An empty or omitted list
-still permits automatic use of installed grammars. `--user-languages-config`
-selects an alternate TOML file; grammar storage continues to use the normal
-Treetags configuration directory.
-
-During tag generation, Treetags validates configured grammar names and loads
-grammars only when needed to parse a matching file, including configured grammars.
-A missing or invalid grammar produces one stderr warning
-per language per run with the required file path. Affected files are skipped;
-other languages still generate tags and the command retains its best-effort
-exit status. Language and kind listings work without installed grammars.
-
-Compiled WASM grammars are cached persistently under
-`${XDG_CACHE_HOME:-$HOME/.cache}/treetags/wasm_grammars/`. The first use compiles
-the grammar; subsequent runs reuse compiled code. Wasmtime invalidates entries
-when grammar contents, compiler version, or compilation settings change and
-manages cache cleanup. Missing or corrupt entries are rebuilt; an unavailable
-cache falls back to normal compilation. You can delete this directory to clear
-the cache. The original `.wasm` grammar files must remain installed.
-
-Automatic grammar downloads and hosting infrastructure will be added separately.
+TODO: Document `[wasm_grammars]` once it is functional
 
 ## WASM plugins
 
