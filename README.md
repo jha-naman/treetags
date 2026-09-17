@@ -93,7 +93,6 @@ Treetags has support for these languages via user installable WASM plugins.
 - [x] Objective C
 - [x] Swift
 - [x] Terraform
-- [x] Zig
 
 
 ### Plugin Management
