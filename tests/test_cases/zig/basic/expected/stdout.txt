@@ -1,0 +1,28 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+AccessDenied	source.zig	/^    AccessDenied,$/;"	E	errorSet:OpenError
+Axis	source.zig	/^    const Axis = enum {$/;"	g	struct:Point
+Color	source.zig	/^const Color = enum(u8) {$/;"	g
+Handle	source.zig	/^const Handle = opaque {};$/;"	o
+InternalCount	source.zig	/^const InternalCount: usize = 4;$/;"	c	typeref:typename:usize
+MutableType	source.zig	/^var MutableType: type = usize;$/;"	v	typeref:typename:type
+NotFound	source.zig	/^    NotFound,$/;"	E	errorSet:OpenError
+OpenError	source.zig	/^pub const OpenError = error {$/;"	r
+Point	source.zig	/^pub const Point = struct {$/;"	s
+Value	source.zig	/^const Value = union(enum) {$/;"	u
+Word	source.zig	/^const Word: type = usize;$/;"	c	typeref:typename:type
+active	source.zig	/^pub var active: bool = true;$/;"	v	typeref:typename:bool
+distance	source.zig	/^    pub fn distance(self: Point, other: Point) f64 {$/;"	m	struct:Point	typeref:typename:f64
+green	source.zig	/^    green = 4,$/;"	e	enum:Color
+horizontal	source.zig	/^        horizontal,$/;"	e	enum:Point.Axis
+integer	source.zig	/^    integer: i64,$/;"	F	typeref:typename:i64	union:Value
+malloc	source.zig	/^extern fn malloc(size: usize) ?*anyopaque;$/;"	f	implementation:extern	typeref:typename:?*anyopaque
+max	source.zig	/^pub inline fn max(comptime T: type, a: T, b: T) T {$/;"	f	implementation:inline	typeref:typename:T
+max	source.zig	/^test max {$/;"	t
+none	source.zig	/^    none,$/;"	F	union:Value
+origin_name	source.zig	/^    const origin_name = "zero";$/;"	c	struct:Point
+point distance	source.zig	/^test "point distance" {$/;"	t
+red	source.zig	/^    red,$/;"	e	enum:Color
+std	source.zig	/^const std = @import("std");$/;"	n
+vertical	source.zig	/^        vertical = 2,$/;"	e	enum:Point.Axis
+x	source.zig	/^    x: f64,$/;"	F	struct:Point	typeref:typename:f64
+y	source.zig	/^    y: f64 = 0,$/;"	F	struct:Point	typeref:typename:f64

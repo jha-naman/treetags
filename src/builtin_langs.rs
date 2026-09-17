@@ -1,9 +1,11 @@
-use crate::parser::{c_sharp, cpp, go, js, python, rust, typescript, TagKindConfig};
+use crate::parser::{c_sharp, cpp, go, js, python, rust, typescript, zig, TagKindConfig};
 use crate::tag::Tag;
+use crate::wasm_grammars::GrammarSource;
 
 /// Function pointer type for builtin language tag generators.
 pub(crate) type BuiltinGenerateFn = fn(
     &mut tree_sitter::Parser,
+    tree_sitter::Language,
     &[u8],
     &str,
     &TagKindConfig,
@@ -30,12 +32,25 @@ pub(crate) struct BuiltinLangDesc {
     /// appears in the file content.
     /// eg `.h` is owned outright by C and available to C++ on content evidence.
     pub disambiguation: &'static [(&'static str, &'static [&'static str])],
+    pub grammar: GrammarSource,
     pub generate_fn: BuiltinGenerateFn,
 }
 
 /// All builtin languages. Priority in tag generation follows array order.
 /// Adding a new builtin language requires exactly one new entry here.
 pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
+    BuiltinLangDesc {
+        lang: zig::LANG_NAME,
+        aliases: &[],
+        extensions: zig::LANG_EXTENSIONS,
+        patterns: &[],
+        interpreters: &[],
+        kind_defaults: zig::KIND_DEFAULTS,
+        kind_optionals: zig::KIND_OPTIONALS,
+        disambiguation: &[],
+        grammar: GrammarSource::Wasm(&crate::wasm_grammars::ZIG),
+        generate_fn: zig::generate,
+    },
     BuiltinLangDesc {
         lang: c_sharp::LANG_NAME,
         aliases: &["csharp"],
@@ -45,6 +60,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_defaults: c_sharp::KIND_DEFAULTS,
         kind_optionals: c_sharp::KIND_OPTIONALS,
         disambiguation: &[],
+        grammar: GrammarSource::Bundled(|| tree_sitter_c_sharp::LANGUAGE.into()),
         generate_fn: c_sharp::generate,
     },
     BuiltinLangDesc {
@@ -56,6 +72,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_defaults: rust::KIND_DEFAULTS,
         kind_optionals: rust::KIND_OPTIONALS,
         disambiguation: &[],
+        grammar: GrammarSource::Bundled(|| tree_sitter_rust::LANGUAGE.into()),
         generate_fn: rust::generate,
     },
     BuiltinLangDesc {
@@ -67,6 +84,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_defaults: go::KIND_DEFAULTS,
         kind_optionals: go::KIND_OPTIONALS,
         disambiguation: &[],
+        grammar: GrammarSource::Bundled(|| tree_sitter_go::LANGUAGE.into()),
         generate_fn: go::generate,
     },
     BuiltinLangDesc {
@@ -79,6 +97,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_optionals: cpp::KIND_OPTIONALS,
         // `.h` is owned outright by C; C++ claims it only on C++ markers.
         disambiguation: &[("h", cpp::CPP_DISAMBIG_SIGNALS)],
+        grammar: GrammarSource::Bundled(|| tree_sitter_cpp::LANGUAGE.into()),
         generate_fn: cpp::generate,
     },
     // C reuses the C++ parser but is a distinct language with its own kind table.
@@ -91,6 +110,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_defaults: cpp::C_KIND_DEFAULTS,
         kind_optionals: cpp::C_KIND_OPTIONALS,
         disambiguation: &[],
+        grammar: GrammarSource::Bundled(|| tree_sitter_cpp::LANGUAGE.into()),
         generate_fn: cpp::generate,
     },
     BuiltinLangDesc {
@@ -102,6 +122,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_defaults: js::KIND_DEFAULTS,
         kind_optionals: js::KIND_OPTIONALS,
         disambiguation: &[],
+        grammar: GrammarSource::Bundled(|| tree_sitter_javascript::LANGUAGE.into()),
         generate_fn: js::generate,
     },
     BuiltinLangDesc {
@@ -113,6 +134,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_defaults: python::KIND_DEFAULTS,
         kind_optionals: python::KIND_OPTIONALS,
         disambiguation: &[],
+        grammar: GrammarSource::Bundled(|| tree_sitter_python::LANGUAGE.into()),
         generate_fn: python::generate,
     },
     BuiltinLangDesc {
@@ -124,6 +146,7 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_defaults: typescript::KIND_DEFAULTS,
         kind_optionals: typescript::KIND_OPTIONALS,
         disambiguation: &[],
+        grammar: GrammarSource::Bundled(|| tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()),
         generate_fn: typescript::generate,
     },
 ];

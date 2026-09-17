@@ -7,7 +7,7 @@ java
 javascript
 julia
 lua
-ocaml
+ocaml             [wasm grammar]
 php
 python
 ruby
@@ -15,3 +15,4 @@ rust
 scala
 shell
 typescript
+zig               [wasm grammar]

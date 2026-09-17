@@ -8,6 +8,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
+use tree_sitter::wasmtime;
 use wasmtime::Engine;
 
 struct PluginEntry {
@@ -102,7 +103,7 @@ impl PluginRegistry {
             entries,
             ext_plugins,
             compiled,
-            engine: Engine::default(),
+            engine: crate::wasm_grammars::engine().clone(),
             cache_enabled_plugins,
             project_cache_root,
         }

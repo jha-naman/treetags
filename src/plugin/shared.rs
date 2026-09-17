@@ -1,4 +1,5 @@
 use std::path::Path;
+use tree_sitter::wasmtime;
 use wasmtime::component::{Component, Linker};
 use wasmtime::Engine;
 
@@ -21,7 +22,7 @@ impl SharedPlugin {
             .map_err(|e| anyhow::anyhow!("load component {}: {e}", path.display()))?;
 
         let mut linker: Linker<PluginState> = Linker::new(&engine);
-        wasmtime_wasi::p2::add_to_linker_sync(&mut linker)?;
+        wasmtime_wasi::p2::add_to_linker_sync(&mut linker).map_err(|e| anyhow::anyhow!("{e:#}"))?;
 
         Ok(Self {
             engine,

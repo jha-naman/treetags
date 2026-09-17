@@ -145,12 +145,5 @@ pub fn address_string_from_line(row: usize, context: &Context) -> String {
     if row >= context.lines.len() {
         return format!("/^{}$/;", row + 1);
     }
-    let line = String::from_utf8_lossy(context.lines[row]);
-
-    // "/^" prefix (2) + "$/;\"" suffix (4) + slack for a few escapes.
-    let mut address = String::with_capacity(line.len() + 16);
-    address.push_str("/^");
-    crate::tag::Tag::escape_address_into(&line, &mut address);
-    address.push_str("$/;\"");
-    address
+    crate::tag::Tag::address_from_line(context.lines[row])
 }

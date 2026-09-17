@@ -69,6 +69,11 @@ fn main() {
 
     let files = file_result.files;
 
+    if config.suggest_grammars {
+        suggest_grammars(&config, &files);
+        return;
+    }
+
     if config.suggest_plugins {
         suggest_plugins(&config, &files);
         return;
@@ -255,5 +260,37 @@ fn print_languages(config: &Config) {
             .map(|sel| registry.parser(sel.lang).language_name().to_string())
             .unwrap_or_else(|| "NONE".to_string());
         println!("{}: {}", name, lang);
+    }
+}
+
+mod wasm_grammars;
+
+/// Suggestions use language metadata and file presence, without compiling WASM.
+fn suggest_grammars(config: &Config, files: &[String]) {
+    let registry = language_parser::LanguageParserRegistry::new(config);
+    let cwd = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
+    let mut missing = std::collections::BTreeSet::new();
+    for file in files {
+        let Some(selection) =
+            tag_processor::select_language(&registry, config, &cwd.join(file), Path::new(file))
+        else {
+            continue;
+        };
+        if let Some(name) = registry.parser(selection.lang).wasm_grammar_name(&registry) {
+            if let Some(grammar) = wasm_grammars::GRAMMARS.iter().find(|g| g.name == name) {
+                let path = grammar.path(&config.wasm_grammars_dir);
+                if !path.is_file() {
+                    missing.insert((name.to_string(), path));
+                }
+            }
+        }
+    }
+    if missing.is_empty() {
+        println!("No missing WASM grammars for the selected files.");
+    } else {
+        println!("WASM grammars needed by the selected files (install manually):");
+        for (name, path) in missing {
+            println!("{name}\t{}", path.display());
+        }
     }
 }

@@ -23,6 +23,7 @@ pub(crate) const KIND_OPTIONALS: &[(&[&str], &str)] = &[];
 
 pub(crate) fn generate(
     ts_parser: &mut tree_sitter::Parser,
+    language: tree_sitter::Language,
     code: &[u8],
     path: &str,
     tag_config: &TagKindConfig,
@@ -30,7 +31,7 @@ pub(crate) fn generate(
 ) -> Option<Vec<tag::Tag>> {
     helper::generate_tags_with_config(
         ts_parser,
-        tree_sitter_javascript::LANGUAGE.into(),
+        language,
         code,
         path,
         |source_code, lines, cursor, tags| {

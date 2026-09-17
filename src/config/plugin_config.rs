@@ -138,6 +138,12 @@ pub fn command_with_all_lang_kinds(plugin_langs: &HashSet<String>) -> clap::Comm
     let mut sorted_langs: Vec<&String> = plugin_langs.iter().collect();
     sorted_langs.sort();
     for lang in sorted_langs {
+        if crate::builtin_langs::BUILTIN_LANG_DESCRIPTORS
+            .iter()
+            .any(|desc| desc.lang == lang)
+        {
+            continue;
+        }
         let name = format!("kinds-{lang}");
         let help = format!("{lang} plugin: kinds to generate tags for");
         cmd = cmd.arg(
@@ -167,6 +173,7 @@ pub fn augment_list_kinds_for_completion(
         lang_names.push(lang.clone());
     }
     lang_names.sort();
+    lang_names.dedup();
     cmd = cmd.mut_arg("list_kinds", |a| {
         a.value_parser(clap::builder::PossibleValuesParser::new(lang_names))
     });

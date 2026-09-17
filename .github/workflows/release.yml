@@ -58,6 +58,7 @@ jobs:
         cp "target/${{ matrix.target }}/release/treetags" "$archive_name/"
         cp README.md "$archive_name/"
         cp CHANGELOG.md "$archive_name/"
+        cp queries/LICENSE-ocaml "$archive_name/LICENSE-ocaml"
 
         tar czf "$archive_name.tar.gz" "$archive_name"
         echo "ASSET=$archive_name.tar.gz" >> $GITHUB_ENV

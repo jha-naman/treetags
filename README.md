@@ -12,6 +12,7 @@ ctags see [here](#what-does-treetags-do).
 
 - [Installation](#installation)
 - [Natively Supported Languages](#natively-supported-languages)
+- [Languages with external WASM grammars](#external-wasm-grammars)
 - [Languages supported by WASM plugins](#wasm-plugins)
 - [Recommended usage](#recommended-usage)
 
@@ -39,10 +40,44 @@ for more about extension fields.
 - [x] Java
 - [x] Julia
 - [x] Lua
-- [x] Ocaml
 - [x] PHP
 - [x] Ruby
 - [x] Scala
+
+## External WASM grammars
+
+Treetags does not include the tree-sitter grammars for all languages it supports
+due to binary size constraints. Currently these languages are **Zig** (with extension fields)
+and  **OCaml** (`.ml` files).
+
+Find missing grammars for your project:
+
+```sh
+treetags --suggest-grammars
+```
+
+### Manual installation
+
+For this version, install these pinned upstream grammar artifacts manually:
+
+| Language | Grammar version | Grammar file |
+| --- | --- | --- |
+| Zig | 1.1.2 | [tree-sitter-zig.wasm](https://github.com/tree-sitter-grammars/tree-sitter-zig/releases/download/v1.1.2/tree-sitter-zig.wasm) |
+| OCaml | 0.24.0 | [tree-sitter-ocaml.wasm](https://github.com/tree-sitter/tree-sitter-ocaml/releases/download/v0.24.0/tree-sitter-ocaml.wasm) |
+
+Place them under `${XDG_CONFIG_HOME:-$HOME/.config}/treetags/wasm_grammars/14/`.
+The directory number is the **grammar ABI**, not the Tree-sitter crate version;
+both of these pinned grammars use ABI 14. Checksums and licenses are recorded in
+[the grammar fixtures](tests/grammars/wasm/README.md).
+
+Optionally declare grammars you want available in the existing
+`treetags/config.toml`:
+
+```toml
+[wasm_grammars]
+languages = ["zig", "ocaml"]
+```
+TODO: Document `[wasm_grammars]` once it is functional
 
 ## WASM plugins
 
@@ -58,7 +93,6 @@ Treetags has support for these languages via user installable WASM plugins.
 - [x] Objective C
 - [x] Swift
 - [x] Terraform
-- [x] Zig
 
 
 ### Plugin Management

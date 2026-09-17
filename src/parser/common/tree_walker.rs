@@ -38,7 +38,11 @@ impl<'a> Context<'a> {
     }
 }
 
-/// Generic tag generation function
+/// Shared native-parser setup and tag generation policy.
+///
+/// Invalid UTF-8 input is skipped with a warning before parsing. Failure to install
+/// a supplied grammar is a programming/setup error and panics; failure to produce
+/// a parse tree returns `None`.
 pub fn generate_tags_with_config(
     ts_parser: &mut tree_sitter::Parser,
     language: tree_sitter::Language,

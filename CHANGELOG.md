@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add native Rust based Zig parser that uses WASM tree-sitter grammar
+
+### Changed
+- Tag Address is truncated to 96 chars for native parsers
+
+### Removed
+- Removed the ability to use treetags as a library crate
+- Ocaml grammar bundled with treetags.
+
 - [0.18.0]
 
 ### Added

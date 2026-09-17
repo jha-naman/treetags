@@ -1,0 +1,2 @@
+--sort yes -f '-' --kinds-zig='flz' --fields=-a,-S,-t,-s,-e
+source.zig

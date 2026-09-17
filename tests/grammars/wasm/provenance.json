@@ -1,0 +1,18 @@
+[
+  {
+    "language": "zig",
+    "grammar_version": "1.1.2",
+    "abi": 14,
+    "file": "14/tree-sitter-zig.wasm",
+    "url": "https://github.com/tree-sitter-grammars/tree-sitter-zig/releases/download/v1.1.2/tree-sitter-zig.wasm",
+    "sha256": "54b3b83dd9c62da5815f06132bc3fc914d9dcc780370b32416446a0b7969e8c6"
+  },
+  {
+    "language": "ocaml",
+    "grammar_version": "0.24.0",
+    "abi": 14,
+    "file": "14/tree-sitter-ocaml.wasm",
+    "url": "https://github.com/tree-sitter/tree-sitter-ocaml/releases/download/v0.24.0/tree-sitter-ocaml.wasm",
+    "sha256": "a7fb5e4bff6854b9f68123cd79bb170788314e8d4e5adc8f4af835039e4ef571"
+  }
+]
