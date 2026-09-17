@@ -178,8 +178,15 @@ fn is_local(w: &ZigWalker) -> bool {
     )
 }
 
-fn access_of(node: Node, source: &[u8]) -> String {
-    if node_text(node, source).trim_start().starts_with("pub ") {
+fn access_of(cursor: &mut TreeCursor) -> String {
+    let mut public = false;
+    for_each_child!(cursor, {
+        if cursor.node().kind() == "pub" {
+            public = true;
+            break;
+        }
+    });
+    if public {
         "public".to_string()
     } else {
         "private".to_string()
@@ -204,10 +211,24 @@ fn initializer_kind(cursor: &mut TreeCursor) -> Option<(&'static str, ScopeKind)
     result
 }
 
-fn initializer_text(node: Node, source: &[u8]) -> Option<String> {
-    let text = node_text(node, source);
-    let (_, value) = text.split_once('=')?;
-    Some(value.trim().trim_end_matches(';').trim().to_string())
+fn is_import_initializer(cursor: &mut TreeCursor, source: &[u8]) -> bool {
+    let mut result = false;
+    for_each_child!(cursor, {
+        if cursor.node().kind() == "builtin_function" {
+            for_each_child!(cursor, {
+                if cursor.node().kind() == "builtin_identifier"
+                    && node_text(cursor.node(), source) == "@import"
+                {
+                    result = true;
+                    break;
+                }
+            });
+            if result {
+                break;
+            }
+        }
+    });
+    result
 }
 
 fn declared_type(cursor: &mut TreeCursor, source: &[u8]) -> Option<String> {
@@ -224,26 +245,22 @@ fn emit_variable(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalker) -> b
     };
     let container = initializer_kind(cursor);
     let local = is_local(w);
-    let initializer = initializer_text(node, source);
 
     let letter = if let Some((letter, _)) = container {
         letter
     } else if local {
         "l"
-    } else if initializer
-        .as_deref()
-        .is_some_and(|value| value.starts_with("@import("))
-    {
+    } else if is_import_initializer(cursor, source) {
         "n"
     } else {
-        let text = node_text(node, source).trim_start();
-        let without_pub = text.strip_prefix("pub ").unwrap_or(text).trim_start();
-        let without_linkage = without_pub
-            .strip_prefix("export ")
-            .or_else(|| without_pub.strip_prefix("threadlocal "))
-            .unwrap_or(without_pub)
-            .trim_start();
-        if without_linkage.starts_with("var ") || without_linkage.starts_with("extern ") {
+        let mut mutable = false;
+        for_each_child!(cursor, {
+            if cursor.node().kind() == "var" {
+                mutable = true;
+                break;
+            }
+        });
+        if mutable {
             "v"
         } else {
             "c"
@@ -252,7 +269,7 @@ fn emit_variable(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalker) -> b
 
     emit_tag(w, name.clone(), line, letter, |fields| {
         if !local {
-            add_field(fields, "access", Some(access_of(node, source)));
+            add_field(fields, "access", Some(access_of(cursor)));
         }
         if container.is_none() {
             add_field(
@@ -291,7 +308,7 @@ fn emit_function(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalker) -> b
     };
 
     emit_tag(w, name.clone(), line_of(name_node), letter, |fields| {
-        add_field(fields, "access", Some(access_of(node, source)));
+        add_field(fields, "access", Some(access_of(cursor)));
         let mut signature = None;
         for_each_child!(cursor, {
             if cursor.node().kind() == "parameters" {
@@ -306,7 +323,7 @@ fn emit_function(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalker) -> b
             node.child_by_field_name("type")
                 .map(|ty| format!("typename:{}", node_text(ty, source))),
         );
-        add_field(fields, "implementation", implementation_of(node, source));
+        add_field(fields, "implementation", implementation_of(cursor));
         add_end_line(fields, node);
     });
 
@@ -318,12 +335,18 @@ fn emit_function(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalker) -> b
     }
 }
 
-fn implementation_of(node: Node, source: &[u8]) -> Option<String> {
-    let prefix = node_text(node, source).split("fn").next().unwrap_or("");
-    ["extern", "export", "inline", "noinline"]
-        .into_iter()
-        .find(|modifier| prefix.split_whitespace().any(|word| word == *modifier))
-        .map(str::to_string)
+fn implementation_of(cursor: &mut TreeCursor) -> Option<String> {
+    let mut implementation = None;
+    for_each_child!(cursor, {
+        match cursor.node().kind() {
+            "extern" | "export" | "inline" | "noinline" => {
+                implementation = Some(cursor.node().kind().to_string());
+                break;
+            }
+            _ => {}
+        };
+    });
+    implementation
 }
 
 fn emit_test(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalker) -> bool {
@@ -347,7 +370,7 @@ fn emit_test(cursor: &mut TreeCursor, source: &[u8], w: &mut ZigWalker) -> bool 
     };
 
     emit_tag(w, name.clone(), line, "t", |fields| {
-        add_field(fields, "access", Some(access_of(node, source)));
+        add_field(fields, "access", Some(access_of(cursor)));
         add_end_line(fields, node);
     });
     w.scopes.push(ScopeKind::Test, &name);
