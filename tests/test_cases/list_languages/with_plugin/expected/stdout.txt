@@ -21,5 +21,4 @@ shell
 swift             [plugin]
 terraform         [plugin]
 typescript
-zig               [plugin]
-zig               [wasm grammar, overridden]
+zig               [wasm grammar]
