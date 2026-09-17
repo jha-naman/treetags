@@ -33,6 +33,25 @@ pub(crate) const KIND_DEFAULTS: &[(&[&str], &str)] = &[
 pub(crate) const KIND_OPTIONALS: &[(&[&str], &str)] =
     &[(&["l", "local"], "l"), (&["z", "parameter"], "z")];
 
+/// field order for emitted tags: the standard fields first, then the
+/// language-specific fields alphabetically
+const FIELD_ORDER: &[&str] = &[
+    "kind",
+    "line",
+    "end",
+    "access",
+    "enum",
+    "errorSet",
+    "function",
+    "implementation",
+    "opaque",
+    "signature",
+    "struct",
+    "test",
+    "typeref",
+    "union",
+];
+
 #[derive(Clone, Copy, PartialEq)]
 enum ScopeKind {
     Struct,
@@ -90,22 +109,18 @@ fn emit_tag(
         fields.insert(key.to_string(), value.to_string());
     }
     extra_fields(&mut fields);
-    let mut fields: Vec<_> = fields.into_iter().collect();
-    // Keep standard fields first, followed by the language fields alphabetically.
-    fields.sort_unstable_by(|a, b| {
-        let order = |key: &str| match key {
-            "kind" => 0,
-            "line" => 1,
-            "end" => 2,
-            _ => 3,
-        };
-        order(&a.0).cmp(&order(&b.0)).then_with(|| a.0.cmp(&b.0))
-    });
+
+    // Emit into the statically-known ctags order, moving each value across and
+    // dropping the disabled ones. No sort or comparator is needed.
+    let mut raw: Vec<_> = fields.into_iter().collect();
     let mut enabled_fields = ExtensionFields::new();
-    for (key, value) in fields {
-        let enabled = match key.as_ref() {
+    for &key in FIELD_ORDER {
+        let Some(pos) = raw.iter().position(|(k, _)| k.as_ref() == key) else {
+            continue;
+        };
+        let enabled = match key {
             "kind" | "line" | "end" | "access" | "signature" | "typeref" => {
-                w.base.user_config.fields_config.is_field_enabled(&key)
+                w.base.user_config.fields_config.is_field_enabled(key)
             }
             "struct" | "union" | "enum" | "opaque" | "errorSet" | "function" | "test" => {
                 w.base.user_config.fields_config.is_field_enabled("scope")
@@ -113,10 +128,15 @@ fn emit_tag(
             }
             _ => true,
         };
+        let (key, value) = raw.swap_remove(pos);
         if enabled {
             enabled_fields.insert(key, value);
         }
     }
+    debug_assert!(
+        raw.is_empty(),
+        "zig emit_tag: field(s) missing from FIELD_ORDER: {raw:?}"
+    );
     w.base.tags.push(Tag {
         name,
         file_name: w.base.file_name.clone(),
