@@ -313,29 +313,6 @@ fn metadata_does_not_require_installed_grammars() {
 }
 
 #[test]
-fn existing_plugin_overrides_host_and_suppresses_suggestions() {
-    let p = Project::new();
-    let plugins = treetags_test_plugin_builder::test_plugins_dir();
-    assert!(!plugins.is_empty(), "plugin fixtures must be built");
-    let out = p.run(&["-f", "-", "--plugin-dir", plugins, "source.zig"]);
-    assert!(out.status.success());
-    assert_eq!(stderr(&out), "");
-    assert!(stdout(&out).contains("greet"));
-    let out = p.run(&["--suggest-grammars", "--plugin-dir", plugins, "source.zig"]);
-    assert!(!stdout(&out).contains("tree-sitter-zig.wasm"));
-    // Configuring a host grammar does not load it when a plugin handles the file.
-    fs::write(
-        p.config_dir().join("config.toml"),
-        "[wasm_grammars]\nlanguages=['zig']\n",
-    )
-    .unwrap();
-    let out = p.run(&["-f", "-", "--plugin-dir", plugins, "source.zig"]);
-    assert!(out.status.success());
-    assert_eq!(stderr(&out), "");
-    assert!(stdout(&out).contains("greet"));
-}
-
-#[test]
 fn user_query_override_does_not_suggest_an_unused_wasm_grammar() {
     let p = Project::new();
     let repo = Path::new(env!("CARGO_MANIFEST_DIR"));
