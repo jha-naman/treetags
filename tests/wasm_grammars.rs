@@ -56,6 +56,116 @@ fn stderr(output: &Output) -> String {
     String::from_utf8(output.stderr.clone()).unwrap()
 }
 
+#[test]
+fn grammar_commands_list_install_and_uninstall_offline() {
+    let p = Project::new();
+    let available = p.run(&["grammar", "available"]);
+    assert!(available.status.success(), "{}", stderr(&available));
+    assert!(stdout(&available).contains("1.1.2"));
+    assert!(stdout(&available).contains("0.24.0"));
+    assert!(!stdout(&p.run(&["grammar", "installed"])).contains("zig"));
+    p.install("zig");
+    p.install("ocaml");
+    let installed = p.run(&["grammar", "installed"]);
+    assert!(stdout(&installed).contains("matches pinned version"));
+    let install = p.run(&["grammar", "install", " ZIG ", "zig", "ocaml"]);
+    assert!(install.status.success(), "{}", stderr(&install));
+    assert_eq!(stdout(&install).matches("'zig'").count(), 1);
+    assert!(!p.dir.path().join("tags").exists());
+    assert!(compiled_entries(&p).is_empty());
+    assert!(stdout(&p.run(&["-f", "-", "source.zig", "source.ml"])).contains("greet"));
+    assert!(stdout(&p.run(&["-f", "-", "source.ml"])).contains("double"));
+
+    let unrelated = p.config_dir().join("wasm_grammars/14/unrelated.wasm");
+    fs::write(&unrelated, "keep").unwrap();
+    let old = p.config_dir().join("wasm_grammars/13");
+    fs::create_dir(&old).unwrap();
+    fs::write(old.join("tree-sitter-zig.wasm"), "keep").unwrap();
+    let invalid = p.run(&["grammar", "uninstall", "zig", "unknown"]);
+    assert!(!invalid.status.success());
+    assert!(p
+        .config_dir()
+        .join("wasm_grammars/14/tree-sitter-zig.wasm")
+        .exists());
+    for _ in 0..2 {
+        assert!(p
+            .run(&["grammar", "uninstall", "zig", "ocaml"])
+            .status
+            .success());
+    }
+    assert!(unrelated.exists());
+    assert!(old.join("tree-sitter-zig.wasm").exists());
+}
+
+#[test]
+fn grammar_configured_install_and_argument_validation() {
+    let p = Project::new();
+    let args = ["grammar", "install", "--configured"];
+    assert!(stdout(&p.run(&args)).contains("No WASM grammars configured"));
+    let config = p.config_dir().join("config.toml");
+    fs::write(
+        &config,
+        "[wasm_grammars]\nlanguages = [' ZIG ', 'zig', 'ocaml']",
+    )
+    .unwrap();
+    p.install("zig");
+    p.install("ocaml");
+    let out = p.run(&args);
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert_eq!(stdout(&out).matches("'zig'").count(), 1);
+    fs::write(&config, "[wasm_grammars]\nlanguages = ['zig', 'unknown']").unwrap();
+    let out = p.run(&args);
+    assert!(!out.status.success());
+    assert!(stdout(&out).is_empty());
+    fs::write(&config, "invalid TOML [").unwrap();
+    assert!(!p.run(&args).status.success());
+    assert!(p.run(&["grammar", "available"]).status.success());
+    for args in [
+        vec!["grammar", "install"],
+        vec!["grammar", "install", "zig", "--configured"],
+        vec!["grammar", "uninstall"],
+        vec!["grammar", "install", "zig", "unknown"],
+    ] {
+        assert!(!p.run(&args).status.success(), "{args:?}");
+    }
+    p.write("custom.toml", "[wasm_grammars]\nlanguages = ['zig']");
+    let out = p.run(&[
+        "--user-languages-config",
+        "custom.toml",
+        "grammar",
+        "install",
+        "--configured",
+    ]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(stdout(&out).contains("'zig'"));
+    assert!(!stdout(&out).contains("ocaml"));
+    assert!(!p.dir.path().join("tags").exists());
+    assert!(compiled_entries(&p).is_empty());
+}
+
+#[test]
+fn grammar_commands_protect_and_report_manual_files() {
+    let p = Project::new();
+    p.install("zig");
+    let path = p.config_dir().join("wasm_grammars/14/tree-sitter-zig.wasm");
+    fs::write(&path, "manual").unwrap();
+    assert!(stdout(&p.run(&["grammar", "installed"])).contains("different from pinned version"));
+    let out = p.run(&["grammar", "install", "zig"]);
+    assert!(!out.status.success());
+    assert!(stderr(&out).contains("--force"));
+    assert_eq!(fs::read(&path).unwrap(), b"manual");
+    fs::remove_file(&path).unwrap();
+    fs::create_dir(&path).unwrap();
+    p.install("ocaml");
+    let out = p.run(&["grammar", "uninstall", "zig", "ocaml"]);
+    assert!(!out.status.success());
+    assert!(path.is_dir());
+    assert!(!p
+        .config_dir()
+        .join("wasm_grammars/14/tree-sitter-ocaml.wasm")
+        .exists());
+}
+
 fn compiled_entries(project: &Project) -> Vec<PathBuf> {
     walkdir::WalkDir::new(
         project

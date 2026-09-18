@@ -39,6 +39,36 @@ pub enum Commands {
         #[command(subcommand)]
         action: PluginCommands,
     },
+    /// Download and manage release-pinned Tree-sitter WASM grammars
+    Grammar {
+        #[command(subcommand)]
+        action: GrammarCommands,
+    },
+}
+
+#[derive(Subcommand, Clone, Debug)]
+pub enum GrammarCommands {
+    /// List supported grammars, pinned versions, and local status (offline)
+    Available,
+    /// List locally present supported grammars (offline)
+    Installed,
+    /// Install grammars pinned to this treetags release
+    Install {
+        /// Grammar names shown by `grammar available`
+        #[arg(required_unless_present = "configured", conflicts_with = "configured", num_args = 1..)]
+        names: Vec<String>,
+        /// Install [wasm_grammars].languages from the configuration file
+        #[arg(long)]
+        configured: bool,
+        /// Reinstall pinned files, replacing different or manually supplied files
+        #[arg(long)]
+        force: bool,
+    },
+    /// Remove the named grammar files from this release's ABI directories
+    Uninstall {
+        #[arg(required = true, num_args = 1..)]
+        names: Vec<String>,
+    },
 }
 
 /// Subcommands under `treetags plugin`.
@@ -347,7 +377,24 @@ impl Config {
 
         config.extras_config = ExtrasConfig::from_string(&config.extras);
         config.fields_config = FieldsConfig::from_string(&config.fields);
-        let language_config = user_grammars::load(config.user_languages_config.as_ref());
+        let language_config = if matches!(
+            config.command,
+            Some(Commands::Grammar {
+                action: GrammarCommands::Install {
+                    configured: true,
+                    ..
+                }
+            })
+        ) {
+            user_grammars::load_checked(config.user_languages_config.as_ref()).unwrap_or_else(
+                |err| {
+                    eprintln!("error: {err:#}");
+                    std::process::exit(1);
+                },
+            )
+        } else {
+            user_grammars::load(config.user_languages_config.as_ref())
+        };
         config.user_grammars = language_config.user_grammars;
         config.wasm_grammar_languages = language_config.wasm_grammars.languages;
         config.plugins_dir = config

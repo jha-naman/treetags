@@ -56,19 +56,27 @@ Find missing grammars for your project:
 treetags --suggest-grammars
 ```
 
-### Manual installation
+### Installing and managing grammars
 
-For this version, install these pinned upstream grammar artifacts manually:
+```sh
+treetags grammar available           # Supported grammars and local status (offline)
+treetags grammar install zig ocaml   # Download and validate the pinned files
+treetags grammar installed           # Check locally installed files (offline)
+treetags grammar uninstall zig       # Remove this release's Zig grammar file
+```
 
-| Language | Grammar version | Grammar file |
-| --- | --- | --- |
-| Zig | 1.1.2 | [tree-sitter-zig.wasm](https://github.com/tree-sitter-grammars/tree-sitter-zig/releases/download/v1.1.2/tree-sitter-zig.wasm) |
-| OCaml | 0.24.0 | [tree-sitter-ocaml.wasm](https://github.com/tree-sitter/tree-sitter-ocaml/releases/download/v0.24.0/tree-sitter-ocaml.wasm) |
+Files are installed under `${XDG_CONFIG_HOME:-$HOME/.config}/treetags/wasm_grammars/14/`.
+The directory number is the **grammar ABI**. Checksums and licenses are recorded
+in [the grammar fixtures](tests/grammars/wasm/README.md)
 
-Place them under `${XDG_CONFIG_HOME:-$HOME/.config}/treetags/wasm_grammars/14/`.
-The directory number is the **grammar ABI**, not the Tree-sitter crate version;
-both of these pinned grammars use ABI 14. Checksums and licenses are recorded in
-[the grammar fixtures](tests/grammars/wasm/README.md).
+Already matching files are skipped without network access. Files that differ
+from the pin, including manually installed grammars, require `--force` to replace:
+
+```sh
+treetags grammar install zig --force
+```
+
+Manual installation at the same paths remains supported.
 
 Optionally declare grammars you want available in the existing
 `treetags/config.toml`:
@@ -77,8 +85,17 @@ Optionally declare grammars you want available in the existing
 [wasm_grammars]
 languages = ["zig", "ocaml"]
 ```
-TODO: Document `[wasm_grammars]` once it is functional
 
+Install that list explicitly with:
+
+```sh
+treetags grammar install --configured
+treetags grammar install --configured --force  # Reinstall every configured pin
+```
+
+The existing `--user-languages-config PATH` option selects an alternative config
+file when placed before `grammar`. Names are case-insensitive and duplicates are
+ignored.
 ## WASM plugins
 
 Treetags functionality can be extended via WASM plugins. WASM plugins are

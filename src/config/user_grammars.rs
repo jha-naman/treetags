@@ -1,3 +1,4 @@
+use anyhow::Context;
 use serde::Deserialize;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -32,49 +33,37 @@ pub struct WasmGrammarConfig {
 }
 
 pub fn load(config_path_override: Option<&PathBuf>) -> TOMLConfig {
+    load_checked(config_path_override).unwrap_or_else(|err| {
+        eprintln!("Warning: {err:#}");
+        TOMLConfig::default()
+    })
+}
+
+pub fn load_checked(config_path_override: Option<&PathBuf>) -> anyhow::Result<TOMLConfig> {
     let config_path = match config_path_override {
         Some(path) => path.clone(),
         None => get_config_path(),
     };
 
-    if !config_path.exists() {
-        return TOMLConfig::default();
-    }
-
-    match fs::read_to_string(&config_path) {
-        Ok(content) => {
-            let mut toml_config: TOMLConfig = match toml::from_str(&content) {
-                Ok(c) => c,
-                Err(e) => {
-                    eprintln!(
-                        "Warning: Failed to parse config file {}: {}",
-                        config_path.display(),
-                        e
-                    );
-                    return TOMLConfig::default();
-                }
-            };
-
-            if let Some(config_dir) = config_path.parent() {
-                for grammar in &mut toml_config.user_grammars {
-                    absolutize_path(config_dir, &mut grammar.grammar_lib_path);
-                    if let Some(query_path) = &mut grammar.query_file_path {
-                        absolutize_path(config_dir, query_path);
-                    }
-                }
+    let content = match fs::read_to_string(&config_path) {
+        Ok(content) => content,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(TOMLConfig::default()),
+        Err(err) => {
+            return Err(err)
+                .with_context(|| format!("Failed to read config file {}", config_path.display()))
+        }
+    };
+    let mut config: TOMLConfig = toml::from_str(&content)
+        .with_context(|| format!("Failed to parse config file {}", config_path.display()))?;
+    if let Some(directory) = config_path.parent() {
+        for grammar in &mut config.user_grammars {
+            absolutize_path(directory, &mut grammar.grammar_lib_path);
+            if let Some(query) = &mut grammar.query_file_path {
+                absolutize_path(directory, query);
             }
-
-            toml_config
-        }
-        Err(e) => {
-            eprintln!(
-                "Warning: Failed to read config file {}: {}",
-                config_path.display(),
-                e
-            );
-            TOMLConfig::default()
         }
     }
+    Ok(config)
 }
 
 fn absolutize_path(base_dir: &Path, path: &mut PathBuf) {

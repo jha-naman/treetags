@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Add native Rust based Zig parser that uses WASM tree-sitter grammar
+- WASM Grammar management commands
+Allow users to manage the downloading of WASM grammars not bundled with treetags
 
 ### Changed
 - Tag Address is truncated to 96 chars for native parsers

@@ -8,6 +8,7 @@ mod builtin_langs;
 mod config;
 mod decode_to_utf8;
 mod file_finder;
+mod grammar_manager;
 mod kinds_listing;
 mod lang_resolve;
 mod language_parser;
@@ -108,6 +109,12 @@ fn handle_early_exit_commands(config: &Config) -> bool {
             }
             config::Commands::Plugin { action } => {
                 if let Err(err) = handle_plugin_command(action, config) {
+                    eprintln!("error: {err:#}");
+                    process::exit(1);
+                }
+            }
+            config::Commands::Grammar { action } => {
+                if let Err(err) = grammar_manager::handle(action, config) {
                     eprintln!("error: {err:#}");
                     process::exit(1);
                 }
@@ -288,9 +295,12 @@ fn suggest_grammars(config: &Config, files: &[String]) {
     if missing.is_empty() {
         println!("No missing WASM grammars for the selected files.");
     } else {
-        println!("WASM grammars needed by the selected files (install manually):");
+        println!("WASM grammars needed by the selected files:");
         for (name, path) in missing {
-            println!("{name}\t{}", path.display());
+            println!(
+                "{name}\t{}\ttreetags grammar install {name}",
+                path.display()
+            );
         }
     }
 }
