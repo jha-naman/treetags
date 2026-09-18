@@ -1,34 +1,35 @@
-wit_bindgen::generate!({
-    world: "plugin-world",
-    path: "../../wit",
-});
-
-use exports::treetags::plugin::plugin::{Guest, Request, Tag};
-use tree_sitter::{Node, Parser as TsParser, TreeCursor};
-use treetags_plugin_common::{
-    child_ident, for_each_child, line_of, node_text, walk_tree, ScopeKey, ScopeStack,
-    TagKindConfig, WalkContext,
+//! Objective-C tag generation, ported from the original Objective-C plugin.
+use super::common::{
+    cursor::{child_ident, line_of, node_text},
+    scope::{ScopeKey, ScopeStack},
+    scope_walker::{walk_tree, WalkContext},
+    tree_walker::{generate_tags_with_config, Context},
 };
+use super::TagKindConfig;
+use crate::for_each_child;
+use crate::tag::{ExtensionFields, Tag};
+use tree_sitter::{Parser as TsParser, TreeCursor};
 
-struct ObjcPlugin;
-
-impl Guest for ObjcPlugin {
-    fn generate(req: Request, source: Vec<u8>) -> Result<Vec<Tag>, String> {
-        let mut parser = TsParser::new();
-        let language: tree_sitter::Language = tree_sitter_objc::LANGUAGE.into();
-        parser
-            .set_language(&language)
-            .map_err(|e| format!("set_language: {e}"))?;
-        generate_tags(&mut parser, &req, &source)
-    }
-}
-
-export!(ObjcPlugin);
+pub(crate) const LANG_NAME: &str = "objc";
+pub(crate) const LANG_ALIASES: &[&str] = &["objectivec", "objective-c"];
+pub(crate) const LANG_EXTENSIONS: &[&str] = &["m", "h"];
+pub(crate) const DISAMBIG_SIGNALS: &[&str] = &[
+    "@interface",
+    "@implementation",
+    "@protocol",
+    "@property",
+    "@end",
+    "@class",
+    "@import",
+    "@selector",
+    "@autoreleasepool",
+    "NS_ASSUME_NONNULL",
+];
 
 // Objective-C is a strict superset of C, so constructs shared with C use the
 // *exact* kind letters the C parser emits (`src/parser/cpp.rs` C_KIND_*), and
 // Objective-C-only constructs use letters that do not clash with any C letter.
-const OBJC_DEFAULT_KINDS: &[(&[&str], &str)] = &[
+pub(crate) const KIND_DEFAULTS: &[(&[&str], &str)] = &[
     // Shared with C — identical letters to the C parser.
     (&["d", "macro"], "d"),
     (&["e", "enumerator"], "e"),
@@ -52,7 +53,7 @@ const OBJC_DEFAULT_KINDS: &[(&[&str], &str)] = &[
 ];
 
 // Off by default, matching the C parser's optional kinds (C_KIND_OPTIONALS).
-const OBJC_OPTIONAL_KINDS: &[(&[&str], &str)] = &[
+pub(crate) const KIND_OPTIONALS: &[(&[&str], &str)] = &[
     (&["l", "local"], "l"),
     (&["p", "prototype"], "p"),
     (&["x", "externvar"], "x"),
@@ -69,6 +70,7 @@ enum ScopeKind {
     Struct,
     Union,
     Function,
+    Method,
 }
 
 impl ScopeKey for ScopeKind {
@@ -80,6 +82,7 @@ impl ScopeKey for ScopeKind {
             ScopeKind::Struct => "struct",
             ScopeKind::Union => "union",
             ScopeKind::Function => "function",
+            ScopeKind::Method => "method",
         }
     }
 }
@@ -94,10 +97,8 @@ enum Open {
 }
 
 struct ObjcWalker<'src> {
-    source: &'src [u8],
+    base: Context<'src>,
     scopes: ScopeStack<ScopeKind>,
-    kinds: TagKindConfig,
-    tags: Vec<Tag>,
     /// Category name of the enclosing `@interface Foo (Cat)` /
     /// `@implementation Foo (Cat)`, added as a `category:` field to members.
     current_category: Option<String>,
@@ -109,7 +110,7 @@ struct ObjcWalker<'src> {
 
 impl WalkContext for ObjcWalker<'_> {
     fn process_node(&mut self, cursor: &mut TreeCursor) -> bool {
-        let source = self.source;
+        let source = self.base.source_code.as_bytes();
         process_node_inner(source, cursor, self)
     }
 
@@ -127,28 +128,105 @@ impl WalkContext for ObjcWalker<'_> {
     }
 }
 
-fn make_tag(name: String, line: u32, kind: &str, scope: Option<(&str, &str)>) -> Tag {
-    let mut ext = vec![];
-    if let Some((scope_key, scope_value)) = scope {
-        ext.push((scope_key.to_string(), scope_value.to_string()));
+/// Standard ctags fields first, then Objective-C-specific fields alphabetically.
+const FIELD_ORDER: &[&str] = &[
+    "kind",
+    "line",
+    "end",
+    "category",
+    "enum",
+    "function",
+    "implementation",
+    "interface",
+    "macro",
+    "method",
+    "protocol",
+    "protocols",
+    "struct",
+    "union",
+];
+
+fn emit_tag(
+    walker: &mut ObjcWalker,
+    name: String,
+    line: u32,
+    kind: &'static str,
+    extra_fields: impl FnOnce(&mut ExtensionFields),
+) {
+    if name.is_empty() || name == "_" || !walker.base.tag_config.is_kind_enabled(kind) {
+        return;
     }
-    Tag {
+
+    let mut fields = ExtensionFields::new();
+    fields.insert("kind", kind);
+    fields.insert("line", line.to_string());
+    if let Some((key, value)) = walker.scopes.current_field() {
+        fields.insert(key, value.to_string());
+    }
+    extra_fields(&mut fields);
+
+    let mut raw: Vec<_> = fields.into_iter().collect();
+    let mut enabled_fields = ExtensionFields::new();
+    for &key in FIELD_ORDER {
+        let Some(pos) = raw.iter().position(|(field, _)| field.as_ref() == key) else {
+            continue;
+        };
+        let enabled = match key {
+            "kind" | "line" | "end" => walker.base.user_config.fields_config.is_field_enabled(key),
+            "enum" | "function" | "implementation" | "interface" | "macro" | "method"
+            | "protocol" | "struct" | "union" => {
+                walker
+                    .base
+                    .user_config
+                    .fields_config
+                    .is_field_enabled("scope")
+                    || walker.base.user_config.extras_config.qualified
+            }
+            _ => true,
+        };
+        let (key, value) = raw.swap_remove(pos);
+        if enabled {
+            enabled_fields.insert(key, value);
+        }
+    }
+    debug_assert!(
+        raw.is_empty(),
+        "objective_c emit_tag: field(s) missing from FIELD_ORDER: {raw:?}"
+    );
+
+    walker.base.tags.push(Tag {
         name,
-        line,
-        kind: kind.to_string(),
-        end_line: None,
-        extension_fields: ext,
-    }
+        file_name: walker.base.file_name.clone(),
+        address: Tag::address_from_line(
+            walker
+                .base
+                .lines
+                .get(line.saturating_sub(1) as usize)
+                .copied()
+                .unwrap_or(b""),
+        ),
+        kind: Some(kind.into()),
+        extension_fields: if enabled_fields.is_empty() {
+            None
+        } else {
+            Some(enabled_fields)
+        },
+    });
 }
 
 /// Resolve the declared name of a (possibly nested) declarator, following the
 /// `declarator` field so parameter names in function/function-pointer
 /// declarators are skipped. Returns `(name, is_function_declarator)`.
-fn declarator_name(node: Node, source: &[u8]) -> Option<(String, bool)> {
-    declarator_name_inner(node, source, false)
+fn declarator_name(cursor: &mut TreeCursor, source: &[u8]) -> Option<(String, bool)> {
+    declarator_name_inner(cursor, source, false)
 }
 
-fn declarator_name_inner(node: Node, source: &[u8], is_func: bool) -> Option<(String, bool)> {
+fn declarator_name_inner(
+    cursor: &mut TreeCursor,
+    source: &[u8],
+    is_func: bool,
+) -> Option<(String, bool)> {
+    let node = cursor.node();
     if matches!(
         node.kind(),
         "identifier" | "type_identifier" | "field_identifier"
@@ -156,14 +234,20 @@ fn declarator_name_inner(node: Node, source: &[u8], is_func: bool) -> Option<(St
         return Some((node_text(node, source).to_string(), is_func));
     }
     let func = is_func || node.kind() == "function_declarator";
-    if let Some(d) = node.child_by_field_name("declarator") {
-        return declarator_name_inner(d, source, func);
+    let mut result = None;
+    for_each_child!(cursor, {
+        if cursor.field_name() == Some("declarator") {
+            result = declarator_name_inner(cursor, source, func);
+            break;
+        }
+    });
+    if result.is_some() {
+        return result;
     }
+
     // No `declarator` field: descend into an identifier-like child, or recurse
     // through a nested `*_declarator` that isn't attached via that field
     // (e.g. `parenthesized_declarator` -> `pointer_declarator`).
-    let mut result = None;
-    let mut cursor = node.walk();
     for_each_child!(cursor, {
         let child = cursor.node();
         let k = child.kind();
@@ -172,7 +256,7 @@ fn declarator_name_inner(node: Node, source: &[u8], is_func: bool) -> Option<(St
             break;
         }
         if k.ends_with("_declarator") {
-            if let Some(r) = declarator_name_inner(child, source, func) {
+            if let Some(r) = declarator_name_inner(cursor, source, func) {
                 result = Some(r);
                 break;
             }
@@ -252,16 +336,15 @@ fn emit_struct_declarators(
     cursor: &mut TreeCursor,
     source: &[u8],
     line: u32,
-    kind: &str,
-    scope: Option<(&str, &str)>,
-    tags: &mut Vec<Tag>,
+    kind: &'static str,
+    walker: &mut ObjcWalker,
 ) {
     for_each_child!(cursor, {
         if cursor.node().kind() == "struct_declaration" {
             for_each_child!(cursor, {
                 if cursor.node().kind() == "struct_declarator" {
-                    if let Some((name, _)) = declarator_name(cursor.node(), source) {
-                        tags.push(make_tag(name, line, kind, scope));
+                    if let Some((name, _)) = declarator_name(cursor, source) {
+                        emit_tag(walker, name, line, kind, |_| {});
                     }
                 }
             });
@@ -275,7 +358,7 @@ fn handle_container(
     cursor: &mut TreeCursor,
     source: &[u8],
     walker: &mut ObjcWalker<'_>,
-    kind: &str,
+    kind: &'static str,
     scope_kind: ScopeKind,
 ) -> bool {
     let node = cursor.node();
@@ -293,75 +376,66 @@ fn handle_container(
         None
     };
 
-    if walker.kinds.is_enabled(kind) {
-        let scope = walker.scopes.current_field();
-        let mut tag = make_tag(name.clone(), line, kind, scope);
+    emit_tag(walker, name.clone(), line, kind, |fields| {
         if let Some(cat) = &category {
-            tag.extension_fields
-                .push(("category".to_string(), cat.clone()));
+            fields.insert("category", cat.clone());
         } else if let Some(p) = &protocols {
-            tag.extension_fields
-                .push(("protocols".to_string(), p.clone()));
+            fields.insert("protocols", p.clone());
         }
-        walker.tags.push(tag);
-    }
+    });
 
     let prev_cat = walker.current_category.clone();
     walker.scopes.push(scope_kind, &name);
     walker.opens.push(Open::ScopeWithCategory(prev_cat));
 
     if let Some(cat) = category {
-        if walker.kinds.is_enabled("C") {
-            let scope = walker.scopes.current_field();
-            walker.tags.push(make_tag(cat.clone(), line, "C", scope));
-        }
+        emit_tag(walker, cat.clone(), line, "C", |_| {});
         walker.current_category = Some(cat);
     }
     true
 }
 
-/// The first `function_declarator` at or below `node` (declarators may be
-/// wrapped, e.g. `pointer_declarator` -> `function_declarator`).
-fn find_function_declarator(node: Node) -> Option<Node> {
-    if node.kind() == "function_declarator" {
-        return Some(node);
+/// Emit a `z` (parameter) tag for each named parameter of the function/prototype
+/// under `function:fn_name` (matches the C parser). The supplied cursor starts
+/// on a declarator and is restored before returning.
+fn emit_function_params(
+    cursor: &mut TreeCursor,
+    source: &[u8],
+    fn_name: &str,
+    walker: &mut ObjcWalker,
+) -> bool {
+    if cursor.node().kind() != "function_declarator" {
+        let mut found = false;
+        for_each_child!(cursor, {
+            if !found && emit_function_params(cursor, source, fn_name, walker) {
+                found = true;
+                break;
+            }
+        });
+        return found;
     }
-    let mut cursor = node.walk();
-    let mut found = None;
+
     for_each_child!(cursor, {
-        if let Some(f) = find_function_declarator(cursor.node()) {
-            found = Some(f);
+        if cursor.field_name() == Some("parameters") {
+            for_each_child!(cursor, {
+                let param = cursor.node();
+                if param.kind() == "parameter_declaration" {
+                    for_each_child!(cursor, {
+                        if cursor.field_name() == Some("declarator") {
+                            if let Some((name, _)) = declarator_name(cursor, source) {
+                                emit_tag(walker, name, line_of(param), "z", |fields| {
+                                    fields.insert("function", fn_name.to_string());
+                                });
+                            }
+                            break;
+                        }
+                    });
+                }
+            });
             break;
         }
     });
-    found
-}
-
-/// Emit a `z` (parameter) tag for each named parameter of the function/prototype
-/// declarator `decl`, scoped under `function:fn_name` (matches the C parser).
-fn emit_function_params(decl: Node, source: &[u8], fn_name: &str, tags: &mut Vec<Tag>) {
-    let Some(func_decl) = find_function_declarator(decl) else {
-        return;
-    };
-    let Some(params) = func_decl.child_by_field_name("parameters") else {
-        return;
-    };
-    let mut cursor = params.walk();
-    for_each_child!(cursor, {
-        let param = cursor.node();
-        if param.kind() == "parameter_declaration" {
-            if let Some(d) = param.child_by_field_name("declarator") {
-                if let Some((name, _)) = declarator_name(d, source) {
-                    tags.push(make_tag(
-                        name,
-                        line_of(param),
-                        "z",
-                        Some(("function", fn_name)),
-                    ));
-                }
-            }
-        }
-    });
+    true
 }
 
 /// Emit a `D` (macroparam) tag for each parameter of a function-like macro,
@@ -370,15 +444,22 @@ fn emit_macro_params(
     cursor: &mut TreeCursor,
     source: &[u8],
     macro_name: &str,
-    tags: &mut Vec<Tag>,
+    walker: &mut ObjcWalker,
 ) {
     for_each_child!(cursor, {
         if cursor.node().kind() == "preproc_params" {
             for_each_child!(cursor, {
                 let p = cursor.node();
                 if p.kind() == "identifier" {
-                    let name = node_text(p, source).to_string();
-                    tags.push(make_tag(name, line_of(p), "D", Some(("macro", macro_name))));
+                    emit_tag(
+                        walker,
+                        node_text(p, source).to_string(),
+                        line_of(p),
+                        "D",
+                        |fields| {
+                            fields.insert("macro", macro_name.to_string());
+                        },
+                    );
                 }
             });
             break;
@@ -399,18 +480,32 @@ fn has_extern_specifier(cursor: &mut TreeCursor, source: &[u8]) -> bool {
     found
 }
 
-/// The first `enumerator_list` at or below `node`. For a plain `enum_specifier`
-/// it is a direct child; for `typedef NS_ENUM(...) { ... }` it sits inside the
-/// macro's expansion, so the search descends.
-fn find_enumerator_list(node: Node) -> Option<Node> {
-    if node.kind() == "enumerator_list" {
-        return Some(node);
+/// Emit an `e` tag for each enumerator below the current node. The same cursor
+/// is moved through descendants and restored on return.
+fn emit_enumerators(
+    cursor: &mut TreeCursor,
+    source: &[u8],
+    enum_name: &str,
+    walker: &mut ObjcWalker,
+) -> bool {
+    if cursor.node().kind() == "enumerator_list" {
+        for_each_child!(cursor, {
+            let e = cursor.node();
+            if e.kind() == "enumerator" {
+                if let Some((name, _)) = child_ident(cursor, source, &["identifier"]) {
+                    emit_tag(walker, name, line_of(e), "e", |fields| {
+                        fields.insert("enum", enum_name.to_string());
+                    });
+                }
+            }
+        });
+        return true;
     }
-    let mut cursor = node.walk();
-    let mut found = None;
+
+    let mut found = false;
     for_each_child!(cursor, {
-        if let Some(l) = find_enumerator_list(cursor.node()) {
-            found = Some(l);
+        if !found && emit_enumerators(cursor, source, enum_name, walker) {
+            found = true;
             break;
         }
     });
@@ -426,30 +521,20 @@ fn emit_nsenum_constants(
     cursor: &mut TreeCursor,
     source: &[u8],
     enum_name: &str,
-    tags: &mut Vec<Tag>,
+    walker: &mut ObjcWalker,
 ) {
     for_each_child!(cursor, {
         let c = cursor.node();
         if c.kind() == "type_identifier" {
-            let name = node_text(c, source).to_string();
-            tags.push(make_tag(name, line_of(c), "e", Some(("enum", enum_name))));
-        }
-    });
-}
-
-/// Emit an `e` (enumerator) tag for each constant in `node`'s enumerator list,
-/// scoped under `enum:enum_name` (matches the C parser).
-fn emit_enumerators(node: Node, source: &[u8], enum_name: &str, tags: &mut Vec<Tag>) {
-    let Some(list) = find_enumerator_list(node) else {
-        return;
-    };
-    let mut cursor = list.walk();
-    for_each_child!(cursor, {
-        let e = cursor.node();
-        if e.kind() == "enumerator" {
-            if let Some((name, _)) = child_ident(&mut cursor, source, &["identifier"]) {
-                tags.push(make_tag(name, line_of(e), "e", Some(("enum", enum_name))));
-            }
+            emit_tag(
+                walker,
+                node_text(c, source).to_string(),
+                line_of(c),
+                "e",
+                |fields| {
+                    fields.insert("enum", enum_name.to_string());
+                },
+            );
         }
     });
 }
@@ -461,11 +546,9 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcW
     match node.kind() {
         "preproc_def" | "preproc_function_def" => {
             if let Some((name, _)) = child_ident(cursor, source, &["identifier"]) {
-                if walker.kinds.is_enabled("d") {
-                    walker.tags.push(make_tag(name.clone(), line, "d", None));
-                }
-                if node.kind() == "preproc_function_def" && walker.kinds.is_enabled("D") {
-                    emit_macro_params(cursor, source, &name, &mut walker.tags);
+                emit_tag(walker, name.clone(), line, "d", |_| {});
+                if node.kind() == "preproc_function_def" {
+                    emit_macro_params(cursor, source, &name, walker);
                 }
             }
             false
@@ -480,63 +563,63 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcW
                 None => return false,
             };
             let protocols = protocol_reference_list(cursor, source);
-            if walker.kinds.is_enabled("P") {
-                let scope = walker.scopes.current_field();
-                let mut tag = make_tag(name.clone(), line, "P", scope);
+            emit_tag(walker, name.clone(), line, "P", |fields| {
                 if let Some(p) = &protocols {
-                    tag.extension_fields
-                        .push(("protocols".to_string(), p.clone()));
+                    fields.insert("protocols", p.clone());
                 }
-                walker.tags.push(tag);
-            }
+            });
             let prev_cat = walker.current_category.clone();
             walker.scopes.push(ScopeKind::Protocol, &name);
             walker.opens.push(Open::ScopeWithCategory(prev_cat));
             true
         }
         "method_declaration" | "method_definition" => {
-            let is_class = node_text(node, source).trim_start().starts_with('+');
-            let kind = if is_class { "c" } else { "M" };
-            if walker.kinds.is_enabled(kind) {
-                if let Some(name) = method_selector(cursor, source) {
-                    let scope = walker.scopes.current_field();
-                    let mut tag = make_tag(name, line, kind, scope);
-                    if let Some(cat) = &walker.current_category {
-                        tag.extension_fields
-                            .push(("category".to_string(), cat.clone()));
+            let mut is_class = false;
+            for_each_child!(cursor, {
+                match cursor.node().kind() {
+                    "+" => {
+                        is_class = true;
+                        break;
                     }
-                    walker.tags.push(tag);
+                    "-" => break,
+                    _ => {}
+                }
+            });
+            let kind = if is_class { "c" } else { "M" };
+            if let Some(name) = method_selector(cursor, source) {
+                let category = walker.current_category.clone();
+                emit_tag(walker, name.clone(), line, kind, |fields| {
+                    if let Some(cat) = category {
+                        fields.insert("category", cat.clone());
+                    }
+                });
+                if node.kind() == "method_definition" {
+                    let prev_cat = walker.current_category.clone();
+                    walker.scopes.push(ScopeKind::Method, &name);
+                    walker.opens.push(Open::ScopeWithCategory(prev_cat));
+                    return true;
                 }
             }
             false
         }
         "property_declaration" => {
-            if walker.kinds.is_enabled("A") {
-                let scope = walker.scopes.current_field();
-                emit_struct_declarators(cursor, source, line, "A", scope, &mut walker.tags);
-            }
+            emit_struct_declarators(cursor, source, line, "A", walker);
             false
         }
         "instance_variable" => {
-            if walker.kinds.is_enabled("E") {
-                let scope = walker.scopes.current_field();
-                emit_struct_declarators(cursor, source, line, "E", scope, &mut walker.tags);
-            }
+            emit_struct_declarators(cursor, source, line, "E", walker);
             false
         }
         "field_declaration" => {
-            if walker.kinds.is_enabled("m") {
-                let scope = walker.scopes.current_field();
-                for_each_child!(cursor, {
-                    if cursor.field_name() == Some("declarator") {
-                        if let Some((name, is_func)) = declarator_name(cursor.node(), source) {
-                            if !is_func {
-                                walker.tags.push(make_tag(name, line, "m", scope));
-                            }
+            for_each_child!(cursor, {
+                if cursor.field_name() == Some("declarator") {
+                    if let Some((name, is_func)) = declarator_name(cursor, source) {
+                        if !is_func {
+                            emit_tag(walker, name, line, "m", |_| {});
                         }
                     }
-                });
-            }
+                }
+            });
             false
         }
         "struct_specifier" | "union_specifier" => {
@@ -548,10 +631,7 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcW
             if let Some(nm) = node.child_by_field_name("name") {
                 if node.child_by_field_name("body").is_some() {
                     let name = node_text(nm, source).to_string();
-                    if walker.kinds.is_enabled(kind) {
-                        let scope = walker.scopes.current_field();
-                        walker.tags.push(make_tag(name.clone(), line, kind, scope));
-                    }
+                    emit_tag(walker, name.clone(), line, kind, |_| {});
                     let prev_cat = walker.current_category.clone();
                     walker.scopes.push(scope_kind, &name);
                     walker.opens.push(Open::ScopeWithCategory(prev_cat));
@@ -565,13 +645,8 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcW
             // scoped `enum:Name`. Anonymous enums emit nothing (as in C).
             if let Some(nm) = node.child_by_field_name("name") {
                 let name = node_text(nm, source).to_string();
-                if walker.kinds.is_enabled("g") {
-                    let scope = walker.scopes.current_field();
-                    walker.tags.push(make_tag(name.clone(), line, "g", scope));
-                }
-                if walker.kinds.is_enabled("e") {
-                    emit_enumerators(node, source, &name, &mut walker.tags);
-                }
+                emit_tag(walker, name.clone(), line, "g", |_| {});
+                emit_enumerators(cursor, source, &name, walker);
             }
             false
         }
@@ -588,20 +663,8 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcW
                         if let Some(ty) = tn.child_by_field_name("type") {
                             let enum_name = node_text(ty, source).trim().to_string();
                             if !enum_name.is_empty() {
-                                if walker.kinds.is_enabled("g") {
-                                    let scope = walker.scopes.current_field();
-                                    walker
-                                        .tags
-                                        .push(make_tag(enum_name.clone(), line, "g", scope));
-                                }
-                                if walker.kinds.is_enabled("e") {
-                                    emit_nsenum_constants(
-                                        cursor,
-                                        source,
-                                        &enum_name,
-                                        &mut walker.tags,
-                                    );
-                                }
+                                emit_tag(walker, enum_name.clone(), line, "g", |_| {});
+                                emit_nsenum_constants(cursor, source, &enum_name, walker);
                             }
                         }
                         return false;
@@ -609,20 +672,19 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcW
                 }
             }
 
-            let declarator = node.child_by_field_name("declarator");
-            let name = declarator
-                .and_then(|d| declarator_name(d, source))
-                .map(|(n, _)| n);
+            let mut name = None;
+            let mut name_line = line;
+            for_each_child!(cursor, {
+                if cursor.field_name() == Some("declarator") {
+                    name_line = line_of(cursor.node());
+                    name = declarator_name(cursor, source).map(|(name, _)| name);
+                    break;
+                }
+            });
             // Point the typedef at the line where its name is written (e.g. the
             // `} KlassCoordinate;` line of a typedef'd anonymous struct).
-            let name_line = declarator.map(line_of).unwrap_or(line);
             if let Some(name) = name {
-                if walker.kinds.is_enabled("t") {
-                    let scope = walker.scopes.current_field();
-                    walker
-                        .tags
-                        .push(make_tag(name.clone(), name_line, "t", scope));
-                }
+                emit_tag(walker, name.clone(), name_line, "t", |_| {});
                 // Anonymous struct/union body: scope its members under the alias.
                 if let Some(tn) = node.child_by_field_name("type") {
                     if matches!(tn.kind(), "struct_specifier" | "union_specifier")
@@ -640,22 +702,24 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcW
         }
         "function_definition" => {
             if walker.in_body == 0 {
-                if let Some(decl) = node.child_by_field_name("declarator") {
-                    if let Some((name, _)) = declarator_name(decl, source) {
-                        if walker.kinds.is_enabled("f") {
-                            let scope = walker.scopes.current_field();
-                            walker.tags.push(make_tag(name.clone(), line, "f", scope));
+                let mut function_name = None;
+                for_each_child!(cursor, {
+                    if cursor.field_name() == Some("declarator") {
+                        if let Some((name, _)) = declarator_name(cursor, source) {
+                            emit_tag(walker, name.clone(), line, "f", |_| {});
+                            emit_function_params(cursor, source, &name, walker);
+                            function_name = Some(name);
                         }
-                        if walker.kinds.is_enabled("z") {
-                            emit_function_params(decl, source, &name, &mut walker.tags);
-                        }
-                        // Open a function scope so body locals/labels get a
-                        // `function:name` field, as the C parser does.
-                        let prev_cat = walker.current_category.clone();
-                        walker.scopes.push(ScopeKind::Function, &name);
-                        walker.opens.push(Open::ScopeWithCategory(prev_cat));
-                        return true;
+                        break;
                     }
+                });
+                if let Some(name) = function_name {
+                    // Open a function scope so body locals/labels get a
+                    // `function:name` field, as the C parser does.
+                    let prev_cat = walker.current_category.clone();
+                    walker.scopes.push(ScopeKind::Function, &name);
+                    walker.opens.push(Open::ScopeWithCategory(prev_cat));
+                    return true;
                 }
             }
             false
@@ -669,16 +733,10 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcW
             let at_file_scope = !in_body && walker.scopes.current_field().is_none();
             for_each_child!(cursor, {
                 if cursor.field_name() == Some("declarator") {
-                    let child = cursor.node();
-                    if let Some((name, is_func)) = declarator_name(child, source) {
+                    if let Some((name, is_func)) = declarator_name(cursor, source) {
                         if is_func {
-                            if walker.kinds.is_enabled("p") {
-                                let scope = walker.scopes.current_field();
-                                walker.tags.push(make_tag(name.clone(), line, "p", scope));
-                            }
-                            if walker.kinds.is_enabled("z") {
-                                emit_function_params(child, source, &name, &mut walker.tags);
-                            }
+                            emit_tag(walker, name.clone(), line, "p", |_| {});
+                            emit_function_params(cursor, source, &name, walker);
                         } else {
                             let (kind, emit) = if is_extern {
                                 ("x", !in_body)
@@ -687,9 +745,8 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcW
                             } else {
                                 ("v", at_file_scope)
                             };
-                            if emit && walker.kinds.is_enabled(kind) {
-                                let scope = walker.scopes.current_field();
-                                walker.tags.push(make_tag(name, line, kind, scope));
+                            if emit {
+                                emit_tag(walker, name, line, kind, |_| {});
                             }
                         }
                     }
@@ -698,24 +755,19 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcW
             false
         }
         "preproc_include" | "preproc_import" => {
-            if walker.kinds.is_enabled("h") {
-                if let Some((path, _)) =
-                    child_ident(cursor, source, &["string_literal", "system_lib_string"])
-                {
-                    let trimmed = path
-                        .trim_matches(|c| c == '"' || c == '<' || c == '>')
-                        .to_string();
-                    walker.tags.push(make_tag(trimmed, line, "h", None));
-                }
+            if let Some((path, _)) =
+                child_ident(cursor, source, &["string_literal", "system_lib_string"])
+            {
+                let trimmed = path
+                    .trim_matches(|c| c == '"' || c == '<' || c == '>')
+                    .to_string();
+                emit_tag(walker, trimmed, line, "h", |_| {});
             }
             false
         }
         "labeled_statement" => {
-            if walker.kinds.is_enabled("L") {
-                if let Some((name, _)) = child_ident(cursor, source, &["statement_identifier"]) {
-                    let scope = walker.scopes.current_field();
-                    walker.tags.push(make_tag(name, line, "L", scope));
-                }
+            if let Some((name, _)) = child_ident(cursor, source, &["statement_identifier"]) {
+                emit_tag(walker, name, line, "L", |_| {});
             }
             false
         }
@@ -728,25 +780,81 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, walker: &mut ObjcW
     }
 }
 
-fn generate_tags(parser: &mut TsParser, req: &Request, source: &[u8]) -> Result<Vec<Tag>, String> {
-    let tree = parser
-        .parse(source, None)
-        .ok_or_else(|| "parse failed".to_string())?;
-
-    let mut walker = ObjcWalker {
+pub(crate) fn generate(
+    parser: &mut TsParser,
+    language: tree_sitter::Language,
+    source: &[u8],
+    path: &str,
+    kinds: &TagKindConfig,
+    config: &crate::config::Config,
+) -> Option<Vec<Tag>> {
+    generate_tags_with_config(
+        parser,
+        language,
         source,
-        scopes: ScopeStack::new(),
-        kinds: TagKindConfig::parse(&req.kinds, OBJC_DEFAULT_KINDS, OBJC_OPTIONAL_KINDS),
-        tags: Vec::new(),
-        current_category: None,
-        in_body: 0,
-        opens: Vec::new(),
-    };
+        path,
+        |source_code, lines, cursor, tags| {
+            let mut walker = ObjcWalker {
+                base: Context {
+                    source_code,
+                    lines,
+                    file_name: path.into(),
+                    tags,
+                    tag_config: kinds,
+                    user_config: config,
+                },
+                scopes: ScopeStack::new(),
+                current_category: None,
+                in_body: 0,
+                opens: Vec::new(),
+            };
+            walk_tree(cursor, &mut walker);
+        },
+    )
+}
 
-    let mut cursor = tree.walk();
-    if cursor.goto_first_child() {
-        walk_tree(&mut cursor, &mut walker);
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::cpp::{C_KIND_DEFAULTS, C_KIND_OPTIONALS};
+    use clap::Parser;
+
+    fn objective_c_language() -> tree_sitter::Language {
+        let engine = tree_sitter::wasmtime::Engine::default();
+        let mut store = tree_sitter::WasmStore::new(&engine).unwrap();
+        store
+            .load_language(
+                "objc",
+                include_bytes!("../../tests/grammars/wasm/14/tree-sitter-objc.wasm"),
+            )
+            .unwrap()
     }
 
-    Ok(walker.tags)
+    #[test]
+    fn c_kind_letters_do_not_drift() {
+        assert_eq!(
+            &KIND_DEFAULTS[..C_KIND_DEFAULTS.len()],
+            C_KIND_DEFAULTS,
+            "Objective-C's shared default kinds must match C"
+        );
+        assert_eq!(
+            KIND_OPTIONALS, C_KIND_OPTIONALS,
+            "Objective-C's optional kinds must match C"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Error loading grammar")]
+    fn grammar_setup_failure_uses_shared_policy() {
+        let mut parser = TsParser::new();
+        let kinds = TagKindConfig::from_string("", KIND_DEFAULTS, KIND_OPTIONALS);
+        generate(
+            &mut parser,
+            objective_c_language(),
+            b"@interface Example\n@end\n",
+            "valid.m",
+            &kinds,
+            &crate::config::Config::parse_from(["treetags"]),
+        );
+    }
 }

@@ -122,13 +122,15 @@ fn execute_command(working_dir: &Path, args: &[String]) -> Result<std::process::
     let config_home = tempfile::tempdir().map_err(|e| e.to_string())?;
     cmd.env("XDG_CONFIG_HOME", config_home.path());
     cmd.env("XDG_CACHE_HOME", config_home.path().join("cache"));
-    if working_dir
-        .components()
-        .any(|c| c.as_os_str() == "zig" || c.as_os_str() == "ocaml")
-    {
+    if working_dir.components().any(|c| {
+        matches!(
+            c.as_os_str().to_str(),
+            Some("zig" | "ocaml" | "objective_c")
+        )
+    }) {
         let destination = config_home.path().join("treetags/wasm_grammars/14");
         fs::create_dir_all(&destination).map_err(|e| e.to_string())?;
-        for lang in ["zig", "ocaml"] {
+        for lang in ["zig", "objc", "ocaml"] {
             let name = format!("tree-sitter-{lang}.wasm");
             fs::copy(
                 Path::new(env!("CARGO_MANIFEST_DIR"))

@@ -8,6 +8,14 @@
     "sha256": "54b3b83dd9c62da5815f06132bc3fc914d9dcc780370b32416446a0b7969e8c6"
   },
   {
+    "language": "objc",
+    "grammar_version": "3.0.2",
+    "abi": 14,
+    "file": "14/tree-sitter-objc.wasm",
+    "url": "https://github.com/tree-sitter-grammars/tree-sitter-objc/releases/download/v3.0.2/tree-sitter-objc.wasm",
+    "sha256": "155bf61fc94941fa9d07c86cd46895f14dfb2549fb7f646faeb83765af05c970"
+  },
+  {
     "language": "ocaml",
     "grammar_version": "0.24.0",
     "abi": 14,

@@ -47,8 +47,8 @@ for more about extension fields.
 ## External WASM grammars
 
 Treetags does not include the tree-sitter grammars for all languages it supports
-due to binary size constraints. Currently these languages are **Zig** (with extension fields)
-and  **OCaml** (`.ml` files).
+due to binary size constraints. Currently these languages are **Zig** and
+**Objective C** (both with extension fields), and **OCaml** (`.ml` files).
 
 Find missing grammars for your project:
 
@@ -83,7 +83,7 @@ Optionally declare grammars you want available in the existing
 
 ```toml
 [wasm_grammars]
-languages = ["zig", "ocaml"]
+languages = ["zig", "objc", "ocaml"]
 ```
 
 Install that list explicitly with:
@@ -107,7 +107,6 @@ Treetags has support for these languages via user installable WASM plugins.
 ### Full support with extension fields
 - [x] Java
 - [x] Kotlin
-- [x] Objective C
 - [x] Swift
 - [x] Terraform
 

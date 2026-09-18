@@ -50,6 +50,14 @@ pub(crate) static ZIG: WasmGrammar = WasmGrammar {
     abi: 14,
     query: None,
 };
+pub(crate) static OBJECTIVE_C: WasmGrammar = WasmGrammar {
+    name: "objc",
+    version: "3.0.2",
+    url: "https://github.com/tree-sitter-grammars/tree-sitter-objc/releases/download/v3.0.2/tree-sitter-objc.wasm",
+    sha256: "155bf61fc94941fa9d07c86cd46895f14dfb2549fb7f646faeb83765af05c970",
+    abi: 14,
+    query: None,
+};
 pub(crate) static OCAML: WasmGrammar = WasmGrammar {
     name: "ocaml",
     version: "0.24.0",
@@ -58,7 +66,7 @@ pub(crate) static OCAML: WasmGrammar = WasmGrammar {
     abi: 14,
     query: Some(include_str!("../queries/ocaml.scm")),
 };
-pub(crate) const GRAMMARS: &[&WasmGrammar] = &[&ZIG, &OCAML];
+pub(crate) const GRAMMARS: &[&WasmGrammar] = &[&ZIG, &OBJECTIVE_C, &OCAML];
 
 impl WasmGrammar {
     pub fn path(&self, root: &Path) -> PathBuf {

@@ -9,6 +9,6 @@ Tests copy these files into temporary `XDG_CONFIG_HOME` directories. No network
 access or grammar build toolchain is needed to run the grammar tests.
 
 OCaml's matching query is vendored in `queries/ocaml.scm`, with its license in
-`queries/LICENSE-ocaml`. Both grammars use ABI 14 even though the runtime also
+`queries/LICENSE-ocaml`. All grammars use ABI 14 even though the runtime also
 supports newer ABIs. Updating a fixture requires updating its descriptor, query
 if applicable, checksum, and baseline-output compatibility tests together.
