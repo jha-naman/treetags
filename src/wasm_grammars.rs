@@ -35,17 +35,26 @@ pub(crate) enum GrammarSource {
 
 pub struct WasmGrammar {
     pub name: &'static str,
+    pub version: &'static str,
+    pub url: &'static str,
+    pub sha256: &'static str,
     pub abi: usize,
     pub query: Option<&'static str>,
 }
 
 pub(crate) static ZIG: WasmGrammar = WasmGrammar {
     name: "zig",
+    version: "1.1.2",
+    url: "https://github.com/tree-sitter-grammars/tree-sitter-zig/releases/download/v1.1.2/tree-sitter-zig.wasm",
+    sha256: "54b3b83dd9c62da5815f06132bc3fc914d9dcc780370b32416446a0b7969e8c6",
     abi: 14,
     query: None,
 };
 pub(crate) static OCAML: WasmGrammar = WasmGrammar {
     name: "ocaml",
+    version: "0.24.0",
+    url: "https://github.com/tree-sitter/tree-sitter-ocaml/releases/download/v0.24.0/tree-sitter-ocaml.wasm",
+    sha256: "a7fb5e4bff6854b9f68123cd79bb170788314e8d4e5adc8f4af835039e4ef571",
     abi: 14,
     query: Some(include_str!("../queries/ocaml.scm")),
 };
@@ -82,7 +91,7 @@ impl WasmGrammars {
             let path = grammar.path(&self.root);
             let result = Self::load(grammar, &path);
             if let Err(error) = &result {
-                eprintln!("treetags: grammar '{}': {error}. Manually install the compatible WASM grammar at {}", grammar.name, path.display());
+                eprintln!("treetags: grammar '{}': {error}. Run `treetags grammar install {} --force` to install the compatible WASM grammar at {}", grammar.name, grammar.name, path.display());
             }
             result
         }).as_ref().ok()
@@ -90,9 +99,13 @@ impl WasmGrammars {
 
     fn load(grammar: &WasmGrammar, path: &Path) -> Result<LoadedGrammar, String> {
         let bytes = std::fs::read(path).map_err(|e| format!("cannot read grammar: {e}"))?;
+        Self::validate(grammar, &bytes)
+    }
+
+    pub(crate) fn validate(grammar: &WasmGrammar, bytes: &[u8]) -> Result<LoadedGrammar, String> {
         let mut store = WasmStore::new(engine()).map_err(|e| e.to_string())?;
         let language = store
-            .load_language(grammar.name, &bytes)
+            .load_language(grammar.name, bytes)
             .map_err(|e| e.to_string())?;
         let abi = language.abi_version();
         if abi != grammar.abi
@@ -117,7 +130,12 @@ impl WasmGrammars {
             .collect::<BTreeSet<_>>()
         {
             if !GRAMMARS.iter().any(|g| g.name == name) {
-                eprintln!("treetags: unknown external grammar '{name}'; supported: ocaml, zig")
+                let mut supported: Vec<_> = GRAMMARS.iter().map(|g| g.name).collect();
+                supported.sort_unstable();
+                eprintln!(
+                    "treetags: unknown external grammar '{name}'; supported: {}",
+                    supported.join(", ")
+                );
             }
         }
     }
@@ -189,19 +207,14 @@ mod tests {
         std::fs::create_dir(root.path().join("14")).unwrap();
         std::fs::copy(fixture(), ZIG.path(root.path())).unwrap();
         assert!(grammars.get(&ZIG).is_none());
-        let wrong_abi = WasmGrammar {
-            name: "zig",
-            abi: 15,
-            query: None,
-        };
+        let wrong_abi = WasmGrammar { abi: 15, ..ZIG };
         assert!(WasmGrammars::load(&wrong_abi, &fixture())
             .err()
             .unwrap()
             .contains("incompatible ABI 14"));
         let bad_query = WasmGrammar {
-            name: "zig",
-            abi: 14,
             query: Some("("),
+            ..ZIG
         };
         assert!(WasmGrammars::load(&bad_query, &fixture())
             .err()
@@ -209,8 +222,7 @@ mod tests {
             .contains("invalid tag query"));
         let wrong_export = WasmGrammar {
             name: "nonexistent",
-            abi: 14,
-            query: None,
+            ..ZIG
         };
         assert!(WasmGrammars::load(&wrong_export, &fixture()).is_err());
     }
