@@ -40,6 +40,10 @@ fn build_all() -> Option<PathBuf> {
 
     let out_root = PathBuf::from(std::env::var_os("OUT_DIR").expect("OUT_DIR is not set"));
     let plugins_out_dir = out_root.join("plugins");
+    if plugins_out_dir.exists() {
+        std::fs::remove_dir_all(&plugins_out_dir)
+            .expect("cannot clean assembled test plugin directory");
+    }
     // Separate target dir avoids lock contention with the outer cargo invocation.
     let wasm_target_dir = out_root.join("wasm-target");
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());

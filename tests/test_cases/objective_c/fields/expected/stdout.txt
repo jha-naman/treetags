@@ -1,0 +1,16 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+Example	source.m	/^@interface Example : NSObject$/;"	kind:i	line:13
+PAIR	source.m	/^#define PAIR(first, second) ((first) + (second))$/;"	kind:d	line:1
+add	source.m	/^int add(int left, int right)$/;"	kind:f	line:6
+add	source.m	/^int add(int left, int right);$/;"	kind:p	line:4
+done	source.m	/^done:$/;"	kind:L	line:9
+externalCounter	source.m	/^extern int externalCounter;$/;"	kind:x	line:3
+first	source.m	/^#define PAIR(first, second) ((first) + (second))$/;"	kind:D	line:1
+left	source.m	/^int add(int left, int right)$/;"	kind:z	line:6
+left	source.m	/^int add(int left, int right);$/;"	kind:z	line:4
+right	source.m	/^int add(int left, int right)$/;"	kind:z	line:6
+right	source.m	/^int add(int left, int right);$/;"	kind:z	line:4
+second	source.m	/^#define PAIR(first, second) ((first) + (second))$/;"	kind:D	line:1
+total	source.m	/^    int total = left + right;$/;"	kind:l	line:8
+update:	source.m	/^- (void)update:(int)value;$/;"	kind:M	line:15
+value	source.m	/^@property int value;$/;"	kind:A	line:14

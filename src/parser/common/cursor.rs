@@ -1,4 +1,4 @@
-//! Language-agnostic tree-sitter traversal helpers used by the Zig walker.
+//! Language-agnostic tree-sitter traversal helpers used by native walkers.
 //!
 //! Utilities for traversing a tree with one TreeCursor.
 

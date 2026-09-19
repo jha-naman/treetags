@@ -1,0 +1,3 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+finished	source.m	/^finished:$/;"	L	method:Example.update:
+localValue	source.m	/^    int localValue = value;$/;"	l	method:Example.update:

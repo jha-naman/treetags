@@ -1,4 +1,6 @@
-use crate::parser::{c_sharp, cpp, go, js, python, rust, typescript, zig, TagKindConfig};
+use crate::parser::{
+    c_sharp, cpp, go, js, objective_c, python, rust, typescript, zig, TagKindConfig,
+};
 use crate::tag::Tag;
 use crate::wasm_grammars::GrammarSource;
 
@@ -112,6 +114,18 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_cpp::LANGUAGE.into()),
         generate_fn: cpp::generate,
+    },
+    BuiltinLangDesc {
+        lang: objective_c::LANG_NAME,
+        aliases: objective_c::LANG_ALIASES,
+        extensions: objective_c::LANG_EXTENSIONS,
+        patterns: &[],
+        interpreters: &[],
+        kind_defaults: objective_c::KIND_DEFAULTS,
+        kind_optionals: objective_c::KIND_OPTIONALS,
+        disambiguation: &[("h", objective_c::DISAMBIG_SIGNALS)],
+        grammar: GrammarSource::Wasm(&crate::wasm_grammars::OBJECTIVE_C),
+        generate_fn: objective_c::generate,
     },
     BuiltinLangDesc {
         lang: js::LANG_NAME,

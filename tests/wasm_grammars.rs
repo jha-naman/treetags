@@ -62,6 +62,7 @@ fn grammar_commands_list_install_and_uninstall_offline() {
     let available = p.run(&["grammar", "available"]);
     assert!(available.status.success(), "{}", stderr(&available));
     assert!(stdout(&available).contains("1.1.2"));
+    assert!(stdout(&available).contains("3.0.2"));
     assert!(stdout(&available).contains("0.24.0"));
     assert!(!stdout(&p.run(&["grammar", "installed"])).contains("zig"));
     p.install("zig");

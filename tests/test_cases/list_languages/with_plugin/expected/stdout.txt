@@ -10,7 +10,7 @@ javascript
 julia
 kotlin            [plugin]
 lua
-objc              [plugin]
+objc              [wasm grammar]
 ocaml             [wasm grammar]
 php
 python

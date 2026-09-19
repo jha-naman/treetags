@@ -21,7 +21,7 @@ struct Frame<K> {
     path_len_before: usize,
 }
 
-/// A stack of nested scopes for the host Zig walker.
+/// A stack of nested scopes for native host walkers.
 pub struct ScopeStack<K: ScopeKey> {
     frames: Vec<Frame<K>>,
     /// The dotted path of the enclosing scopes.
