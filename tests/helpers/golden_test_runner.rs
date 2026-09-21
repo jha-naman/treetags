@@ -125,16 +125,21 @@ fn execute_command(working_dir: &Path, args: &[String]) -> Result<std::process::
     if working_dir.components().any(|c| {
         matches!(
             c.as_os_str().to_str(),
-            Some("zig" | "ocaml" | "objective_c")
+            Some("zig" | "swift" | "ocaml" | "objective_c")
         )
     }) {
-        let destination = config_home.path().join("treetags/wasm_grammars/14");
-        fs::create_dir_all(&destination).map_err(|e| e.to_string())?;
-        for lang in ["zig", "objc", "ocaml"] {
+        for (lang, abi) in [("zig", 14), ("swift", 15), ("objc", 14), ("ocaml", 14)] {
             let name = format!("tree-sitter-{lang}.wasm");
+            let directory = abi.to_string();
+            let destination = config_home
+                .path()
+                .join("treetags/wasm_grammars")
+                .join(&directory);
+            fs::create_dir_all(&destination).map_err(|e| e.to_string())?;
             fs::copy(
                 Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .join("tests/grammars/wasm/14")
+                    .join("tests/grammars/wasm")
+                    .join(&directory)
                     .join(&name),
                 destination.join(name),
             )
