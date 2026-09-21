@@ -17,7 +17,7 @@ ruby
 rust
 scala
 shell
-swift             [plugin]
+swift             [wasm grammar]
 terraform         [plugin]
 typescript
 zig               [wasm grammar]

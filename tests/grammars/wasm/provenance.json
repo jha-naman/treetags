@@ -8,6 +8,14 @@
     "sha256": "54b3b83dd9c62da5815f06132bc3fc914d9dcc780370b32416446a0b7969e8c6"
   },
   {
+    "language": "swift",
+    "grammar_version": "0.7.3",
+    "abi": 15,
+    "file": "15/tree-sitter-swift.wasm",
+    "url": "https://github.com/alex-pinkus/tree-sitter-swift/releases/download/0.7.3/tree-sitter-swift.wasm",
+    "sha256": "0258a7ef17303a8079ffe0748b3583d59656b5c3e8653fca7b6451b3e6689eb2"
+  },
+  {
     "language": "objc",
     "grammar_version": "3.0.2",
     "abi": 14,

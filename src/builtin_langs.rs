@@ -1,5 +1,5 @@
 use crate::parser::{
-    c_sharp, cpp, go, java, js, objective_c, python, rust, typescript, zig, TagKindConfig,
+    c_sharp, cpp, go, java, js, objective_c, python, rust, swift, typescript, zig, TagKindConfig,
 };
 use crate::tag::Tag;
 use crate::wasm_grammars::GrammarSource;
@@ -64,6 +64,18 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         disambiguation: &[],
         grammar: GrammarSource::Wasm(&crate::wasm_grammars::ZIG),
         generate_fn: zig::generate,
+    },
+    BuiltinLangDesc {
+        lang: swift::LANG_NAME,
+        aliases: &[],
+        extensions: swift::LANG_EXTENSIONS,
+        patterns: &[],
+        interpreters: &[],
+        kind_defaults: swift::KIND_DEFAULTS,
+        kind_optionals: swift::KIND_OPTIONALS,
+        disambiguation: &[],
+        grammar: GrammarSource::Wasm(&crate::wasm_grammars::SWIFT),
+        generate_fn: swift::generate,
     },
     BuiltinLangDesc {
         lang: c_sharp::LANG_NAME,

@@ -34,6 +34,7 @@ pub(crate) mod js;
 pub(crate) mod objective_c;
 pub(crate) mod python;
 pub(crate) mod rust;
+pub(crate) mod swift;
 pub(crate) mod typescript;
 pub(crate) mod zig;
 
@@ -334,6 +335,7 @@ mod wasm_tests {
         for _ in 0..2 {
             for (extension, source, expected_name) in [
                 ("zig", "pub fn zig_one() void {}", None),
+                ("swift", "struct SwiftOne {}", None),
                 ("ml", "let ocaml_one x = x + 1", None),
                 ("rs", "pub fn rust_one() {}", Some("rust_one")),
                 ("rb", "def ruby_one\nend", Some("ruby_one")),
@@ -361,10 +363,12 @@ mod wasm_tests {
         let files = tempfile::tempdir().unwrap();
         for (extension, source, name) in [
             ("zig", "pub fn zig_one() void {}", "zig_one"),
+            ("swift", "struct SwiftOne {}", "SwiftOne"),
             ("rs", "pub fn rust_one() {}", "rust_one"),
             ("ml", "let ocaml_one x = x + 1", "ocaml_one"),
             ("rb", "def ruby_one\nend", "ruby_one"),
             ("zig", "pub fn zig_two() void {}", "zig_two"),
+            ("swift", "struct SwiftTwo {}", "SwiftTwo"),
             ("ml", "let ocaml_two x = x * 2", "ocaml_two"),
         ] {
             let path = files.path().join(format!("source.{extension}"));

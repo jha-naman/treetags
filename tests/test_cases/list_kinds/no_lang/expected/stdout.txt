@@ -139,6 +139,23 @@ rust
     v  variable
     t  type
     M  macro
+swift
+    c  class
+    s  struct
+    P  protocol
+    g  enum
+    e  enumerator
+    x  extension
+    a  actor
+    f  function
+    m  method
+    p  property
+    v  variable
+    t  typealias
+    A  associatedtype
+    o  operator
+    l  local [off]
+    z  parameter [off]
 typescript
     f  function
     c  class

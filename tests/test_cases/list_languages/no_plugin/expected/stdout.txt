@@ -15,5 +15,6 @@ ruby
 rust
 scala
 shell
+swift             [wasm grammar]
 typescript
 zig               [wasm grammar]
