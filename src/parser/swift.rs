@@ -97,100 +97,76 @@ impl WalkContext for SwiftWalker<'_> {
     }
 }
 
-struct PendingTag {
-    name: String,
-    line: u32,
-    kind: &'static str,
-    end_line: Option<u32>,
-    extension_fields: Vec<(String, String)>,
-}
-
-fn make_tag(
-    name: String,
-    line: u32,
-    kind: &'static str,
-    scope: Option<(&str, &str)>,
-) -> PendingTag {
-    let mut extension_fields = Vec::new();
-    if let Some((key, value)) = scope {
-        extension_fields.push((key.to_string(), value.to_string()));
-    }
-    PendingTag {
-        name,
-        line,
-        kind,
-        end_line: None,
-        extension_fields,
-    }
-}
-
-fn add_field(tag: &mut PendingTag, key: &str, value: Option<String>) {
+fn add_field(fields: &mut ExtensionFields, key: &'static str, value: Option<String>) {
     if let Some(value) = value {
-        tag.extension_fields.push((key.to_string(), value));
+        fields.insert(key, value);
     }
 }
 
-fn end_line(node: Node) -> Option<u32> {
-    Some(node.end_position().row as u32 + 1)
+fn add_end_line(fields: &mut ExtensionFields, node: Node) {
+    add_field(
+        fields,
+        "end",
+        Some((node.end_position().row + 1).to_string()),
+    );
 }
 
-impl SwiftWalker<'_> {
-    fn emit(&mut self, tag: PendingTag) {
-        if tag.name.is_empty() || tag.name == "_" || !self.base.tag_config.is_kind_enabled(tag.kind)
-        {
-            return;
-        }
-        let mut fields = ExtensionFields::new();
-        fields.insert("kind", tag.kind);
-        fields.insert("line", tag.line.to_string());
-        if let Some(end) = tag.end_line {
-            fields.insert("end", end.to_string());
-        }
-        for (key, value) in tag.extension_fields {
-            fields.insert(key, value);
-        }
-        let mut raw: Vec<_> = fields.into_iter().collect();
-        let mut enabled_fields = ExtensionFields::new();
-        for &key in FIELD_ORDER {
-            let Some(pos) = raw.iter().position(|(field, _)| field.as_ref() == key) else {
-                continue;
-            };
-            let enabled = match key {
-                "kind" | "line" | "end" | "access" | "signature" | "typeref" => {
-                    self.base.user_config.fields_config.is_field_enabled(key)
-                }
-                "actor" | "class" | "enum" | "extension" | "function" | "protocol" | "struct" => {
-                    self.base
-                        .user_config
-                        .fields_config
-                        .is_field_enabled("scope")
-                        || self.base.user_config.extras_config.qualified
-                }
-                _ => true,
-            };
-            let (key, value) = raw.swap_remove(pos);
-            if enabled {
-                enabled_fields.insert(key, value);
+fn emit_tag(
+    w: &mut SwiftWalker,
+    name: String,
+    line: u32,
+    kind: &'static str,
+    extra_fields: impl FnOnce(&mut ExtensionFields),
+) {
+    if name.is_empty() || name == "_" || !w.base.tag_config.is_kind_enabled(kind) {
+        return;
+    }
+    let mut fields = ExtensionFields::new();
+    fields.insert("kind", kind);
+    fields.insert("line", line.to_string());
+    if let Some((key, value)) = w.scopes.current_field() {
+        fields.insert(key, value.to_string());
+    }
+    extra_fields(&mut fields);
+
+    let mut raw: Vec<_> = fields.into_iter().collect();
+    let mut enabled_fields = ExtensionFields::new();
+    for &key in FIELD_ORDER {
+        let Some(pos) = raw.iter().position(|(field, _)| field.as_ref() == key) else {
+            continue;
+        };
+        let enabled = match key {
+            "kind" | "line" | "end" | "access" | "signature" | "typeref" => {
+                w.base.user_config.fields_config.is_field_enabled(key)
             }
+            "actor" | "class" | "enum" | "extension" | "function" | "protocol" | "struct" => {
+                w.base.user_config.fields_config.is_field_enabled("scope")
+                    || w.base.user_config.extras_config.qualified
+            }
+            _ => true,
+        };
+        let (key, value) = raw.swap_remove(pos);
+        if enabled {
+            enabled_fields.insert(key, value);
         }
-        debug_assert!(
-            raw.is_empty(),
-            "swift emit: fields missing from FIELD_ORDER: {raw:?}"
-        );
-        self.base.tags.push(Tag {
-            name: tag.name,
-            file_name: self.base.file_name.clone(),
-            address: Tag::address_from_line(
-                self.base
-                    .lines
-                    .get(tag.line.saturating_sub(1) as usize)
-                    .copied()
-                    .unwrap_or(b""),
-            ),
-            kind: Some(tag.kind.into()),
-            extension_fields: (!enabled_fields.is_empty()).then_some(enabled_fields),
-        });
     }
+    debug_assert!(
+        raw.is_empty(),
+        "swift emit: fields missing from FIELD_ORDER: {raw:?}"
+    );
+    w.base.tags.push(Tag {
+        name,
+        file_name: w.base.file_name.clone(),
+        address: Tag::address_from_line(
+            w.base
+                .lines
+                .get(line.saturating_sub(1) as usize)
+                .copied()
+                .unwrap_or(b""),
+        ),
+        kind: Some(kind.into()),
+        extension_fields: (!enabled_fields.is_empty()).then_some(enabled_fields),
+    });
 }
 
 fn has_child(cursor: &mut TreeCursor, kinds: &[&str]) -> bool {
@@ -345,11 +321,13 @@ fn emit_type(cursor: &mut TreeCursor, source: &[u8], w: &mut SwiftWalker) -> boo
         field_ident(cursor, source, "name").unwrap_or_else(|| (String::new(), line_of(node)));
 
     if w.base.tag_config.is_kind_enabled(letter) {
-        let mut tag = make_tag(name.clone(), line, letter, w.scopes.current_field());
-        add_field(&mut tag, "access", access_of(cursor, source));
-        add_field(&mut tag, "inherits", inherits_of(cursor, source));
-        tag.end_line = end_line(node);
-        w.emit(tag);
+        let access = access_of(cursor, source);
+        let inherits = inherits_of(cursor, source);
+        emit_tag(w, name.clone(), line, letter, |fields| {
+            add_field(fields, "access", access);
+            add_field(fields, "inherits", inherits);
+            add_end_line(fields, node);
+        });
     }
     w.scopes.push(scope_kind, &name);
     true
@@ -361,11 +339,13 @@ fn emit_protocol(cursor: &mut TreeCursor, source: &[u8], w: &mut SwiftWalker) ->
         field_ident(cursor, source, "name").unwrap_or_else(|| (String::new(), line_of(node)));
 
     if w.base.tag_config.is_kind_enabled("P") {
-        let mut tag = make_tag(name.clone(), line, "P", w.scopes.current_field());
-        add_field(&mut tag, "access", access_of(cursor, source));
-        add_field(&mut tag, "inherits", inherits_of(cursor, source));
-        tag.end_line = end_line(node);
-        w.emit(tag);
+        let access = access_of(cursor, source);
+        let inherits = inherits_of(cursor, source);
+        emit_tag(w, name.clone(), line, "P", |fields| {
+            add_field(fields, "access", access);
+            add_field(fields, "inherits", inherits);
+            add_end_line(fields, node);
+        });
     }
     w.scopes.push(ScopeKind::Protocol, &name);
     true
@@ -383,13 +363,15 @@ fn emit_function(cursor: &mut TreeCursor, source: &[u8], w: &mut SwiftWalker) ->
     };
 
     if w.base.tag_config.is_kind_enabled(letter) {
-        let mut tag = make_tag(name.clone(), line, letter, w.scopes.current_field());
-        add_field(&mut tag, "access", access_of(cursor, source));
-        tag.extension_fields
-            .push(("signature".to_string(), signature_of(cursor, source)));
-        add_field(&mut tag, "typeref", return_typeref(node, source));
-        tag.end_line = end_line(node);
-        w.emit(tag);
+        let access = access_of(cursor, source);
+        let signature = signature_of(cursor, source);
+        let typeref = return_typeref(node, source);
+        emit_tag(w, name.clone(), line, letter, |fields| {
+            add_field(fields, "access", access);
+            fields.insert("signature", signature);
+            add_field(fields, "typeref", typeref);
+            add_end_line(fields, node);
+        });
     }
     w.scopes.push(ScopeKind::Function, &name);
     true
@@ -404,19 +386,13 @@ fn emit_named_method(
 ) -> bool {
     let node = cursor.node();
     if w.base.tag_config.is_kind_enabled("m") {
-        let mut tag = make_tag(
-            name.to_string(),
-            line_of(node),
-            "m",
-            w.scopes.current_field(),
-        );
-        add_field(&mut tag, "access", access_of(cursor, source));
-        if with_signature {
-            tag.extension_fields
-                .push(("signature".to_string(), signature_of(cursor, source)));
-        }
-        tag.end_line = end_line(node);
-        w.emit(tag);
+        let access = access_of(cursor, source);
+        let signature = with_signature.then(|| signature_of(cursor, source));
+        emit_tag(w, name.to_string(), line_of(node), "m", |fields| {
+            add_field(fields, "access", access);
+            add_field(fields, "signature", signature);
+            add_end_line(fields, node);
+        });
     }
     w.scopes.push(ScopeKind::Function, name);
     true
@@ -425,18 +401,15 @@ fn emit_named_method(
 fn emit_subscript(cursor: &mut TreeCursor, source: &[u8], w: &mut SwiftWalker) -> bool {
     let node = cursor.node();
     if w.base.tag_config.is_kind_enabled("m") {
-        let mut tag = make_tag(
-            "subscript".to_string(),
-            line_of(node),
-            "m",
-            w.scopes.current_field(),
-        );
-        add_field(&mut tag, "access", access_of(cursor, source));
-        tag.extension_fields
-            .push(("signature".to_string(), signature_of(cursor, source)));
-        add_field(&mut tag, "typeref", return_typeref(node, source));
-        tag.end_line = end_line(node);
-        w.emit(tag);
+        let access = access_of(cursor, source);
+        let signature = signature_of(cursor, source);
+        let typeref = return_typeref(node, source);
+        emit_tag(w, "subscript".to_string(), line_of(node), "m", |fields| {
+            add_field(fields, "access", access);
+            fields.insert("signature", signature);
+            add_field(fields, "typeref", typeref);
+            add_end_line(fields, node);
+        });
     }
     w.scopes.push(ScopeKind::Function, "subscript");
     true
@@ -460,10 +433,10 @@ fn emit_property(cursor: &mut TreeCursor, source: &[u8], w: &mut SwiftWalker) ->
                     first_name = Some(name.clone());
                 }
                 if w.base.tag_config.is_kind_enabled(letter) {
-                    let mut tag = make_tag(name, line, letter, w.scopes.current_field());
-                    add_field(&mut tag, "access", access.clone());
-                    add_field(&mut tag, "typeref", typeref.clone());
-                    w.emit(tag);
+                    emit_tag(w, name, line, letter, |fields| {
+                        add_field(fields, "access", access.clone());
+                        add_field(fields, "typeref", typeref.clone());
+                    });
                 }
             }
         }
@@ -494,10 +467,10 @@ fn emit_protocol_property(cursor: &mut TreeCursor, source: &[u8], w: &mut SwiftW
     });
 
     if let Some((name, line)) = name_line {
-        let mut tag = make_tag(name, line, "p", w.scopes.current_field());
-        add_field(&mut tag, "access", access);
-        add_field(&mut tag, "typeref", typeref);
-        w.emit(tag);
+        emit_tag(w, name, line, "p", |fields| {
+            add_field(fields, "access", access);
+            add_field(fields, "typeref", typeref);
+        });
     }
 }
 
@@ -508,13 +481,7 @@ fn emit_enum_entry(cursor: &mut TreeCursor, source: &[u8], w: &mut SwiftWalker) 
     for_each_child!(cursor, {
         if cursor.node().kind() == "simple_identifier" {
             let n = cursor.node();
-            let tag = make_tag(
-                node_text(n, source).to_string(),
-                line_of(n),
-                "e",
-                w.scopes.current_field(),
-            );
-            w.emit(tag);
+            emit_tag(w, node_text(n, source).to_string(), line_of(n), "e", |_| {});
         }
     });
 }
@@ -527,16 +494,14 @@ fn emit_typealias(cursor: &mut TreeCursor, source: &[u8], w: &mut SwiftWalker) {
     let Some((name, line)) = field_ident(cursor, source, "name") else {
         return;
     };
-    let mut tag = make_tag(name, line, "t", w.scopes.current_field());
-    add_field(&mut tag, "access", access_of(cursor, source));
-    if let Some(value) = node.child_by_field_name("value") {
-        add_field(
-            &mut tag,
-            "typeref",
-            Some(format!("typename:{}", node_text(value, source))),
-        );
-    }
-    w.emit(tag);
+    let access = access_of(cursor, source);
+    let typeref = node
+        .child_by_field_name("value")
+        .map(|value| format!("typename:{}", node_text(value, source)));
+    emit_tag(w, name, line, "t", |fields| {
+        add_field(fields, "access", access);
+        add_field(fields, "typeref", typeref);
+    });
 }
 
 fn emit_associatedtype(cursor: &mut TreeCursor, source: &[u8], w: &mut SwiftWalker) {
@@ -546,8 +511,7 @@ fn emit_associatedtype(cursor: &mut TreeCursor, source: &[u8], w: &mut SwiftWalk
     let Some((name, line)) = field_ident(cursor, source, "name") else {
         return;
     };
-    let tag = make_tag(name, line, "A", w.scopes.current_field());
-    w.emit(tag);
+    emit_tag(w, name, line, "A", |_| {});
 }
 
 fn emit_operator(cursor: &mut TreeCursor, source: &[u8], w: &mut SwiftWalker) {
@@ -555,8 +519,7 @@ fn emit_operator(cursor: &mut TreeCursor, source: &[u8], w: &mut SwiftWalker) {
         return;
     }
     if let Some((name, line)) = child_ident(cursor, source, &["custom_operator", "bang"]) {
-        let tag = make_tag(name, line, "o", w.scopes.current_field());
-        w.emit(tag);
+        emit_tag(w, name, line, "o", |_| {});
     }
 }
 
@@ -568,15 +531,12 @@ fn emit_parameter(cursor: &mut TreeCursor, source: &[u8], w: &mut SwiftWalker) {
     let Some((name, line)) = field_ident(cursor, source, "name") else {
         return;
     };
-    let mut tag = make_tag(name, line, "z", w.scopes.current_field());
-    if let Some(ty) = node.child_by_field_name("type") {
-        add_field(
-            &mut tag,
-            "typeref",
-            Some(format!("typename:{}", node_text(ty, source))),
-        );
-    }
-    w.emit(tag);
+    let typeref = node
+        .child_by_field_name("type")
+        .map(|ty| format!("typename:{}", node_text(ty, source)));
+    emit_tag(w, name, line, "z", |fields| {
+        add_field(fields, "typeref", typeref);
+    });
 }
 
 pub(crate) fn generate(
