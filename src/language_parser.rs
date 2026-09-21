@@ -901,6 +901,33 @@ mod tests {
         LanguageParserRegistry::new(&cfg)
     }
 
+    #[test]
+    fn java_kinds_are_available_with_expected_defaults() {
+        let reg = registry();
+        let kinds = reg
+            .for_language("java")
+            .expect("Java must be registered")
+            .kinds();
+        let actual: Vec<_> = kinds
+            .iter()
+            .map(|kind| (kind.letter.as_str(), kind.name.as_str(), kind.default))
+            .collect();
+        assert_eq!(
+            actual,
+            [
+                ("a", "annotation", true),
+                ("c", "class", true),
+                ("e", "enumConstant", true),
+                ("f", "field", true),
+                ("g", "enum", true),
+                ("i", "interface", true),
+                ("m", "method", true),
+                ("p", "package", true),
+                ("l", "local", false),
+            ]
+        );
+    }
+
     /// Language selected for a file name, taking the highest-priority candidate
     /// (mirrors the worker's Phase 0 resolution).
     fn lang_for(reg: &LanguageParserRegistry, file: &str) -> Option<String> {

@@ -56,18 +56,6 @@ pub fn load() -> Vec<BuiltinGrammar> {
             ),
         },
         BuiltinGrammar {
-            lang: "java",
-            aliases: &[],
-            extensions: &["java"],
-            patterns: &[],
-            interpreters: &[],
-            config: get_query_config(
-                tree_sitter_java::LANGUAGE.into(),
-                tree_sitter_java::TAGS_QUERY,
-                "java",
-            ),
-        },
-        BuiltinGrammar {
             lang: "ocaml",
             aliases: &[],
             extensions: &["ml"],

@@ -1,5 +1,5 @@
 use crate::parser::{
-    c_sharp, cpp, go, js, objective_c, python, rust, typescript, zig, TagKindConfig,
+    c_sharp, cpp, go, java, js, objective_c, python, rust, typescript, zig, TagKindConfig,
 };
 use crate::tag::Tag;
 use crate::wasm_grammars::GrammarSource;
@@ -41,6 +41,18 @@ pub(crate) struct BuiltinLangDesc {
 /// All builtin languages. Priority in tag generation follows array order.
 /// Adding a new builtin language requires exactly one new entry here.
 pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
+    BuiltinLangDesc {
+        lang: java::LANG_NAME,
+        aliases: &[],
+        extensions: java::LANG_EXTENSIONS,
+        patterns: &[],
+        interpreters: &[],
+        kind_defaults: java::KIND_DEFAULTS,
+        kind_optionals: java::KIND_OPTIONALS,
+        disambiguation: &[],
+        grammar: GrammarSource::Bundled(|| tree_sitter_java::LANGUAGE.into()),
+        generate_fn: java::generate,
+    },
     BuiltinLangDesc {
         lang: zig::LANG_NAME,
         aliases: &[],

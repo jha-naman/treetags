@@ -4,8 +4,7 @@ c++
 dart              [plugin]
 elixir
 go
-java              [plugin]
-java              [native, overridden]
+java
 javascript
 julia
 kotlin            [plugin]

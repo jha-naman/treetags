@@ -67,6 +67,16 @@ go
     n  method
     P  import
     a  alias
+java
+    a  annotation
+    c  class
+    e  enumConstant
+    f  field
+    g  enum
+    i  interface
+    m  method
+    p  package
+    l  local [off]
 javascript
     f  function
     c  classes
