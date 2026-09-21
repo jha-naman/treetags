@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WASM Grammar management commands
 Allow users to manage the downloading of WASM grammars not bundled with treetags
 - Add native Rust based Objective C parser that uses WASM tree-sitter grammar
+- Add native extension fields support for Java
 
 ### Changed
 - Tag Address is truncated to 96 chars for native parsers
@@ -21,6 +22,7 @@ Allow users to manage the downloading of WASM grammars not bundled with treetags
 - Ocaml grammar bundled with treetags.
 - Zig plugin removed from the source repository
 - Objective C plugin removed from the source repository
+- Java plugin removed from the source repository
 
 - [0.18.0]
 

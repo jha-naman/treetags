@@ -2,19 +2,19 @@
 
 ## Installing WASM plugins
 
-Build the plugin using the provided helper binary from the treetags root directory.
+Build a plugin using the provided helper binary from the treetags root directory.
 You need to fulfill the requirements for building treetags documented in
 [README.md](README.md#installation)
 
 ```
-cargo run --bin treetags-build-plugin -- plugins/java
+cargo run --bin treetags-build-plugin -- plugins/kotlin
 ```
 
 Copy the plugins to the default location treetags looks for plugins and then
 your plugin will be picked up by treetags on next runs.
 
 ```
-cp -r plugins/java/dist/java ~/.config/treetags/plugins/
+cp -r plugins/kotlin/dist/kotlin ~/.config/treetags/plugins/
 ```
 
 Use `--plugin-dir` or `--plugins-dir` if you want plugins to be located in
@@ -29,9 +29,8 @@ purpose.
 
 This is a WebAssembly component that satisfies the WIT interface defined
 [here](wit/treetags-plugin.wit). This being a WASM file can be written in any
-language that supports creating WebAssembly Components. The Java plugin
-implementation in `plugins/java` should be considered as a reference implementation
-of what treetags expects from a plugin.
+language that supports creating WebAssembly Components. The Kotlin plugin in
+`plugins/kotlin` is a reference implementation of the plugin interface.
 
 The `generate` function exposed by the component is passed the information it
 requires for generating tags for a single source code file. Refer to the `request`

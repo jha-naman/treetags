@@ -2193,16 +2193,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "treetags-plugin-java"
-version = "0.1.0"
-dependencies = [
- "tree-sitter",
- "tree-sitter-java",
- "treetags-plugin-common",
- "wit-bindgen 0.58.0",
-]
-
-[[package]]
 name = "treetags-plugin-kotlin"
 version = "0.1.0"
 dependencies = [

@@ -29,6 +29,7 @@ pub(crate) mod common;
 pub(crate) mod cpp;
 pub(crate) mod go;
 mod helper;
+pub(crate) mod java;
 pub(crate) mod js;
 pub(crate) mod objective_c;
 pub(crate) mod python;

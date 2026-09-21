@@ -536,28 +536,28 @@ extensions = ["b"]
     #[test]
     fn test_list_plugins() {
         let dir = tempdir().unwrap();
-        let plugin_java = dir.path().join("java");
-        fs::create_dir_all(&plugin_java).unwrap();
+        let plugin_sample = dir.path().join("sample");
+        fs::create_dir_all(&plugin_sample).unwrap();
 
         fs::write(
-            plugin_java.join("plugin.toml"),
+            plugin_sample.join("plugin.toml"),
             r#"
-name = "java-plugin"
+name = "sample-plugin"
 version = "0.1.0"
 abi_version = 3
 wasm_file = "plugin.wasm"
-language = "java"
-extensions = ["java", "class"]
+language = "sample"
+extensions = ["sample", "class"]
 "#,
         )
         .unwrap();
-        fs::write(plugin_java.join("plugin.wasm"), "").unwrap();
+        fs::write(plugin_sample.join("plugin.wasm"), "").unwrap();
 
         let registry = PluginRegistry::scan(&[], Some(&dir.path().to_path_buf()), &[]);
         let plugins = registry.list_plugins();
         assert_eq!(plugins.len(), 1);
-        assert_eq!(plugins[0].language, "java");
-        assert_eq!(plugins[0].extensions, vec!["class", "java"]);
+        assert_eq!(plugins[0].language, "sample");
+        assert_eq!(plugins[0].extensions, vec!["class", "sample"]);
     }
 
     #[test]

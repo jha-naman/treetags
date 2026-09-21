@@ -1,0 +1,11 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+Abstract	source.java	/^public abstract class Abstract {$/;"	kind:c	line:40
+Bar	source.java	/^public class Bar extends Foo {$/;"	kind:c	line:35
+Class	source.java	/^public class Class {$/;"	kind:c	line:4
+Foo	source.java	/^@interface Foo {$/;"	kind:a	line:48
+Foo	source.java	/^public class Foo implements FooInterface {$/;"	kind:c	line:30
+FooClass	source.java	/^		private static class FooClass {$/;"	kind:c	line:10
+FooInterface	source.java	/^interface FooInterface {$/;"	kind:i	line:25
+Record	source.java	/^public record Record(int foo, String bar) {}$/;"	kind:c	line:44
+SOME_CONSTANT	source.java	/^				final int SOME_CONSTANT = 1;$/;"	kind:l	line:7
+local	source.java	/^				boolean local = true;$/;"	kind:l	line:6

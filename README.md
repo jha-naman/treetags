@@ -24,6 +24,7 @@ Support for these languages is available out of the box in treetags
 - [x] C
 - [x] C++
 - [x] Go
+- [x] Java
 - [x] JavaScript
 - [x] Python
 - [x] Rust
@@ -37,7 +38,6 @@ for more about extension fields.
 - [x] C#
 - [x] Elixir
 - [x] ~Haskell~
-- [x] Java
 - [x] Julia
 - [x] Lua
 - [x] PHP

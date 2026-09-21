@@ -153,12 +153,12 @@ mod tests {
     fn manifest() -> PluginManifest {
         toml::from_str(
             r#"
-            name = "java"
+            name = "example"
             version = "0.2.0"
             abi_version = 3
-            extensions = ["java"]
-            language = "java"
-            aliases = ["jvm"]
+            extensions = ["example"]
+            language = "example"
+            aliases = ["ex"]
 
             [[kinds]]
             letter = "m"
@@ -194,19 +194,19 @@ mod tests {
             "deadbeef".to_string(),
             42,
         );
-        assert_eq!(entry.name, "java");
+        assert_eq!(entry.name, "example");
         assert_eq!(entry.version, "0.2.0");
-        assert_eq!(entry.language.as_deref(), Some("java"));
-        assert_eq!(entry.extensions, vec!["java"]);
-        assert_eq!(entry.aliases, vec!["jvm"]);
+        assert_eq!(entry.language.as_deref(), Some("example"));
+        assert_eq!(entry.extensions, vec!["example"]);
+        assert_eq!(entry.aliases, vec!["ex"]);
         // Trailing slash on the base is trimmed exactly once.
         assert_eq!(
             entry.wasm_url,
-            "https://example.com/releases/download/plugin-store-v3/java.wasm"
+            "https://example.com/releases/download/plugin-store-v3/example.wasm"
         );
         assert_eq!(
             entry.manifest_url,
-            "https://example.com/releases/download/plugin-store-v3/java.toml"
+            "https://example.com/releases/download/plugin-store-v3/example.toml"
         );
         assert_eq!(entry.wasm_sha256, "deadbeef");
         assert_eq!(entry.wasm_size, 42);
