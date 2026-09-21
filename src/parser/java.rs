@@ -1,6 +1,6 @@
 //! Java tag generation with the bundled tree-sitter-java grammar.
 use super::common::{
-    cursor::{line_of, node_text},
+    cursor::line_of,
     scope::{ScopeKey, ScopeStack},
     scope_walker::{walk_tree, WalkContext},
     tree_walker::{generate_tags_with_config, Context},
@@ -60,7 +60,7 @@ struct JavaWalker<'src> {
 
 impl WalkContext for JavaWalker<'_> {
     fn process_node(&mut self, cursor: &mut TreeCursor) -> bool {
-        process_node_inner(self.base.source_code.as_bytes(), cursor, self)
+        process_node_inner(cursor, self)
     }
 
     fn pop_scope(&mut self) {
@@ -132,8 +132,12 @@ fn emit_tag(
     });
 }
 
-fn name_of(node: Node, source: &[u8]) -> Option<String> {
-    Some(node_text(node.child_by_field_name("name")?, source).to_string())
+fn name_of(node: Node, context: &Context) -> Option<String> {
+    Some(
+        context
+            .node_text(&node.child_by_field_name("name")?)
+            .to_string(),
+    )
 }
 
 fn is_private(cursor: &mut TreeCursor) -> bool {
@@ -163,7 +167,7 @@ fn has_default(cursor: &mut TreeCursor) -> bool {
     found
 }
 
-fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, w: &mut JavaWalker) -> bool {
+fn process_node_inner(cursor: &mut TreeCursor, w: &mut JavaWalker) -> bool {
     let node = cursor.node();
     let line = line_of(node);
     match node.kind() {
@@ -172,7 +176,7 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, w: &mut JavaWalker
         | "interface_declaration"
         | "enum_declaration"
         | "annotation_type_declaration" => {
-            let Some(name) = name_of(node, source) else {
+            let Some(name) = name_of(node, &w.base) else {
                 return false;
             };
             let (kind, scope) = match node.kind() {
@@ -187,14 +191,8 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, w: &mut JavaWalker
         }
         "method_declaration" | "constructor_declaration" => {
             if let Some(name_node) = node.child_by_field_name("name") {
-                emit_tag(
-                    w,
-                    node_text(name_node, source).to_string(),
-                    line_of(name_node),
-                    "m",
-                    false,
-                    true,
-                );
+                let name = w.base.node_text(&name_node).to_string();
+                emit_tag(w, name, line_of(name_node), "m", false, true);
             }
             false
         }
@@ -203,7 +201,7 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, w: &mut JavaWalker
             let private = field && is_private(cursor);
             for_each_child!(cursor, {
                 if cursor.node().kind() == "variable_declarator" {
-                    if let Some(name) = name_of(cursor.node(), source) {
+                    if let Some(name) = name_of(cursor.node(), &w.base) {
                         emit_tag(w, name, line, if field { "f" } else { "l" }, private, field);
                     }
                 }
@@ -211,13 +209,13 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, w: &mut JavaWalker
             false
         }
         "enum_constant" => {
-            if let Some(name) = name_of(node, source) {
+            if let Some(name) = name_of(node, &w.base) {
                 emit_tag(w, name, line, "e", true, true);
             }
             false
         }
         "annotation_type_element_declaration" => {
-            if let Some(name) = name_of(node, source) {
+            if let Some(name) = name_of(node, &w.base) {
                 if has_default(cursor) {
                     emit_tag(w, name.clone(), line, "f", false, true);
                 }
@@ -228,14 +226,8 @@ fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, w: &mut JavaWalker
         "package_declaration" => {
             for_each_child!(cursor, {
                 if matches!(cursor.node().kind(), "identifier" | "scoped_identifier") {
-                    emit_tag(
-                        w,
-                        node_text(cursor.node(), source).to_string(),
-                        line,
-                        "p",
-                        false,
-                        false,
-                    );
+                    let name = w.base.node_text(&cursor.node()).to_string();
+                    emit_tag(w, name, line, "p", false, false);
                     break;
                 }
             });
