@@ -155,7 +155,7 @@ mod tests {
             r#"
             name = "example"
             version = "0.2.0"
-            abi_version = 3
+            abi_version = 4
             extensions = ["example"]
             language = "example"
             aliases = ["ex"]
@@ -220,7 +220,7 @@ mod tests {
     fn index_round_trips_through_json() {
         let m = manifest();
         let index = PluginIndex {
-            abi_version: 3,
+            abi_version: 4,
             generated_at: Some("2026-07-21T00:00:00Z".to_string()),
             plugins: vec![IndexEntry::from_manifest(&m, "https://x/y", "ab".into(), 1)],
         };

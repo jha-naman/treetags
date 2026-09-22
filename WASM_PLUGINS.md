@@ -7,14 +7,14 @@ You need to fulfill the requirements for building treetags documented in
 [README.md](README.md#installation)
 
 ```
-cargo run --bin treetags-build-plugin -- plugins/terraform
+cargo run --bin treetags-build-plugin -- path/to/your-plugin
 ```
 
 Copy the plugins to the default location treetags looks for plugins and then
 your plugin will be picked up by treetags on next runs.
 
 ```
-cp -r plugins/terraform/dist/terraform ~/.config/treetags/plugins/
+cp -r path/to/your-plugin/dist/your-plugin ~/.config/treetags/plugins/
 ```
 
 Use `--plugin-dir` or `--plugins-dir` if you want plugins to be located in
@@ -29,8 +29,8 @@ purpose.
 
 This is a WebAssembly component that satisfies the WIT interface defined
 [here](wit/treetags-plugin.wit). This being a WASM file can be written in any
-language that supports creating WebAssembly Components. The Terraform plugin in
-`plugins/terraform` is a reference implementation of the plugin interface.
+language that supports creating WebAssembly Components. The WIT file defines
+the request and tag records used by plugins.
 
 The `generate` function exposed by the component is passed the information it
 requires for generating tags for a single source code file. Refer to the `request`

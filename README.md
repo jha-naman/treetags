@@ -117,10 +117,7 @@ Use `--suggest-plugins` CLI arg to find plugin that may be of interest to you
 treetags --suggest-plugins
 Plugins available for file types in your tree:
 
-PLUGIN    HANDLES    TYPE            INSTALL WITH
-terraform *.tf       adds support    treetags plugin install terraform
-
-No plugin available for unsupported types: *.0, *.1, *.2, *.a, *.bin, *.cache, *.d, *.db, *.db-shm, *.db-wal, *.dylib, *.echo, *.gleam, *.history, *.idx, *.isle, *.json, *.ll, *.lock, *.md, *.o, *.pack, *.plist, *.qc, *.rev, *.rlib, *.rmeta, *.scm, *.timestamp, *.tmp, *.toml, *.txt, *.wasm, *.wit, *.yml
+No plugins available for unsupported file types in this tree.
 ```
 
 List of all plugin management commands

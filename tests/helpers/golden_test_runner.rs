@@ -125,7 +125,7 @@ fn execute_command(working_dir: &Path, args: &[String]) -> Result<std::process::
     if working_dir.components().any(|c| {
         matches!(
             c.as_os_str().to_str(),
-            Some("zig" | "dart" | "swift" | "ocaml" | "objective_c" | "kotlin")
+            Some("zig" | "dart" | "swift" | "ocaml" | "objective_c" | "kotlin" | "terraform")
         )
     }) {
         for (lang, abi) in [
@@ -135,6 +135,7 @@ fn execute_command(working_dir: &Path, args: &[String]) -> Result<std::process::
             ("objc", 14),
             ("ocaml", 14),
             ("kotlin", 14),
+            ("terraform", 15),
         ] {
             let name = format!("tree-sitter-{lang}.wasm");
             let directory = abi.to_string();

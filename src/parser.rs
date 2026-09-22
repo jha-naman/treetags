@@ -37,6 +37,7 @@ pub(crate) mod objective_c;
 pub(crate) mod python;
 pub(crate) mod rust;
 pub(crate) mod swift;
+pub(crate) mod terraform;
 pub(crate) mod typescript;
 pub(crate) mod zig;
 
