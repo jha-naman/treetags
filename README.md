@@ -47,8 +47,9 @@ for more about extension fields.
 ## External WASM grammars
 
 Treetags does not include the tree-sitter grammars for all languages it supports
-due to binary size constraints. Currently these languages are **Zig** and
-**Objective C** (both with extension fields), and **OCaml** (`.ml` files).
+due to binary size constraints. **Dart**, **Zig**, **Swift**, **Kotlin**, and
+**Objective C** use downloaded grammars with extension fields; **OCaml** also
+uses a downloaded grammar.
 
 Find missing grammars for your project:
 
@@ -65,7 +66,7 @@ treetags grammar installed           # Check locally installed files (offline)
 treetags grammar uninstall zig       # Remove this release's Zig grammar file
 ```
 
-Files are installed under `${XDG_CONFIG_HOME:-$HOME/.config}/treetags/wasm_grammars/14/`.
+Files are installed under `${XDG_CONFIG_HOME:-$HOME/.config}/treetags/wasm_grammars/<ABI>/`.
 The directory number is the **grammar ABI**. Checksums and licenses are recorded
 in [the grammar fixtures](tests/grammars/wasm/README.md)
 
@@ -102,12 +103,9 @@ Treetags functionality can be extended via WASM plugins. WASM plugins are
 functionally equivalent to native tag generators, except they are not installed
 by default and they can be updated independently of treetags releases.
 
-Treetags has support for these languages via user installable WASM plugins.
+Treetags has a user installable WASM plugin for Terraform.
 
 ### Full support with extension fields
-- [x] Java
-- [x] Kotlin
-- [x] Swift
 - [x] Terraform
 
 
@@ -120,7 +118,7 @@ treetags --suggest-plugins
 Plugins available for file types in your tree:
 
 PLUGIN    HANDLES    TYPE            INSTALL WITH
-dart      *.dart     adds support    treetags plugin install dart
+terraform *.tf       adds support    treetags plugin install terraform
 
 No plugin available for unsupported types: *.0, *.1, *.2, *.a, *.bin, *.cache, *.d, *.db, *.db-shm, *.db-wal, *.dylib, *.echo, *.gleam, *.history, *.idx, *.isle, *.json, *.ll, *.lock, *.md, *.o, *.pack, *.plist, *.qc, *.rev, *.rlib, *.rmeta, *.scm, *.timestamp, *.tmp, *.toml, *.txt, *.wasm, *.wit, *.yml
 ```

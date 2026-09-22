@@ -1,5 +1,13 @@
 [
   {
+    "language": "dart",
+    "grammar_version": "0.2.1",
+    "abi": 15,
+    "file": "15/tree-sitter-dart.wasm",
+    "url": "https://github.com/jha-naman/tree-sitter-dart/releases/download/v0.2.1/tree-sitter-dart.wasm",
+    "sha256": "e700b38561a3f1e641340fac8232dfca493dbc024d142d338a5075feca3e9efc"
+  },
+  {
     "language": "zig",
     "grammar_version": "1.1.2",
     "abi": 14,

@@ -27,6 +27,7 @@ use tree_sitter_tags::TagsContext;
 pub(crate) mod c_sharp;
 pub(crate) mod common;
 pub(crate) mod cpp;
+pub(crate) mod dart;
 pub(crate) mod go;
 mod helper;
 pub(crate) mod java;
@@ -336,6 +337,7 @@ mod wasm_tests {
         for _ in 0..2 {
             for (extension, source, expected_name) in [
                 ("zig", "pub fn zig_one() void {}", None),
+                ("dart", "void dartOne() {}", None),
                 ("swift", "struct SwiftOne {}", None),
                 ("ml", "let ocaml_one x = x + 1", None),
                 ("rs", "pub fn rust_one() {}", Some("rust_one")),
@@ -364,11 +366,13 @@ mod wasm_tests {
         let files = tempfile::tempdir().unwrap();
         for (extension, source, name) in [
             ("zig", "pub fn zig_one() void {}", "zig_one"),
+            ("dart", "void dartOne() {}", "dartOne"),
             ("swift", "struct SwiftOne {}", "SwiftOne"),
             ("rs", "pub fn rust_one() {}", "rust_one"),
             ("ml", "let ocaml_one x = x + 1", "ocaml_one"),
             ("rb", "def ruby_one\nend", "ruby_one"),
             ("zig", "pub fn zig_two() void {}", "zig_two"),
+            ("dart", "void dartTwo() {}", "dartTwo"),
             ("swift", "struct SwiftTwo {}", "SwiftTwo"),
             ("ml", "let ocaml_two x = x * 2", "ocaml_two"),
         ] {

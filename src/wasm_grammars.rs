@@ -50,6 +50,14 @@ pub(crate) static ZIG: WasmGrammar = WasmGrammar {
     abi: 14,
     query: None,
 };
+pub(crate) static DART: WasmGrammar = WasmGrammar {
+    name: "dart",
+    version: "0.2.1",
+    url: "https://github.com/jha-naman/tree-sitter-dart/releases/download/v0.2.1/tree-sitter-dart.wasm",
+    sha256: "e700b38561a3f1e641340fac8232dfca493dbc024d142d338a5075feca3e9efc",
+    abi: 15,
+    query: None,
+};
 pub(crate) static SWIFT: WasmGrammar = WasmGrammar {
     name: "swift",
     version: "0.7.3",
@@ -83,7 +91,7 @@ pub(crate) static OCAML: WasmGrammar = WasmGrammar {
     abi: 14,
     query: Some(include_str!("../queries/ocaml.scm")),
 };
-pub(crate) const GRAMMARS: &[&WasmGrammar] = &[&ZIG, &SWIFT, &KOTLIN, &OBJECTIVE_C, &OCAML];
+pub(crate) const GRAMMARS: &[&WasmGrammar] = &[&ZIG, &DART, &SWIFT, &KOTLIN, &OBJECTIVE_C, &OCAML];
 
 impl WasmGrammar {
     pub fn path(&self, root: &Path) -> PathBuf {

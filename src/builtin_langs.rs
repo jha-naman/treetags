@@ -1,5 +1,5 @@
 use crate::parser::{
-    c_sharp, cpp, go, java, js, kotlin, objective_c, python, rust, swift, typescript, zig,
+    c_sharp, cpp, dart, go, java, js, kotlin, objective_c, python, rust, swift, typescript, zig,
     TagKindConfig,
 };
 use crate::tag::Tag;
@@ -42,6 +42,18 @@ pub(crate) struct BuiltinLangDesc {
 /// All builtin languages. Priority in tag generation follows array order.
 /// Adding a new builtin language requires exactly one new entry here.
 pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
+    BuiltinLangDesc {
+        lang: dart::LANG_NAME,
+        aliases: &[],
+        extensions: dart::LANG_EXTENSIONS,
+        patterns: &[],
+        interpreters: &[],
+        kind_defaults: dart::KIND_DEFAULTS,
+        kind_optionals: dart::KIND_OPTIONALS,
+        disambiguation: &[],
+        grammar: GrammarSource::Wasm(&crate::wasm_grammars::DART),
+        generate_fn: dart::generate,
+    },
     BuiltinLangDesc {
         lang: java::LANG_NAME,
         aliases: &[],

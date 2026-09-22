@@ -125,11 +125,12 @@ fn execute_command(working_dir: &Path, args: &[String]) -> Result<std::process::
     if working_dir.components().any(|c| {
         matches!(
             c.as_os_str().to_str(),
-            Some("zig" | "swift" | "ocaml" | "objective_c" | "kotlin")
+            Some("zig" | "dart" | "swift" | "ocaml" | "objective_c" | "kotlin")
         )
     }) {
         for (lang, abi) in [
             ("zig", 14),
+            ("dart", 15),
             ("swift", 15),
             ("objc", 14),
             ("ocaml", 14),
