@@ -1,0 +1,2 @@
+--sort yes -f '-' --extras='+r' --fields='+l,+r'
+source.tf source.tfvars

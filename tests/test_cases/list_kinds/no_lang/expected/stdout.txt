@@ -179,6 +179,14 @@ swift
     o  operator
     l  local [off]
     z  parameter [off]
+terraform
+    d  data
+    l  local
+    m  module
+    o  output
+    p  provider
+    r  resource
+    v  variable
 typescript
     f  function
     c  class

@@ -1,6 +1,6 @@
 use crate::parser::{
-    c_sharp, cpp, dart, go, java, js, kotlin, objective_c, python, rust, swift, typescript, zig,
-    TagKindConfig,
+    c_sharp, cpp, dart, go, java, js, kotlin, objective_c, python, rust, swift, terraform,
+    typescript, zig, TagKindConfig,
 };
 use crate::tag::Tag;
 use crate::wasm_grammars::GrammarSource;
@@ -101,6 +101,18 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         disambiguation: &[],
         grammar: GrammarSource::Wasm(&crate::wasm_grammars::KOTLIN),
         generate_fn: kotlin::generate,
+    },
+    BuiltinLangDesc {
+        lang: terraform::LANG_NAME,
+        aliases: &[],
+        extensions: terraform::LANG_EXTENSIONS,
+        patterns: &[],
+        interpreters: &[],
+        kind_defaults: terraform::KIND_DEFAULTS,
+        kind_optionals: terraform::KIND_OPTIONALS,
+        disambiguation: &[],
+        grammar: GrammarSource::Wasm(&crate::wasm_grammars::TERRAFORM),
+        generate_fn: terraform::generate,
     },
     BuiltinLangDesc {
         lang: c_sharp::LANG_NAME,

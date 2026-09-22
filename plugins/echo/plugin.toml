@@ -1,6 +1,6 @@
 name = "echo"
 version = "0.2.0"
-abi_version = 3
+abi_version = 4
 extensions = ["echo"]
 # Dev/test-only fixture — hidden from `--list-plugins` and excluded from the
 # published index so end users never see or install it. See src/lib.rs.

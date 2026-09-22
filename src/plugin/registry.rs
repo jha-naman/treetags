@@ -506,7 +506,7 @@ mod tests {
             r#"
 name = "plugin-a"
 version = "0.1.0"
-abi_version = 3
+abi_version = 4
 wasm_file = "plugin.wasm"
 extensions = ["a"]
 "#,
@@ -519,7 +519,7 @@ extensions = ["a"]
             r#"
 name = "plugin-b"
 version = "0.1.0"
-abi_version = 3
+abi_version = 4
 wasm_file = "plugin.wasm"
 extensions = ["b"]
 "#,
@@ -544,7 +544,7 @@ extensions = ["b"]
             r#"
 name = "sample-plugin"
 version = "0.1.0"
-abi_version = 3
+abi_version = 4
 wasm_file = "plugin.wasm"
 language = "sample"
 extensions = ["sample", "class"]
@@ -570,7 +570,7 @@ extensions = ["sample", "class"]
             r#"
 name = "mylang-plugin"
 version = "0.1.0"
-abi_version = 3
+abi_version = 4
 wasm_file = "plugin.wasm"
 language = "mylang"
 aliases = ["ml2", "mylanguage"]
@@ -599,7 +599,7 @@ extensions = ["ml2"]
             r#"
 name = "mylang-plugin"
 version = "0.1.0"
-abi_version = 3
+abi_version = 4
 wasm_file = "plugin.wasm"
 language = "mylang"
 extensions = ["ml2"]
@@ -630,7 +630,7 @@ interpreters = ["mylang", "ml2run"]
             r#"
 name = "noalias"
 version = "0.1.0"
-abi_version = 3
+abi_version = 4
 wasm_file = "plugin.wasm"
 extensions = ["xyz"]
 "#,
@@ -655,7 +655,7 @@ extensions = ["xyz"]
             r#"
 name = "my-plugin"
 version = "0.1.0"
-abi_version = 3
+abi_version = 4
 wasm_file = "plugin.wasm"
 extensions = ["xyz"]
 "#,

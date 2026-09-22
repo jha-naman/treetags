@@ -35,6 +35,8 @@ pub(crate) enum GrammarSource {
 
 pub struct WasmGrammar {
     pub name: &'static str,
+    /// Tree-sitter export name when it differs from the user-facing grammar name.
+    pub export_name: Option<&'static str>,
     pub version: &'static str,
     pub url: &'static str,
     pub sha256: &'static str,
@@ -44,6 +46,7 @@ pub struct WasmGrammar {
 
 pub(crate) static ZIG: WasmGrammar = WasmGrammar {
     name: "zig",
+    export_name: None,
     version: "1.1.2",
     url: "https://github.com/tree-sitter-grammars/tree-sitter-zig/releases/download/v1.1.2/tree-sitter-zig.wasm",
     sha256: "54b3b83dd9c62da5815f06132bc3fc914d9dcc780370b32416446a0b7969e8c6",
@@ -52,6 +55,7 @@ pub(crate) static ZIG: WasmGrammar = WasmGrammar {
 };
 pub(crate) static DART: WasmGrammar = WasmGrammar {
     name: "dart",
+    export_name: None,
     version: "0.2.1",
     url: "https://github.com/jha-naman/tree-sitter-dart/releases/download/v0.2.1/tree-sitter-dart.wasm",
     sha256: "e700b38561a3f1e641340fac8232dfca493dbc024d142d338a5075feca3e9efc",
@@ -60,6 +64,7 @@ pub(crate) static DART: WasmGrammar = WasmGrammar {
 };
 pub(crate) static SWIFT: WasmGrammar = WasmGrammar {
     name: "swift",
+    export_name: None,
     version: "0.7.3",
     url: "https://github.com/alex-pinkus/tree-sitter-swift/releases/download/0.7.3/tree-sitter-swift.wasm",
     sha256: "0258a7ef17303a8079ffe0748b3583d59656b5c3e8653fca7b6451b3e6689eb2",
@@ -68,6 +73,7 @@ pub(crate) static SWIFT: WasmGrammar = WasmGrammar {
 };
 pub(crate) static KOTLIN: WasmGrammar = WasmGrammar {
     name: "kotlin",
+    export_name: None,
     version: "0.3.8",
     url:
         "https://github.com/fwcd/tree-sitter-kotlin/releases/download/0.3.8/tree-sitter-kotlin.wasm",
@@ -77,21 +83,40 @@ pub(crate) static KOTLIN: WasmGrammar = WasmGrammar {
 };
 pub(crate) static OBJECTIVE_C: WasmGrammar = WasmGrammar {
     name: "objc",
+    export_name: None,
     version: "3.0.2",
     url: "https://github.com/tree-sitter-grammars/tree-sitter-objc/releases/download/v3.0.2/tree-sitter-objc.wasm",
     sha256: "155bf61fc94941fa9d07c86cd46895f14dfb2549fb7f646faeb83765af05c970",
     abi: 14,
     query: None,
 };
+pub(crate) static TERRAFORM: WasmGrammar = WasmGrammar {
+    name: "terraform",
+    export_name: Some("hcl"),
+    version: "1.2.0",
+    url: "https://github.com/tree-sitter-grammars/tree-sitter-hcl/releases/download/v1.2.0/tree-sitter-hcl.wasm",
+    sha256: "2f9acf63e7c263215f283e2cf0f4ebbb9bfa77f58e18fa42b91094be201372a7",
+    abi: 15,
+    query: None,
+};
 pub(crate) static OCAML: WasmGrammar = WasmGrammar {
     name: "ocaml",
+    export_name: None,
     version: "0.24.0",
     url: "https://github.com/tree-sitter/tree-sitter-ocaml/releases/download/v0.24.0/tree-sitter-ocaml.wasm",
     sha256: "a7fb5e4bff6854b9f68123cd79bb170788314e8d4e5adc8f4af835039e4ef571",
     abi: 14,
     query: Some(include_str!("../queries/ocaml.scm")),
 };
-pub(crate) const GRAMMARS: &[&WasmGrammar] = &[&ZIG, &DART, &SWIFT, &KOTLIN, &OBJECTIVE_C, &OCAML];
+pub(crate) const GRAMMARS: &[&WasmGrammar] = &[
+    &ZIG,
+    &DART,
+    &SWIFT,
+    &KOTLIN,
+    &OBJECTIVE_C,
+    &TERRAFORM,
+    &OCAML,
+];
 
 impl WasmGrammar {
     pub fn path(&self, root: &Path) -> PathBuf {
@@ -138,7 +163,7 @@ impl WasmGrammars {
     pub(crate) fn validate(grammar: &WasmGrammar, bytes: &[u8]) -> Result<LoadedGrammar, String> {
         let mut store = WasmStore::new(engine()).map_err(|e| e.to_string())?;
         let language = store
-            .load_language(grammar.name, bytes)
+            .load_language(grammar.export_name.unwrap_or(grammar.name), bytes)
             .map_err(|e| e.to_string())?;
         let abi = language.abi_version();
         if abi != grammar.abi
