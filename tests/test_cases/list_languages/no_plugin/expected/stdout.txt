@@ -1,6 +1,7 @@
 c
 c#
 c++
+dart              [wasm grammar]
 elixir
 go
 java

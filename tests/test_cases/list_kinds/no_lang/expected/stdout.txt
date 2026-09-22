@@ -54,6 +54,20 @@ c++
     U  using [off]
     Z  tparam [off]
     M  module [off]
+dart
+    c  class
+    M  mixin
+    g  enum
+    e  enumerator
+    x  extension
+    t  typedef
+    f  function
+    m  method
+    p  property
+    F  field
+    v  variable
+    l  local [off]
+    z  parameter [off]
 go
     p  package
     f  function

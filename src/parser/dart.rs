@@ -1,31 +1,19 @@
-wit_bindgen::generate!({
-    world: "plugin-world",
-    path: "../../wit",
-});
-
-use exports::treetags::plugin::plugin::{Guest, Request, Tag};
-use tree_sitter::{Node, Parser as TsParser, TreeCursor};
-use treetags_plugin_common::{
-    for_each_child, line_of, node_text, walk_tree, ScopeKey, ScopeStack, TagKindConfig, WalkContext,
+//! Dart tags from the downloaded tree-sitter WASM grammar.
+use super::common::{
+    cursor::{line_of, node_text},
+    scope::{ScopeKey, ScopeStack},
+    scope_walker::{walk_tree, WalkContext},
+    tree_walker::{generate_tags_with_config, Context},
 };
+use super::TagKindConfig;
+use crate::for_each_child;
+use crate::tag::{ExtensionFields, Tag};
+use tree_sitter::{Node, Parser as TsParser, TreeCursor};
 
-struct DartPlugin;
+pub(crate) const LANG_NAME: &str = "dart";
+pub(crate) const LANG_EXTENSIONS: &[&str] = &["dart"];
 
-impl Guest for DartPlugin {
-    fn generate(req: Request, source: Vec<u8>) -> Result<Vec<Tag>, String> {
-        let mut parser = TsParser::new();
-        let language: tree_sitter::Language = tree_sitter_dart::LANGUAGE.into();
-        parser
-            .set_language(&language)
-            .map_err(|e| format!("set_language: {e}"))?;
-        generate_tags(&mut parser, &req, &source)
-    }
-}
-
-export!(DartPlugin);
-
-// These tables must stay in sync with plugin.toml.
-const DART_DEFAULT_KINDS: &[(&[&str], &str)] = &[
+pub(crate) const KIND_DEFAULTS: &[(&[&str], &str)] = &[
     (&["c", "class"], "c"),
     (&["M", "mixin"], "M"),
     (&["g", "enum"], "g"),
@@ -39,8 +27,23 @@ const DART_DEFAULT_KINDS: &[(&[&str], &str)] = &[
     (&["v", "variable"], "v"),
 ];
 
-const DART_OPTIONAL_KINDS: &[(&[&str], &str)] =
+pub(crate) const KIND_OPTIONALS: &[(&[&str], &str)] =
     &[(&["l", "local"], "l"), (&["z", "parameter"], "z")];
+
+const FIELD_ORDER: &[&str] = &[
+    "kind",
+    "line",
+    "end",
+    "access",
+    "class",
+    "enum",
+    "extension",
+    "function",
+    "inherits",
+    "mixin",
+    "signature",
+    "typeref",
+];
 
 #[derive(Clone, Copy, PartialEq)]
 enum ScopeKind {
@@ -85,15 +88,13 @@ fn classify_sig(kind: &str) -> Option<SigClass> {
 }
 
 struct DartWalker<'src> {
-    source: &'src [u8],
+    base: Context<'src>,
     scopes: ScopeStack<ScopeKind>,
-    kinds: TagKindConfig,
-    tags: Vec<Tag>,
 }
 
 impl WalkContext for DartWalker<'_> {
     fn process_node(&mut self, cursor: &mut TreeCursor) -> bool {
-        process_node_inner(self.source, cursor, self)
+        process_node_inner(self.base.source_code.as_bytes(), cursor, self)
     }
 
     fn pop_scope(&mut self) {
@@ -101,48 +102,111 @@ impl WalkContext for DartWalker<'_> {
     }
 }
 
-fn make_tag(name: String, line: u32, kind: &str, scope: Option<(&str, &str)>) -> Tag {
-    let mut ext = Vec::new();
-    if let Some((key, value)) = scope {
-        ext.push((key.to_string(), value.to_string()));
-    }
-    Tag {
-        name,
-        line,
-        kind: kind.to_string(),
-        end_line: None,
-        extension_fields: ext,
-    }
-}
-
-fn add_field(tag: &mut Tag, key: &str, value: Option<String>) {
+fn add_field(fields: &mut ExtensionFields, key: &'static str, value: Option<String>) {
     if let Some(value) = value {
-        tag.extension_fields.push((key.to_string(), value));
+        fields.insert(key, value);
     }
 }
 
-fn end_line(node: Node) -> Option<u32> {
-    Some(node.end_position().row as u32 + 1)
+fn emit_tag(
+    w: &mut DartWalker,
+    name: String,
+    line: u32,
+    kind: &'static str,
+    extra_fields: impl FnOnce(&mut ExtensionFields),
+) {
+    if name.is_empty() || name == "_" || !w.base.tag_config.is_kind_enabled(kind) {
+        return;
+    }
+    let mut fields = ExtensionFields::new();
+    fields.insert("kind", kind);
+    fields.insert("line", line.to_string());
+    if let Some((key, value)) = w.scopes.current_field() {
+        fields.insert(key, value.to_string());
+    }
+    extra_fields(&mut fields);
+    let mut raw: Vec<_> = fields.into_iter().collect();
+    let mut enabled_fields = ExtensionFields::new();
+    for &key in FIELD_ORDER {
+        let Some(pos) = raw.iter().position(|(field, _)| field.as_ref() == key) else {
+            continue;
+        };
+        let enabled = match key {
+            "kind" | "line" | "end" | "access" | "signature" | "typeref" => {
+                w.base.user_config.fields_config.is_field_enabled(key)
+            }
+            "class" | "enum" | "extension" | "function" | "mixin" => {
+                w.base.user_config.fields_config.is_field_enabled("scope")
+                    || w.base.user_config.extras_config.qualified
+            }
+            _ => true,
+        };
+        let (key, value) = raw.swap_remove(pos);
+        if enabled {
+            enabled_fields.insert(key, value);
+        }
+    }
+    debug_assert!(
+        raw.is_empty(),
+        "dart emit_tag: fields missing from FIELD_ORDER: {raw:?}"
+    );
+    w.base.tags.push(Tag {
+        name,
+        file_name: w.base.file_name.clone(),
+        address: Tag::address_from_line(
+            w.base
+                .lines
+                .get(line.saturating_sub(1) as usize)
+                .copied()
+                .unwrap_or(b""),
+        ),
+        kind: Some(kind.into()),
+        extension_fields: (!enabled_fields.is_empty()).then_some(enabled_fields),
+    });
+}
+
+fn add_end_line(fields: &mut ExtensionFields, node: Node) {
+    fields.insert("end", (node.end_position().row + 1).to_string());
 }
 
 fn access_of_name(name: &str) -> Option<String> {
     name.starts_with('_').then(|| "private".to_string())
 }
 
-fn type_base_name(node: Node, source: &[u8]) -> Option<String> {
-    let first = node.named_child(0)?;
-    (first.kind() == "type_identifier").then(|| node_text(first, source).to_string())
+fn type_base_name(cursor: &mut TreeCursor, source: &[u8]) -> Option<String> {
+    let mut result = None;
+    for_each_child!(cursor, {
+        let node = cursor.node();
+        if node.is_named() {
+            if node.kind() == "type_identifier" {
+                result = Some(node_text(node, source).to_string());
+            }
+            break;
+        }
+    });
+    result
 }
 
-fn named_child_of_kind<'a>(node: Node<'a>, kind: &str) -> Option<Node<'a>> {
-    let mut i = 0;
-    while let Some(child) = node.named_child(i) {
-        if child.kind() == kind {
-            return Some(child);
+fn named_child_of_kind<'a>(cursor: &mut TreeCursor<'a>, kind: &str) -> Option<Node<'a>> {
+    let mut result = None;
+    for_each_child!(cursor, {
+        if cursor.node().kind() == kind {
+            result = Some(cursor.node());
+            break;
         }
-        i += 1;
-    }
-    None
+    });
+    result
+}
+
+fn field_child<'a>(cursor: &mut TreeCursor<'a>, field: &str) -> Option<Node<'a>> {
+    let mut result = None;
+    for_each_child!(cursor, {
+        if cursor.field_name() == Some(field) {
+            result = Some(cursor.node());
+            break;
+        }
+    });
+    result
 }
 
 fn process_node_inner(source: &[u8], cursor: &mut TreeCursor, w: &mut DartWalker) -> bool {
@@ -193,19 +257,18 @@ fn emit_type(
     cursor: &mut TreeCursor,
     source: &[u8],
     w: &mut DartWalker,
-    letter: &str,
+    letter: &'static str,
     scope_kind: ScopeKind,
 ) -> bool {
     let node = cursor.node();
     let (name, line) = type_name_line(cursor, source);
 
-    if w.kinds.is_enabled(letter) {
-        let mut tag = make_tag(name.clone(), line, letter, w.scopes.current_field());
-        add_field(&mut tag, "access", access_of_name(&name));
-        add_field(&mut tag, "inherits", inherits_of(cursor, source));
-        tag.end_line = end_line(node);
-        w.tags.push(tag);
-    }
+    let inherits = inherits_of(cursor, source);
+    emit_tag(w, name.clone(), line, letter, |fields| {
+        add_field(fields, "access", access_of_name(&name));
+        add_field(fields, "inherits", inherits);
+        add_end_line(fields, node);
+    });
     w.scopes.push(scope_kind, &name);
     true
 }
@@ -215,7 +278,7 @@ fn emit_type(
 /// `mixin_application_class` rather than the `name` field.
 fn type_name_line(cursor: &mut TreeCursor, source: &[u8]) -> (String, u32) {
     let node = cursor.node();
-    if let Some(nm) = node.child_by_field_name("name") {
+    if let Some(nm) = field_child(cursor, "name") {
         return (node_text(nm, source).to_string(), line_of(nm));
     }
     let mut result = None;
@@ -240,7 +303,7 @@ fn inherits_of(cursor: &mut TreeCursor, source: &[u8]) -> Option<String> {
         match cursor.node().kind() {
             // `type` direct child = a mixin's `on` constraint.
             "type" => {
-                if let Some(n) = type_base_name(cursor.node(), source) {
+                if let Some(n) = type_base_name(cursor, source) {
                     names.push(n);
                 }
             }
@@ -248,7 +311,7 @@ fn inherits_of(cursor: &mut TreeCursor, source: &[u8]) -> Option<String> {
                 for_each_child!(cursor, {
                     match cursor.node().kind() {
                         "type" => {
-                            if let Some(n) = type_base_name(cursor.node(), source) {
+                            if let Some(n) = type_base_name(cursor, source) {
                                 names.push(n);
                             }
                         }
@@ -264,7 +327,7 @@ fn inherits_of(cursor: &mut TreeCursor, source: &[u8]) -> Option<String> {
                         for_each_child!(cursor, {
                             match cursor.node().kind() {
                                 "type" => {
-                                    if let Some(n) = type_base_name(cursor.node(), source) {
+                                    if let Some(n) = type_base_name(cursor, source) {
                                         names.push(n);
                                     }
                                 }
@@ -284,7 +347,7 @@ fn inherits_of(cursor: &mut TreeCursor, source: &[u8]) -> Option<String> {
 fn collect_types(cursor: &mut TreeCursor, source: &[u8], names: &mut Vec<String>) {
     for_each_child!(cursor, {
         if cursor.node().kind() == "type" {
-            if let Some(n) = type_base_name(cursor.node(), source) {
+            if let Some(n) = type_base_name(cursor, source) {
                 names.push(n);
             }
         }
@@ -293,10 +356,14 @@ fn collect_types(cursor: &mut TreeCursor, source: &[u8], names: &mut Vec<String>
 
 fn emit_extension(cursor: &mut TreeCursor, source: &[u8], w: &mut DartWalker) -> bool {
     let node = cursor.node();
-    let on_type = node
-        .child_by_field_name("class")
-        .and_then(|t| type_base_name(t, source));
-    let (name, line) = match node.child_by_field_name("name") {
+    let mut on_type = None;
+    for_each_child!(cursor, {
+        if cursor.field_name() == Some("class") {
+            on_type = type_base_name(cursor, source);
+            break;
+        }
+    });
+    let (name, line) = match field_child(cursor, "name") {
         Some(nm) => (node_text(nm, source).to_string(), line_of(nm)),
         None => (
             on_type.clone().unwrap_or_else(|| "extension".to_string()),
@@ -304,87 +371,69 @@ fn emit_extension(cursor: &mut TreeCursor, source: &[u8], w: &mut DartWalker) ->
         ),
     };
 
-    if w.kinds.is_enabled("x") {
-        let mut tag = make_tag(name.clone(), line, "x", w.scopes.current_field());
-        add_field(&mut tag, "access", access_of_name(&name));
-        add_field(
-            &mut tag,
-            "typeref",
-            on_type.map(|t| format!("typename:{t}")),
-        );
-        tag.end_line = end_line(node);
-        w.tags.push(tag);
-    }
+    emit_tag(w, name.clone(), line, "x", |fields| {
+        add_field(fields, "access", access_of_name(&name));
+        add_field(fields, "typeref", on_type.map(|t| format!("typename:{t}")));
+        add_end_line(fields, node);
+    });
     w.scopes.push(ScopeKind::Extension, &name);
     true
 }
 
 fn emit_extension_type(cursor: &mut TreeCursor, source: &[u8], w: &mut DartWalker) -> bool {
     let node = cursor.node();
-    let name_node = node
-        .child_by_field_name("name")
-        .and_then(|n| named_child_of_kind(n, "identifier"));
+    let mut name_node = None;
+    let mut repr_type = None;
+    for_each_child!(cursor, {
+        match cursor.field_name() {
+            Some("name") => name_node = named_child_of_kind(cursor, "identifier"),
+            Some("representation") => {
+                repr_type = field_child(cursor, "type")
+                    .map(|t| format!("typename:{}", node_text(t, source)));
+            }
+            _ => {}
+        }
+    });
     let (name, line) = match name_node {
         Some(id) => (node_text(id, source).to_string(), line_of(id)),
         None => (String::new(), line_of(node)),
     };
-    let repr_type = node
-        .child_by_field_name("representation")
-        .and_then(|r| r.child_by_field_name("type"))
-        .map(|t| format!("typename:{}", node_text(t, source)));
-
-    if w.kinds.is_enabled("x") {
-        let mut tag = make_tag(name.clone(), line, "x", w.scopes.current_field());
-        add_field(&mut tag, "access", access_of_name(&name));
-        add_field(&mut tag, "typeref", repr_type);
-        add_field(&mut tag, "inherits", inherits_of(cursor, source));
-        tag.end_line = end_line(node);
-        w.tags.push(tag);
-    }
+    let inherits = inherits_of(cursor, source);
+    emit_tag(w, name.clone(), line, "x", |fields| {
+        add_field(fields, "access", access_of_name(&name));
+        add_field(fields, "typeref", repr_type);
+        add_field(fields, "inherits", inherits);
+        add_end_line(fields, node);
+    });
     w.scopes.push(ScopeKind::Extension, &name);
     true
 }
 
 fn emit_representation(cursor: &mut TreeCursor, source: &[u8], w: &mut DartWalker) {
-    if !w.kinds.is_enabled("F") {
-        return;
-    }
-    let node = cursor.node();
-    let Some(nm) = node.child_by_field_name("name") else {
+    let Some(nm) = field_child(cursor, "name") else {
         return;
     };
     let name = node_text(nm, source).to_string();
-    let mut tag = make_tag(name.clone(), line_of(nm), "F", w.scopes.current_field());
-    add_field(&mut tag, "access", access_of_name(&name));
-    if let Some(t) = node.child_by_field_name("type") {
-        add_field(
-            &mut tag,
-            "typeref",
-            Some(format!("typename:{}", node_text(t, source))),
-        );
-    }
-    w.tags.push(tag);
+    let typeref = field_child(cursor, "type").map(|t| format!("typename:{}", w.base.node_text(&t)));
+    emit_tag(w, name.clone(), line_of(nm), "F", |fields| {
+        add_field(fields, "access", access_of_name(&name));
+        add_field(fields, "typeref", typeref);
+    });
 }
 
 fn emit_enum_constant(cursor: &mut TreeCursor, source: &[u8], w: &mut DartWalker) {
-    if !w.kinds.is_enabled("e") {
-        return;
-    }
-    if let Some(nm) = cursor.node().child_by_field_name("name") {
-        let tag = make_tag(
+    if let Some(nm) = field_child(cursor, "name") {
+        emit_tag(
+            w,
             node_text(nm, source).to_string(),
             line_of(nm),
             "e",
-            w.scopes.current_field(),
+            |_| {},
         );
-        w.tags.push(tag);
     }
 }
 
 fn emit_typedef(cursor: &mut TreeCursor, source: &[u8], w: &mut DartWalker) {
-    if !w.kinds.is_enabled("t") {
-        return;
-    }
     let mut name_line = None;
     let mut value = None;
     for_each_child!(cursor, {
@@ -398,17 +447,14 @@ fn emit_typedef(cursor: &mut TreeCursor, source: &[u8], w: &mut DartWalker) {
         }
     });
     if let Some((name, line)) = name_line {
-        let mut tag = make_tag(name.clone(), line, "t", w.scopes.current_field());
-        add_field(&mut tag, "access", access_of_name(&name));
-        add_field(&mut tag, "typeref", value.map(|v| format!("typename:{v}")));
-        w.tags.push(tag);
+        emit_tag(w, name.clone(), line, "t", |fields| {
+            add_field(fields, "access", access_of_name(&name));
+            add_field(fields, "typeref", value.map(|v| format!("typename:{v}")));
+        });
     }
 }
 
-fn emit_fields(cursor: &mut TreeCursor, source: &[u8], w: &mut DartWalker, letter: &str) {
-    if !w.kinds.is_enabled(letter) {
-        return;
-    }
+fn emit_fields(cursor: &mut TreeCursor, source: &[u8], w: &mut DartWalker, letter: &'static str) {
     let mut typeref = None;
     for_each_child!(cursor, {
         match cursor.node().kind() {
@@ -420,17 +466,12 @@ fn emit_fields(cursor: &mut TreeCursor, source: &[u8], w: &mut DartWalker, lette
                         entry.kind(),
                         "initialized_identifier" | "static_final_declaration"
                     ) {
-                        if let Some(nm) = entry.child_by_field_name("name") {
+                        if let Some(nm) = field_child(cursor, "name") {
                             let name = node_text(nm, source).to_string();
-                            let mut tag = make_tag(
-                                name.clone(),
-                                line_of(nm),
-                                letter,
-                                w.scopes.current_field(),
-                            );
-                            add_field(&mut tag, "access", access_of_name(&name));
-                            add_field(&mut tag, "typeref", typeref.clone());
-                            w.tags.push(tag);
+                            emit_tag(w, name.clone(), line_of(nm), letter, |fields| {
+                                add_field(fields, "access", access_of_name(&name));
+                                add_field(fields, "typeref", typeref.clone());
+                            });
                         }
                     }
                 });
@@ -441,47 +482,34 @@ fn emit_fields(cursor: &mut TreeCursor, source: &[u8], w: &mut DartWalker, lette
 }
 
 fn emit_locals(cursor: &mut TreeCursor, source: &[u8], w: &mut DartWalker) {
-    if !w.kinds.is_enabled("l") {
-        return;
-    }
     for_each_child!(cursor, {
         if cursor.node().kind() == "initialized_variable_definition" {
-            if let Some(nm) = cursor.node().child_by_field_name("name") {
-                let tag = make_tag(
+            if let Some(nm) = field_child(cursor, "name") {
+                emit_tag(
+                    w,
                     node_text(nm, source).to_string(),
                     line_of(nm),
                     "l",
-                    w.scopes.current_field(),
+                    |_| {},
                 );
-                w.tags.push(tag);
             }
         }
     });
 }
 
 fn emit_parameter(cursor: &mut TreeCursor, source: &[u8], w: &mut DartWalker) {
-    if !w.kinds.is_enabled("z") {
-        return;
-    }
-    let node = cursor.node();
-    if let Some(nm) = node.child_by_field_name("name") {
-        let mut tag = make_tag(
-            node_text(nm, source).to_string(),
-            line_of(nm),
-            "z",
-            w.scopes.current_field(),
-        );
+    if let Some(nm) = field_child(cursor, "name") {
+        let name = node_text(nm, source).to_string();
+        let mut typeref = None;
         for_each_child!(cursor, {
             if cursor.node().kind() == "type" {
-                add_field(
-                    &mut tag,
-                    "typeref",
-                    Some(format!("typename:{}", node_text(cursor.node(), source))),
-                );
+                typeref = Some(format!("typename:{}", node_text(cursor.node(), source)));
                 break;
             }
         });
-        w.tags.push(tag);
+        emit_tag(w, name, line_of(nm), "z", |fields| {
+            add_field(fields, "typeref", typeref);
+        });
     }
 }
 
@@ -489,80 +517,74 @@ fn emit_signature_decl(
     cursor: &mut TreeCursor,
     source: &[u8],
     w: &mut DartWalker,
-    letter: &str,
+    letter: &'static str,
 ) -> bool {
-    let node = cursor.node();
-    let Some(sig) = node.child_by_field_name("signature") else {
-        return false;
-    };
-    let (name, line) = callable_name_line(sig, source);
-    callable_tag(w, source, node, sig, letter, name.clone(), line);
-    push_body_scope(node, w, &name)
-}
-
-fn emit_local_function(cursor: &mut TreeCursor, source: &[u8], w: &mut DartWalker) -> bool {
-    let node = cursor.node();
-    let mut sig = None;
+    let wrapper = cursor.node();
+    let mut name = None;
     for_each_child!(cursor, {
-        if cursor.node().kind() == "function_signature" {
-            sig = Some(cursor.node());
+        if cursor.field_name() == Some("signature") {
+            name = Some(emit_callable(cursor, source, w, wrapper, letter));
             break;
         }
     });
-    let Some(sig) = sig else { return false };
-    let (name, line) = callable_name_line(sig, source);
-    callable_tag(w, source, node, sig, "f", name.clone(), line);
-    push_body_scope(node, w, &name)
+    name.is_some_and(|name| push_body_scope(cursor, w, &name))
+}
+
+fn emit_local_function(cursor: &mut TreeCursor, source: &[u8], w: &mut DartWalker) -> bool {
+    let wrapper = cursor.node();
+    let mut name = None;
+    for_each_child!(cursor, {
+        if cursor.node().kind() == "function_signature" {
+            name = Some(emit_callable(cursor, source, w, wrapper, "f"));
+            break;
+        }
+    });
+    name.is_some_and(|name| push_body_scope(cursor, w, &name))
 }
 
 fn emit_method(cursor: &mut TreeCursor, source: &[u8], w: &mut DartWalker) -> bool {
-    let node = cursor.node();
-    let mut sig = None;
+    let wrapper = cursor.node();
+    let mut name = None;
     for_each_child!(cursor, {
         if cursor.node().kind() == "method_signature" {
             for_each_child!(cursor, {
                 if classify_sig(cursor.node().kind()).is_some() {
-                    sig = Some(cursor.node());
+                    let letter = member_letter(cursor.node());
+                    name = Some(emit_callable(cursor, source, w, wrapper, letter));
                     break;
                 }
             });
             break;
         }
     });
-    let Some(sig) = sig else { return false };
-    let letter = member_letter(&sig);
-    let (name, line) = callable_name_line(sig, source);
-    callable_tag(w, source, node, sig, letter, name.clone(), line);
-    push_body_scope(node, w, &name)
+    name.is_some_and(|name| push_body_scope(cursor, w, &name))
 }
 
 fn emit_member_declaration(cursor: &mut TreeCursor, source: &[u8], w: &mut DartWalker) {
-    let mut sig = None;
+    let wrapper = cursor.node();
+    let mut found = false;
     for_each_child!(cursor, {
         if classify_sig(cursor.node().kind()).is_some() {
-            sig = Some(cursor.node());
+            let letter = member_letter(cursor.node());
+            emit_callable(cursor, source, w, wrapper, letter);
+            found = true;
             break;
         }
     });
-    match sig {
-        Some(sig) => {
-            let letter = member_letter(&sig);
-            let (name, line) = callable_name_line(sig, source);
-            callable_tag(w, source, cursor.node(), sig, letter, name, line);
-        }
-        None => emit_fields(cursor, source, w, "F"),
+    if !found {
+        emit_fields(cursor, source, w, "F");
     }
 }
 
-fn member_letter(sig: &Node) -> &'static str {
+fn member_letter(sig: Node) -> &'static str {
     match classify_sig(sig.kind()) {
         Some(SigClass::Property) => "p",
         _ => "m",
     }
 }
 
-fn push_body_scope(node: Node, w: &mut DartWalker, name: &str) -> bool {
-    if node.child_by_field_name("body").is_some() {
+fn push_body_scope(cursor: &mut TreeCursor, w: &mut DartWalker, name: &str) -> bool {
+    if field_child(cursor, "body").is_some() {
         w.scopes.push(ScopeKind::Function, name);
         true
     } else {
@@ -570,9 +592,10 @@ fn push_body_scope(node: Node, w: &mut DartWalker, name: &str) -> bool {
     }
 }
 
-fn callable_name_line(sig: Node, source: &[u8]) -> (String, u32) {
+fn callable_name_line(cursor: &mut TreeCursor, source: &[u8]) -> (String, u32) {
+    let sig = cursor.node();
     match sig.kind() {
-        "operator_signature" => match sig.child_by_field_name("operator") {
+        "operator_signature" => match field_child(cursor, "operator") {
             Some(op) => (format!("operator {}", node_text(op, source)), line_of(op)),
             None => ("operator".to_string(), line_of(sig)),
         },
@@ -582,7 +605,7 @@ fn callable_name_line(sig: Node, source: &[u8]) -> (String, u32) {
         | "redirecting_factory_constructor_signature" => {
             (constructor_name(sig, source), line_of(sig))
         }
-        _ => match sig.child_by_field_name("name") {
+        _ => match field_child(cursor, "name") {
             Some(nm) => (node_text(nm, source).to_string(), line_of(nm)),
             None => (String::new(), line_of(sig)),
         },
@@ -595,53 +618,53 @@ fn constructor_name(sig: Node, source: &[u8]) -> String {
     head.split_whitespace().last().unwrap_or("").to_string()
 }
 
-fn callable_tag(
-    w: &mut DartWalker,
+fn emit_callable(
+    cursor: &mut TreeCursor,
     source: &[u8],
+    w: &mut DartWalker,
     wrapper: Node,
-    sig: Node,
-    letter: &str,
-    name: String,
-    line: u32,
-) {
-    if !w.kinds.is_enabled(letter) {
-        return;
-    }
-    let mut tag = make_tag(name.clone(), line, letter, w.scopes.current_field());
-    add_field(&mut tag, "access", access_of_name(&name));
-    if let Some(params) = named_child_of_kind(sig, "formal_parameter_list") {
-        tag.extension_fields.push((
-            "signature".to_string(),
-            node_text(params, source).to_string(),
-        ));
-    }
-    if let Some(rt) = sig.child_by_field_name("return_type") {
-        add_field(
-            &mut tag,
-            "typeref",
-            Some(format!("typename:{}", node_text(rt, source))),
-        );
-    }
-    tag.end_line = end_line(wrapper);
-    w.tags.push(tag);
+    letter: &'static str,
+) -> String {
+    let (name, line) = callable_name_line(cursor, source);
+    let signature = named_child_of_kind(cursor, "formal_parameter_list")
+        .map(|params| w.base.node_text(&params).to_string());
+    let typeref =
+        field_child(cursor, "return_type").map(|rt| format!("typename:{}", w.base.node_text(&rt)));
+    emit_tag(w, name.clone(), line, letter, |fields| {
+        add_field(fields, "access", access_of_name(&name));
+        add_field(fields, "signature", signature);
+        add_field(fields, "typeref", typeref);
+        add_end_line(fields, wrapper);
+    });
+    name
 }
 
-fn generate_tags(parser: &mut TsParser, req: &Request, source: &[u8]) -> Result<Vec<Tag>, String> {
-    let tree = parser
-        .parse(source, None)
-        .ok_or_else(|| "parse failed".to_string())?;
-
-    let mut walker = DartWalker {
+pub(crate) fn generate(
+    parser: &mut TsParser,
+    language: tree_sitter::Language,
+    source: &[u8],
+    path: &str,
+    kinds: &TagKindConfig,
+    config: &crate::config::Config,
+) -> Option<Vec<Tag>> {
+    generate_tags_with_config(
+        parser,
+        language,
         source,
-        scopes: ScopeStack::new(),
-        kinds: TagKindConfig::parse(&req.kinds, DART_DEFAULT_KINDS, DART_OPTIONAL_KINDS),
-        tags: Vec::new(),
-    };
-
-    let mut cursor = tree.walk();
-    if cursor.goto_first_child() {
-        walk_tree(&mut cursor, &mut walker);
-    }
-
-    Ok(walker.tags)
+        path,
+        |source_code, lines, cursor, tags| {
+            let mut walker = DartWalker {
+                base: Context {
+                    source_code,
+                    lines,
+                    file_name: path.into(),
+                    tags,
+                    tag_config: kinds,
+                    user_config: config,
+                },
+                scopes: ScopeStack::new(),
+            };
+            walk_tree(cursor, &mut walker);
+        },
+    )
 }
