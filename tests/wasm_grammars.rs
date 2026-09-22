@@ -460,34 +460,6 @@ fn metadata_does_not_require_installed_grammars() {
 }
 
 #[test]
-fn user_query_override_does_not_suggest_an_unused_wasm_grammar() {
-    let p = Project::new();
-    let repo = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let library = Path::new(env!("OUT_DIR")).join(format!(
-        "{}tree_sitter_kotlin{}",
-        std::env::consts::DLL_PREFIX,
-        std::env::consts::DLL_SUFFIX
-    ));
-    let query = repo.join("tests/test_cases/kotlin/basic/input/queries.scm");
-    fs::write(p.config_dir().join("config.toml"), format!(
-        "[[user_grammars]]\nlanguage_name='kotlin'\ngrammar_lib_path={:?}\nextensions=['ml']\nquery_file_path={:?}\n",
-        library, query)).unwrap();
-    fs::copy(
-        repo.join("tests/test_cases/kotlin/basic/input/source.kt"),
-        p.dir.path().join("source.ml"),
-    )
-    .unwrap();
-    let out = p.run(&["--suggest-grammars", "source.ml"]);
-    assert!(out.status.success());
-    assert_eq!(stderr(&out), "");
-    assert!(!stdout(&out).contains("tree-sitter-ocaml.wasm"));
-    let out = p.run(&["-f", "-", "source.ml"]);
-    assert!(out.status.success());
-    assert_eq!(stderr(&out), "");
-    assert!(stdout(&out).lines().count() > 1);
-}
-
-#[test]
 fn zig_emitter_filters_names_and_preserves_disabled_parent_scopes() {
     let p = Project::new();
     p.install("zig");

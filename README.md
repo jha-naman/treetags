@@ -120,7 +120,7 @@ treetags --suggest-plugins
 Plugins available for file types in your tree:
 
 PLUGIN    HANDLES    TYPE            INSTALL WITH
-kotlin    *.kt       adds support    treetags plugin install kotlin
+dart      *.dart     adds support    treetags plugin install dart
 
 No plugin available for unsupported types: *.0, *.1, *.2, *.a, *.bin, *.cache, *.d, *.db, *.db-shm, *.db-wal, *.dylib, *.echo, *.gleam, *.history, *.idx, *.isle, *.json, *.ll, *.lock, *.md, *.o, *.pack, *.plist, *.qc, *.rev, *.rlib, *.rmeta, *.scm, *.timestamp, *.tmp, *.toml, *.txt, *.wasm, *.wit, *.yml
 ```

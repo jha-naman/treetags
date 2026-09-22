@@ -1,0 +1,6 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+Alias	source.kt	/^typealias Alias = Box$/;"	kind:T	line:11
+Box	source.kt	/^class Box(val constant: Int, var variable: Int) {$/;"	kind:c	line:3
+Named	source.kt	/^interface Named {$/;"	kind:i	line:7
+name	source.kt	/^    fun name(): String$/;"	kind:m	line:8
+value	source.kt	/^    fun value() = constant$/;"	kind:m	line:4

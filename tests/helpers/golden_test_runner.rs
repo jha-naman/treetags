@@ -125,10 +125,16 @@ fn execute_command(working_dir: &Path, args: &[String]) -> Result<std::process::
     if working_dir.components().any(|c| {
         matches!(
             c.as_os_str().to_str(),
-            Some("zig" | "swift" | "ocaml" | "objective_c")
+            Some("zig" | "swift" | "ocaml" | "objective_c" | "kotlin")
         )
     }) {
-        for (lang, abi) in [("zig", 14), ("swift", 15), ("objc", 14), ("ocaml", 14)] {
+        for (lang, abi) in [
+            ("zig", 14),
+            ("swift", 15),
+            ("objc", 14),
+            ("ocaml", 14),
+            ("kotlin", 14),
+        ] {
             let name = format!("tree-sitter-{lang}.wasm");
             let directory = abi.to_string();
             let destination = config_home

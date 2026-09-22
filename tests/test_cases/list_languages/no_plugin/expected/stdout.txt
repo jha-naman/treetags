@@ -6,6 +6,7 @@ go
 java
 javascript
 julia
+kotlin            [wasm grammar]
 lua
 objc              [wasm grammar]
 ocaml             [wasm grammar]
