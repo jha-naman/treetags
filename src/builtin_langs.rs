@@ -1,5 +1,6 @@
 use crate::parser::{
-    c_sharp, cpp, go, java, js, objective_c, python, rust, swift, typescript, zig, TagKindConfig,
+    c_sharp, cpp, go, java, js, kotlin, objective_c, python, rust, swift, typescript, zig,
+    TagKindConfig,
 };
 use crate::tag::Tag;
 use crate::wasm_grammars::GrammarSource;
@@ -76,6 +77,18 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         disambiguation: &[],
         grammar: GrammarSource::Wasm(&crate::wasm_grammars::SWIFT),
         generate_fn: swift::generate,
+    },
+    BuiltinLangDesc {
+        lang: kotlin::LANG_NAME,
+        aliases: &[],
+        extensions: kotlin::LANG_EXTENSIONS,
+        patterns: &[],
+        interpreters: &[],
+        kind_defaults: kotlin::KIND_DEFAULTS,
+        kind_optionals: kotlin::KIND_OPTIONALS,
+        disambiguation: &[],
+        grammar: GrammarSource::Wasm(&crate::wasm_grammars::KOTLIN),
+        generate_fn: kotlin::generate,
     },
     BuiltinLangDesc {
         lang: c_sharp::LANG_NAME,

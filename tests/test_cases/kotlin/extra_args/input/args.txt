@@ -1,0 +1,2 @@
+--sort yes -f '-' --kinds-kotlin='c,i,m,T' --fields=+k,+n,-s
+source.kt

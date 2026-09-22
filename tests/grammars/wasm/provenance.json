@@ -16,6 +16,14 @@
     "sha256": "0258a7ef17303a8079ffe0748b3583d59656b5c3e8653fca7b6451b3e6689eb2"
   },
   {
+    "language": "kotlin",
+    "grammar_version": "0.3.8",
+    "abi": 14,
+    "file": "14/tree-sitter-kotlin.wasm",
+    "url": "https://github.com/fwcd/tree-sitter-kotlin/releases/download/0.3.8/tree-sitter-kotlin.wasm",
+    "sha256": "c624e7443b371c28adc5d81674e73067564c12555ebe3ed96a6c8db814b7602d"
+  },
+  {
     "language": "objc",
     "grammar_version": "3.0.2",
     "abi": 14,

@@ -7,7 +7,7 @@ go
 java
 javascript
 julia
-kotlin            [plugin]
+kotlin            [wasm grammar]
 lua
 objc              [wasm grammar]
 ocaml             [wasm grammar]

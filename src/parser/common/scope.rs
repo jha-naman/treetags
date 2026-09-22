@@ -23,6 +23,7 @@ struct Frame<K> {
 
 /// A stack of nested scopes for native host walkers.
 pub struct ScopeStack<K: ScopeKey> {
+    has_package: bool,
     frames: Vec<Frame<K>>,
     /// The dotted path of the enclosing scopes.
     path: String,
@@ -37,9 +38,17 @@ impl<K: ScopeKey> Default for ScopeStack<K> {
 impl<K: ScopeKey> ScopeStack<K> {
     pub fn new() -> Self {
         Self {
+            has_package: false,
             frames: Vec::new(),
             path: String::new(),
         }
+    }
+
+    /// Set the outermost package before entering named scopes.
+    pub fn set_package(&mut self, name: &str) {
+        debug_assert!(self.frames.is_empty() && !self.has_package);
+        self.path.push_str(name);
+        self.has_package = true;
     }
 
     /// Enter a scope named `name` of kind `key`.
@@ -67,11 +76,18 @@ impl<K: ScopeKey> ScopeStack<K> {
         self.frames.last().map(|f| f.key)
     }
 
+    pub fn set_last_key(&mut self, key: K) {
+        if let Some(frame) = self.frames.last_mut() {
+            frame.key = key;
+        }
+    }
+
     /// The scope extension field for a tag emitted at the current position:
     /// `(key, dotted_path)`. `None` when there is no enclosing scope.
     pub fn current_field(&self) -> Option<(&'static str, &str)> {
         let key = match self.frames.last() {
             Some(frame) => frame.key.key(),
+            None if self.has_package => "package",
             None => return None,
         };
         Some((key, self.path.as_str()))

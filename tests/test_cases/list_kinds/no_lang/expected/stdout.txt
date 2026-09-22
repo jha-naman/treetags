@@ -88,6 +88,15 @@ javascript
     G  getters
     S  setters
     M  fields
+kotlin
+    C  constant
+    T  typealias
+    c  class
+    i  interface
+    m  method
+    o  object
+    p  package
+    v  variable
 objc
     d  macro
     e  enumerator

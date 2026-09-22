@@ -14,6 +14,7 @@ Allow users to manage the downloading of WASM grammars not bundled with treetags
 - Add native Rust based Objective C parser that uses WASM tree-sitter grammar
 - Add native extension fields support for Java
 - Add native Rust based Swift parser that uses WASM tree-sitter grammar
+- Add native Kotlin tag generator that uses downloadable WASM tree-sitter grammar
 
 ### Changed
 - Tag Address is truncated to 96 chars for native parsers
@@ -25,6 +26,7 @@ Allow users to manage the downloading of WASM grammars not bundled with treetags
 - Objective C plugin removed from the source repository
 - Java plugin removed from the source repository
 - Swift plugin removed from the source repository
+- Kotlin plugin removed from the source repository
 
 - [0.18.0]
 
