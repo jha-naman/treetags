@@ -93,12 +93,12 @@ pub(crate) struct OfficialLanguageParser {
 
 impl OfficialLanguageParser {
     pub(crate) fn from_desc(desc: &'static LanguageDescriptor, config: &Config) -> Self {
-        let kinds_str =
-            if config.tag_preferences.select(desc).effective == TagStyle::WithExtensionFields {
-                config.get_kinds(desc.lang)
-            } else {
-                ""
-            };
+        let selection = config.tag_preferences.select(desc);
+        let kinds_str = if selection.effective == TagStyle::WithExtensionFields {
+            config.get_kinds(desc.lang)
+        } else {
+            ""
+        };
         let kind_config =
             TagKindConfig::from_string(kinds_str, desc.kind_defaults, desc.kind_optionals);
         Self {
@@ -107,7 +107,7 @@ impl OfficialLanguageParser {
             kind_defaults: desc.kind_defaults,
             kind_optionals: desc.kind_optionals,
             desc,
-            selection: config.tag_preferences.select(desc),
+            selection,
         }
     }
 }
