@@ -41,7 +41,7 @@ language catalog by tests.
 | objc | wasm | — | yes |
 | ocaml | wasm | yes | — |
 | php | bundled | yes | — |
-| python | bundled | — | yes |
+| python | bundled | yes | yes |
 | ruby | bundled | yes | — |
 | rust | bundled | yes | yes |
 | scala | bundled | yes | — |

@@ -1,2 +1,2 @@
---sort yes -f '-' -G
+--sort yes -f '-' -G --tag-style=with_extension_fields
 script.txt

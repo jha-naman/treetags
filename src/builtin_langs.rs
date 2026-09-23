@@ -269,7 +269,7 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_python::LANGUAGE.into()),
         generate_fn: Some(python::generate),
-        query: None,
+        query: Some(tree_sitter_python::TAGS_QUERY),
         legacy_query_overrides: false,
     },
     LanguageDescriptor {

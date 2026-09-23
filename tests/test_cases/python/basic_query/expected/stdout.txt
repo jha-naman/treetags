@@ -1,0 +1,10 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+Foo	source.py	/^class Foo:$/;"	
+__Foo1	source.py	/^class __Foo1(Bar, Baz):$/;"	
+__init__	source.py	/^	def __init__(self, bar):$/;"	
+_bar	source.py	/^    def _bar(self,$/;"	
+bar	source.py	/^	def bar(self):$/;"	
+decorated_func	source.py	/^def decorated_func():$/;"	
+func	source.py	/^async def func(): pass$/;"	
+func	source.py	/^def func(x: int, y: float) -> float:$/;"	
+variable	source.py	/^variable: List[int] = [1, 2]$/;"	
