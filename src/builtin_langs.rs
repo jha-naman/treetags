@@ -43,6 +43,34 @@ pub(crate) struct LanguageDescriptor {
     pub legacy_query_overrides: bool,
 }
 
+#[cfg(test)]
+pub(crate) struct LanguageDescriptorTestBuilder(LanguageDescriptor);
+
+#[cfg(test)]
+impl LanguageDescriptorTestBuilder {
+    pub(crate) fn from_language(lang: &str) -> Self {
+        let desc = OFFICIAL_LANGUAGES
+            .iter()
+            .find(|desc| desc.lang == lang)
+            .unwrap_or_else(|| panic!("unknown test language: {lang}"));
+        Self(desc.clone())
+    }
+
+    pub(crate) fn query(mut self, query: &'static str) -> Self {
+        self.0.query = Some(query);
+        self
+    }
+
+    pub(crate) fn grammar(mut self, grammar: GrammarSource) -> Self {
+        self.0.grammar = grammar;
+        self
+    }
+
+    pub(crate) fn build(self) -> LanguageDescriptor {
+        self.0
+    }
+}
+
 /// All official languages. Source precedence follows array order.
 /// Each language is registered once, whether it has one or both implementations.
 pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[

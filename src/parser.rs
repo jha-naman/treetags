@@ -64,16 +64,13 @@ impl GrammarStore {
             .is_some_and(|&index| matches!(self.grammar_configs[index], QueryConfig::User(_)))
     }
 
-    fn language(&self, desc: &'static LanguageDescriptor) -> Option<tree_sitter::Language> {
+    fn language(&self, desc: &LanguageDescriptor) -> Option<tree_sitter::Language> {
         self.languages[desc.lang]
             .get_or_init(|| desc.grammar.language(&self.wasm))
             .clone()
     }
 
-    fn query(
-        &self,
-        desc: &'static LanguageDescriptor,
-    ) -> Option<&tree_sitter_tags::TagsConfiguration> {
+    fn query(&self, desc: &LanguageDescriptor) -> Option<&tree_sitter_tags::TagsConfiguration> {
         self.queries[desc.lang]
             .get_or_init(|| {
                 let language = self
@@ -186,7 +183,7 @@ impl Parser {
 
     pub(crate) fn generate_with_walker(
         &mut self,
-        desc: &'static LanguageDescriptor,
+        desc: &LanguageDescriptor,
         code: &[u8],
         path: &str,
         kinds: &TagKindConfig,
@@ -268,7 +265,7 @@ impl Parser {
 
     pub(crate) fn generate_official_query(
         &mut self,
-        desc: &'static LanguageDescriptor,
+        desc: &LanguageDescriptor,
         code: &[u8],
         path: &str,
     ) -> Vec<tag::Tag> {
@@ -374,17 +371,17 @@ mod wasm_tests {
 
     #[test]
     fn dual_implementation_dispatch_and_query_failure_isolation() {
-        use crate::config::tag_styles::{official_language, TagStyle};
+        use crate::config::tag_styles::TagStyle;
         use crate::language_parser::{LanguageParser, OfficialLanguageParser};
 
         let mut config = Config::for_test();
-        let mut desc = official_language("rust").unwrap().clone();
-        desc.query = Some("(function_item name: (identifier) @name) @definition.function");
-        let desc = Box::leak(Box::new(desc));
+        let desc = crate::builtin_langs::LanguageDescriptorTestBuilder::from_language("rust")
+            .query("(function_item name: (identifier) @name) @definition.function")
+            .build();
         let mut parser = Parser::new(&config);
         let source = b"pub fn example() {}";
         let path = std::path::Path::new("source.rs");
-        let basic = OfficialLanguageParser::from_desc(desc, &config).generate_tags(
+        let basic = OfficialLanguageParser::from_desc(&desc, &config).generate_tags(
             &mut parser,
             source,
             "source.rs",
@@ -396,7 +393,7 @@ mod wasm_tests {
         assert!(basic[0].kind.is_none() && basic[0].extension_fields.is_none());
 
         config.tag_preferences.default = TagStyle::WithExtensionFields;
-        let rich = OfficialLanguageParser::from_desc(desc, &config).generate_tags(
+        let rich = OfficialLanguageParser::from_desc(&desc, &config).generate_tags(
             &mut parser,
             source,
             "source.rs",
@@ -407,12 +404,12 @@ mod wasm_tests {
             .iter()
             .any(|tag| tag.name == "example" && tag.kind.is_some()));
 
-        let mut broken = desc.clone();
-        broken.query = Some("(");
-        let broken = Box::leak(Box::new(broken));
+        let broken = crate::builtin_langs::LanguageDescriptorTestBuilder::from_language("rust")
+            .query("(")
+            .build();
         let mut parser = Parser::new(&config);
         assert!(parser.grammar_store.queries["rust"].get().is_none());
-        let rich = OfficialLanguageParser::from_desc(broken, &config).generate_tags(
+        let rich = OfficialLanguageParser::from_desc(&broken, &config).generate_tags(
             &mut parser,
             source,
             "source.rs",
@@ -423,7 +420,7 @@ mod wasm_tests {
         assert!(parser.grammar_store.queries["rust"].get().is_none());
         config.tag_preferences.default = TagStyle::Basic;
         for _ in 0..2 {
-            let basic = OfficialLanguageParser::from_desc(broken, &config).generate_tags(
+            let basic = OfficialLanguageParser::from_desc(&broken, &config).generate_tags(
                 &mut parser,
                 source,
                 "source.rs",
@@ -437,7 +434,7 @@ mod wasm_tests {
         }
         assert!(parser.grammar_store.queries["rust"].get().unwrap().is_err());
         config.tag_preferences.default = TagStyle::WithExtensionFields;
-        assert!(!OfficialLanguageParser::from_desc(broken, &config)
+        assert!(!OfficialLanguageParser::from_desc(&broken, &config)
             .generate_tags(&mut parser, source, "source.rs", &config, path)
             .is_empty());
     }
@@ -459,13 +456,12 @@ mod wasm_tests {
 
     #[test]
     fn newly_added_official_query_is_not_replaced_by_custom_extension_mapping() {
-        use crate::config::tag_styles::official_language;
         use crate::language_parser::{LanguageParser, OfficialLanguageParser};
 
         let config = Config::for_test();
-        let mut desc = official_language("rust").unwrap().clone();
-        desc.query = Some("(function_item name: (identifier) @name) @definition.function");
-        let desc = Box::leak(Box::new(desc));
+        let desc = crate::builtin_langs::LanguageDescriptorTestBuilder::from_language("rust")
+            .query("(function_item name: (identifier) @name) @definition.function")
+            .build();
         let mut parser = Parser::new(&config);
         let store = Arc::get_mut(&mut parser.grammar_store).unwrap();
         let index = store.grammar_configs.len();
@@ -477,7 +473,7 @@ mod wasm_tests {
                 "",
             )));
         store.extension_config_map.insert("rs".into(), index);
-        let tags = OfficialLanguageParser::from_desc(desc, &config).generate_tags(
+        let tags = OfficialLanguageParser::from_desc(&desc, &config).generate_tags(
             &mut parser,
             b"fn official() {}",
             "source.rs",
@@ -489,16 +485,16 @@ mod wasm_tests {
 
     #[test]
     fn dual_styles_share_a_wasm_grammar_with_separate_parser_stores() {
-        use crate::config::tag_styles::{official_language, TagStyle};
+        use crate::config::tag_styles::TagStyle;
         use crate::language_parser::{LanguageParser, OfficialLanguageParser};
 
         let mut config = Config::for_test();
         config.wasm_grammars_dir =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/grammars/wasm");
-        let mut desc = official_language("zig").unwrap().clone();
         // A framework fixture, not the production query to be added in Zig's migration.
-        desc.query = Some("(identifier) @name @definition.function");
-        let desc = Box::leak(Box::new(desc));
+        let desc = crate::builtin_langs::LanguageDescriptorTestBuilder::from_language("zig")
+            .query("(identifier) @name @definition.function")
+            .build();
         let mut parser = Parser::new(&config);
         for style in [
             TagStyle::Basic,
@@ -506,7 +502,7 @@ mod wasm_tests {
             TagStyle::Basic,
         ] {
             config.tag_preferences.default = style;
-            let tags = OfficialLanguageParser::from_desc(desc, &config).generate_tags(
+            let tags = OfficialLanguageParser::from_desc(&desc, &config).generate_tags(
                 &mut parser,
                 b"pub fn example() void {}",
                 "source.zig",

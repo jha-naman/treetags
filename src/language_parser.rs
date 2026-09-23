@@ -87,12 +87,12 @@ pub(crate) struct OfficialLanguageParser {
     kind_config: TagKindConfig,
     kind_defaults: &'static [(&'static [&'static str], &'static str)],
     kind_optionals: &'static [(&'static [&'static str], &'static str)],
-    desc: &'static LanguageDescriptor,
+    desc: LanguageDescriptor,
     selection: TagSelection,
 }
 
 impl OfficialLanguageParser {
-    pub(crate) fn from_desc(desc: &'static LanguageDescriptor, config: &Config) -> Self {
+    pub(crate) fn from_desc(desc: &LanguageDescriptor, config: &Config) -> Self {
         let selection = config.tag_preferences.select(desc);
         let kinds_str = if selection.effective == TagStyle::WithExtensionFields {
             config.get_kinds(desc.lang)
@@ -106,7 +106,7 @@ impl OfficialLanguageParser {
             kind_config,
             kind_defaults: desc.kind_defaults,
             kind_optionals: desc.kind_optionals,
-            desc,
+            desc: desc.clone(),
             selection,
         }
     }
@@ -136,7 +136,7 @@ impl LanguageParser for OfficialLanguageParser {
     ) -> Vec<Tag> {
         match self.selection.effective {
             TagStyle::WithExtensionFields => {
-                parser.generate_with_walker(self.desc, code, path, &self.kind_config, config)
+                parser.generate_with_walker(&self.desc, code, path, &self.kind_config, config)
             }
             TagStyle::Basic => {
                 if self.desc.legacy_query_overrides {
@@ -150,7 +150,7 @@ impl LanguageParser for OfficialLanguageParser {
                         return parser.generate_by_tag_query(code, path, extension);
                     }
                 }
-                parser.generate_official_query(self.desc, code, path)
+                parser.generate_official_query(&self.desc, code, path)
             }
         }
     }
@@ -874,14 +874,12 @@ mod tests {
     fn wasm_grammar_name_respects_user_queries_on_all_extensions() {
         // Use an external grammar so bundled shell's unconditional None cannot
         // hide a missed override on its second extension.
-        let mut desc = OFFICIAL_LANGUAGES
-            .iter()
-            .find(|desc| desc.lang == "shell")
-            .unwrap()
-            .clone();
-        desc.grammar = crate::wasm_grammars::GrammarSource::Wasm(&crate::wasm_grammars::OCAML);
-        let parser =
-            OfficialLanguageParser::from_desc(Box::leak(Box::new(desc)), &Config::for_test());
+        let desc = crate::builtin_langs::LanguageDescriptorTestBuilder::from_language("shell")
+            .grammar(crate::wasm_grammars::GrammarSource::Wasm(
+                &crate::wasm_grammars::OCAML,
+            ))
+            .build();
+        let parser = OfficialLanguageParser::from_desc(&desc, &Config::for_test());
         let mut reg = registry();
         assert_eq!(parser.wasm_grammar_name(&reg), Some("ocaml"));
 
