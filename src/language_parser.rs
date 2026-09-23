@@ -114,19 +114,15 @@ impl OfficialLanguageParser {
 
 impl LanguageParser for OfficialLanguageParser {
     fn wasm_grammar_name(&self, registry: &LanguageParserRegistry) -> Option<&str> {
-        if self.selection.effective == TagStyle::Basic && self.desc.legacy_query_overrides {
-            if let Some(index) = registry
-                .grammar_store
-                .extension_config_map
-                .get(self.desc.extensions[0])
-            {
-                if matches!(
-                    registry.grammar_store.grammar_configs[*index],
-                    crate::built_in_grammars::QueryConfig::User(_)
-                ) {
-                    return None;
-                }
-            }
+        if self.selection.effective == TagStyle::Basic
+            && self.desc.legacy_query_overrides
+            && self
+                .desc
+                .extensions
+                .iter()
+                .any(|extension| registry.grammar_store.has_user_query(extension))
+        {
+            return None;
         }
         self.desc.grammar.external().map(|g| g.name)
     }
@@ -872,6 +868,48 @@ mod tests {
         let mut cfg = Config::for_test();
         cfg.language_force = lang.to_string();
         LanguageParserRegistry::new(&cfg)
+    }
+
+    #[test]
+    fn wasm_grammar_name_respects_user_queries_on_all_extensions() {
+        // Use an external grammar so bundled shell's unconditional None cannot
+        // hide a missed override on its second extension.
+        let mut desc = OFFICIAL_LANGUAGES
+            .iter()
+            .find(|desc| desc.lang == "shell")
+            .unwrap()
+            .clone();
+        desc.grammar = crate::wasm_grammars::GrammarSource::Wasm(&crate::wasm_grammars::OCAML);
+        let parser =
+            OfficialLanguageParser::from_desc(Box::leak(Box::new(desc)), &Config::for_test());
+        let mut reg = registry();
+        assert_eq!(parser.wasm_grammar_name(&reg), Some("ocaml"));
+
+        for (extension, expected) in [("sh", None), ("bash", None), ("unrelated", Some("ocaml"))] {
+            let store = Arc::get_mut(&mut reg.grammar_store).unwrap();
+            let index = store.grammar_configs.len();
+            store
+                .grammar_configs
+                .push(crate::built_in_grammars::QueryConfig::User(
+                    tree_sitter_tags::TagsConfiguration::new(
+                        tree_sitter_bash::LANGUAGE.into(),
+                        "",
+                        "",
+                    ),
+                ));
+            let previous = store.extension_config_map.insert(extension.into(), index);
+
+            assert_eq!(parser.wasm_grammar_name(&reg), expected, "{extension}");
+
+            let store = Arc::get_mut(&mut reg.grammar_store).unwrap();
+            if let Some(previous) = previous {
+                store
+                    .extension_config_map
+                    .insert(extension.into(), previous);
+            } else {
+                store.extension_config_map.remove(extension);
+            }
+        }
     }
 
     #[test]
