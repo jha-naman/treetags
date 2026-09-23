@@ -169,7 +169,7 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_c_sharp::LANGUAGE.into()),
         generate_fn: Some(c_sharp::generate),
-        query: None,
+        query: Some(crate::queries::C_SHARP_TAGS_QUERY),
         legacy_query_overrides: false,
     },
     LanguageDescriptor {

@@ -28,7 +28,7 @@ language catalog by tests.
 | Language | Grammar | Basic | With extension fields |
 | --- | --- | --- | --- |
 | c | bundled | yes | yes |
-| c# | bundled | — | yes |
+| c# | bundled | yes | yes |
 | c++ | bundled | yes | yes |
 | dart | wasm | — | yes |
 | elixir | bundled | yes | — |

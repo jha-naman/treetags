@@ -1,2 +1,2 @@
---sort yes -f '-' --kinds-c#=lmn
+--sort yes -f '-' --kinds-c#=lmn --tag-style=with_extension_fields
 source.cs
