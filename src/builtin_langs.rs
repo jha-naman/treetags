@@ -212,7 +212,7 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
         disambiguation: &[("h", cpp::CPP_DISAMBIG_SIGNALS)],
         grammar: GrammarSource::Bundled(|| tree_sitter_cpp::LANGUAGE.into()),
         generate_fn: Some(cpp::generate),
-        query: None,
+        query: Some(tree_sitter_cpp::TAGS_QUERY),
         legacy_query_overrides: false,
     },
     // C reuses the C++ parser but is a distinct language with its own kind table.
