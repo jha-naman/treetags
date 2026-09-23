@@ -21,6 +21,8 @@ pub struct UserGrammar {
 #[derive(Debug, Default, Deserialize)]
 pub struct TOMLConfig {
     #[serde(default)]
+    pub tags: super::tag_styles::TagPreferences,
+    #[serde(default)]
     pub user_grammars: Vec<UserGrammar>,
     #[serde(default)]
     pub wasm_grammars: WasmGrammarConfig,
@@ -30,13 +32,6 @@ pub struct TOMLConfig {
 pub struct WasmGrammarConfig {
     #[serde(default)]
     pub languages: Vec<String>,
-}
-
-pub fn load(config_path_override: Option<&PathBuf>) -> TOMLConfig {
-    load_checked(config_path_override).unwrap_or_else(|err| {
-        eprintln!("Warning: {err:#}");
-        TOMLConfig::default()
-    })
 }
 
 pub fn load_checked(config_path_override: Option<&PathBuf>) -> anyhow::Result<TOMLConfig> {

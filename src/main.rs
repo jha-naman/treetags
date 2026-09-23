@@ -19,6 +19,7 @@ mod shell_to_regex;
 mod split_by_newlines;
 mod tag;
 mod tag_processor;
+mod tag_styles_listing;
 mod tag_writer;
 mod tags_config;
 mod user_grammars;
@@ -97,6 +98,13 @@ fn main() {
 }
 
 fn handle_early_exit_commands(config: &Config) -> bool {
+    if let Some(language) = &config.list_tag_styles {
+        if let Err(error) = tag_styles_listing::handle(language, config) {
+            eprintln!("treetags: {error}");
+            process::exit(1);
+        }
+        return true;
+    }
     if let Some(command) = &config.command {
         match command {
             config::Commands::Completions { shell } => {

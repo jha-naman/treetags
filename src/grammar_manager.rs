@@ -326,7 +326,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         publish(&ZIG, dir.path(), b"original", false).unwrap();
         let incompatible = WasmGrammar {
-            query: Some("("),
+            export_name: Some("nonexistent"),
             ..ZIG
         };
         assert!(install(&incompatible, dir.path(), true, &mut |_| Ok(fixture(&ZIG))).is_err());

@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::builtin_langs::{BuiltinLangDesc, BUILTIN_LANG_DESCRIPTORS};
+use crate::builtin_langs::{LanguageDescriptor, OFFICIAL_LANGUAGES};
+use crate::config::tag_styles::{TagSelection, TagStyle};
 use crate::config::Config;
 use crate::parser::{kinds_from_mappings, KindInfo, TagKindConfig};
 use crate::parser::{GrammarStore, Parser};
@@ -77,21 +78,27 @@ pub trait LanguageParser: Send + Sync {
 }
 
 // ---------------------------------------------------------------------------
-// Builtin language parser (tree-walker with extension fields)
+// Official language parser (selectable query and walker implementations)
 // ---------------------------------------------------------------------------
 
 #[derive(Clone)]
-pub(crate) struct BuiltinLanguageParser {
+pub(crate) struct OfficialLanguageParser {
     lang: &'static str,
     kind_config: TagKindConfig,
     kind_defaults: &'static [(&'static [&'static str], &'static str)],
     kind_optionals: &'static [(&'static [&'static str], &'static str)],
-    desc: &'static BuiltinLangDesc,
+    desc: &'static LanguageDescriptor,
+    selection: TagSelection,
 }
 
-impl BuiltinLanguageParser {
-    pub(crate) fn from_desc(desc: &'static BuiltinLangDesc, config: &Config) -> Self {
-        let kinds_str = config.get_kinds(desc.lang);
+impl OfficialLanguageParser {
+    pub(crate) fn from_desc(desc: &'static LanguageDescriptor, config: &Config) -> Self {
+        let kinds_str =
+            if config.tag_preferences.select(desc).effective == TagStyle::WithExtensionFields {
+                config.get_kinds(desc.lang)
+            } else {
+                ""
+            };
         let kind_config =
             TagKindConfig::from_string(kinds_str, desc.kind_defaults, desc.kind_optionals);
         Self {
@@ -100,12 +107,27 @@ impl BuiltinLanguageParser {
             kind_defaults: desc.kind_defaults,
             kind_optionals: desc.kind_optionals,
             desc,
+            selection: config.tag_preferences.select(desc),
         }
     }
 }
 
-impl LanguageParser for BuiltinLanguageParser {
-    fn wasm_grammar_name(&self, _registry: &LanguageParserRegistry) -> Option<&str> {
+impl LanguageParser for OfficialLanguageParser {
+    fn wasm_grammar_name(&self, registry: &LanguageParserRegistry) -> Option<&str> {
+        if self.selection.effective == TagStyle::Basic && self.desc.legacy_query_overrides {
+            if let Some(index) = registry
+                .grammar_store
+                .extension_config_map
+                .get(self.desc.extensions[0])
+            {
+                if matches!(
+                    registry.grammar_store.grammar_configs[*index],
+                    crate::built_in_grammars::QueryConfig::User(_)
+                ) {
+                    return None;
+                }
+            }
+        }
         self.desc.grammar.external().map(|g| g.name)
     }
     fn generate_tags(
@@ -116,7 +138,25 @@ impl LanguageParser for BuiltinLanguageParser {
         config: &Config,
         _absolute_path: &Path,
     ) -> Vec<Tag> {
-        parser.generate_builtin(self.desc, code, path, &self.kind_config, config)
+        match self.selection.effective {
+            TagStyle::WithExtensionFields => {
+                parser.generate_with_walker(self.desc, code, path, &self.kind_config, config)
+            }
+            TagStyle::Basic => {
+                if self.desc.legacy_query_overrides {
+                    // Existing query languages retain per-extension user overrides.
+                    let extension = Path::new(path)
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .filter(|e| self.desc.extensions.contains(e))
+                        .unwrap_or(self.desc.extensions[0]);
+                    if parser.grammar_store.has_user_query(extension) {
+                        return parser.generate_by_tag_query(code, path, extension);
+                    }
+                }
+                parser.generate_official_query(self.desc, code, path)
+            }
+        }
     }
 
     fn kinds(&self) -> Vec<KindInfo> {
@@ -162,18 +202,18 @@ impl LanguageParser for WasmLanguageParser {
 }
 
 // ---------------------------------------------------------------------------
-// Query-based fallback parser (tree-sitter tag queries)
+// Compatibility parser for user-provided query grammars
 // ---------------------------------------------------------------------------
 
-pub(crate) struct QueryLanguageParser {
+pub(crate) struct UserQueryLanguageParser {
     /// File extension used to look up the compiled grammar in `GrammarStore`.
     extension: String,
-    /// Canonical language name (e.g. `ruby`, `shell`), used for `--list-kinds`
+    /// User-provided language name, used for `--list-kinds`
     /// and `--language-force`.
     lang: String,
 }
 
-impl LanguageParser for QueryLanguageParser {
+impl LanguageParser for UserQueryLanguageParser {
     fn wasm_grammar_name(&self, registry: &LanguageParserRegistry) -> Option<&str> {
         // User-provided query grammars can replace the effective extension config.
         let index = registry
@@ -181,8 +221,10 @@ impl LanguageParser for QueryLanguageParser {
             .extension_config_map
             .get(&self.extension)?;
         match &registry.grammar_store.grammar_configs[*index] {
-            crate::built_in_grammars::QueryConfig::Wasm(grammar) => Some(grammar.name),
-            crate::built_in_grammars::QueryConfig::Bundled(_) => None,
+            crate::built_in_grammars::QueryConfig::Official(desc) => {
+                desc.grammar.external().map(|g| g.name)
+            }
+            crate::built_in_grammars::QueryConfig::User(_) => None,
         }
     }
 
@@ -318,8 +360,7 @@ impl LanguageParserRegistry {
     /// Build the registry metadata; WASM grammars and plugins compile on first use.
     /// Call this once at startup and share the result via `Arc`.
     pub fn new(config: &Config) -> Self {
-        // Load once and share with the GrammarStore , so the built-in grammars
-        // `TagsConfiguration`s are compiled only once at startup
+        // Register compatibility query records without compiling any queries.
         let builtin_grammars = crate::built_in_grammars::load();
         let plugin_registry = Arc::new(PluginRegistry::scan(
             &config.plugin_dirs,
@@ -415,9 +456,9 @@ impl LanguageParserRegistry {
             }
         }
 
-        // Priority 2: Builtin tree-walker parsers.
+        // Priority 2: Official languages, with one registration for both tag styles.
         // One parser instance per language, shared across all its extensions.
-        for desc in BUILTIN_LANG_DESCRIPTORS {
+        for desc in OFFICIAL_LANGUAGES {
             let id = parsers.len();
             let mut claimed = false;
             for ext in desc.extensions {
@@ -470,79 +511,11 @@ impl LanguageParserRegistry {
                         &mut disambig_signals,
                     );
                 }
-                parsers.push(Box::new(BuiltinLanguageParser::from_desc(desc, config)));
+                parsers.push(Box::new(OfficialLanguageParser::from_desc(desc, config)));
             }
         }
 
-        // Priority 3: Query grammar fallbacks
-        for grammar in &builtin_grammars {
-            if grammar.config.is_err() {
-                continue;
-            }
-            // A grammar spans several extensions; its aliases and patterns attach
-            // to the first (representative) parser created for it.
-            let mut rep_id: Option<LangId> = None;
-            let mut claimed = false;
-            for ext in grammar.extensions {
-                if by_extension.contains_key(*ext) {
-                    continue;
-                }
-                let id = parsers.len();
-                rep_id.get_or_insert(id);
-                parsers.push(Box::new(QueryLanguageParser {
-                    extension: (*ext).to_string(),
-                    lang: grammar.lang.to_string(),
-                }));
-                by_extension.insert((*ext).to_string(), vec![id]);
-                claimed = true;
-            }
-            sources.push(LangSource {
-                kind: if matches!(
-                    grammar.config,
-                    crate::built_in_grammars::QueryConfig::Wasm(_)
-                ) {
-                    SourceKind::WasmGrammar
-                } else {
-                    SourceKind::Native
-                },
-                name: grammar.lang.to_string(),
-                extensions: grammar.extensions.iter().map(|e| e.to_string()).collect(),
-                won: claimed,
-            });
-            // If every extension was already claimed, still register the
-            // grammar's metadata against a representative parser so its
-            // aliases/patterns/interpreters are not lost. The parser's
-            // extension is used only for GrammarStore lookup, which is keyed
-            // independently of who claims the extension in `by_extension`.
-            let has_metadata = !grammar.aliases.is_empty()
-                || !grammar.patterns.is_empty()
-                || !grammar.interpreters.is_empty();
-            let rep_id = rep_id.or_else(|| {
-                if !has_metadata {
-                    return None;
-                }
-                let id = parsers.len();
-                let ext = grammar.extensions.first().copied().unwrap_or_default();
-                parsers.push(Box::new(QueryLanguageParser {
-                    extension: ext.to_string(),
-                    lang: grammar.lang.to_string(),
-                }));
-                Some(id)
-            });
-            if let Some(id) = rep_id {
-                for alias in grammar.aliases {
-                    alias_specs.push((id, (*alias).to_string()));
-                }
-                for pat in grammar.patterns {
-                    by_pattern.push(((*pat).to_string(), id));
-                }
-                for interp in grammar.interpreters {
-                    interp_specs.push((id, (*interp).to_string()));
-                }
-            }
-        }
-
-        // Priority 4: User grammars (--user-languages-config).
+        // Priority 3: User grammars (--user-languages-config).
         // Extensions registered for routing; TagsConfiguration and library
         // lifetimes are held by the shared GrammarStore.
         for ug in &config.user_grammars {
@@ -556,7 +529,7 @@ impl LanguageParserRegistry {
                 }
                 let id = parsers.len();
                 rep_id.get_or_insert(id);
-                parsers.push(Box::new(QueryLanguageParser {
+                parsers.push(Box::new(UserQueryLanguageParser {
                     extension: ext.clone(),
                     lang: ug.language_name.clone(),
                 }));
@@ -946,11 +919,18 @@ mod tests {
     }
 
     #[test]
-    fn builtin_tree_walker_wins_over_query_fallback() {
-        // `.py` is claimed by both the builtin Python tree-walker (priority 2)
-        // and the query-grammar fallback (priority 3). The builtin must win.
+    fn official_language_has_one_registration() {
         let reg = registry();
         assert_eq!(lang_for(&reg, "script.py").as_deref(), Some("python"));
+        for desc in OFFICIAL_LANGUAGES {
+            assert_eq!(
+                reg.parsers
+                    .iter()
+                    .filter(|p| p.language_name() == desc.lang)
+                    .count(),
+                1
+            );
+        }
     }
 
     #[test]
