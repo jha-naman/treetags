@@ -1,2 +1,2 @@
--f '-' --sort yes --kinds-typescript=fcigemnzpvlCGa
+-f '-' --sort yes --kinds-typescript=fcigemnzpvlCGa --tag-style=with_extension_fields
 source.ts

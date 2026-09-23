@@ -48,7 +48,7 @@ language catalog by tests.
 | shell | bundled | yes | — |
 | swift | wasm | — | yes |
 | terraform | wasm | — | yes |
-| typescript | bundled | — | yes |
+| typescript | bundled | yes | yes |
 | zig | wasm | — | yes |
 <!-- tag-style-capabilities:end -->
 

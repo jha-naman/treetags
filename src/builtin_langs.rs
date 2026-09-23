@@ -283,7 +283,7 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()),
         generate_fn: Some(typescript::generate),
-        query: None,
+        query: Some(crate::queries::TYPESCRIPT_TAGS_QUERY),
         legacy_query_overrides: false,
     },
     LanguageDescriptor {
