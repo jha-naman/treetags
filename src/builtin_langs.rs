@@ -99,7 +99,7 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_java::LANGUAGE.into()),
         generate_fn: Some(java::generate),
-        query: None,
+        query: Some(tree_sitter_java::TAGS_QUERY),
         legacy_query_overrides: false,
     },
     LanguageDescriptor {

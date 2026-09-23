@@ -33,7 +33,7 @@ language catalog by tests.
 | dart | wasm | — | yes |
 | elixir | bundled | yes | — |
 | go | bundled | — | yes |
-| java | bundled | — | yes |
+| java | bundled | yes | yes |
 | javascript | bundled | — | yes |
 | julia | bundled | yes | — |
 | kotlin | wasm | — | yes |
