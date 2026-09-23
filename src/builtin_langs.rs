@@ -255,7 +255,7 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_javascript::LANGUAGE.into()),
         generate_fn: Some(js::generate),
-        query: None,
+        query: Some(tree_sitter_javascript::TAGS_QUERY),
         legacy_query_overrides: false,
     },
     LanguageDescriptor {

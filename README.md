@@ -34,7 +34,7 @@ language catalog by tests.
 | elixir | bundled | yes | — |
 | go | bundled | — | yes |
 | java | bundled | yes | yes |
-| javascript | bundled | — | yes |
+| javascript | bundled | yes | yes |
 | julia | bundled | yes | — |
 | kotlin | wasm | — | yes |
 | lua | bundled | yes | — |
