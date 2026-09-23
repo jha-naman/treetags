@@ -197,7 +197,7 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_go::LANGUAGE.into()),
         generate_fn: Some(go::generate),
-        query: None,
+        query: Some(tree_sitter_go::TAGS_QUERY),
         legacy_query_overrides: false,
     },
     LanguageDescriptor {

@@ -32,7 +32,7 @@ language catalog by tests.
 | c++ | bundled | yes | yes |
 | dart | wasm | — | yes |
 | elixir | bundled | yes | — |
-| go | bundled | — | yes |
+| go | bundled | yes | yes |
 | java | bundled | yes | yes |
 | javascript | bundled | yes | yes |
 | julia | bundled | yes | — |
