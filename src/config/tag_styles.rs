@@ -139,7 +139,7 @@ mod tests {
             basic.select(rust),
             TagSelection {
                 preferred: TagStyle::Basic,
-                effective: TagStyle::WithExtensionFields,
+                effective: TagStyle::Basic,
             }
         );
         assert_eq!(basic.select(ruby).effective, TagStyle::Basic);
@@ -154,12 +154,9 @@ mod tests {
                 effective: TagStyle::Basic,
             }
         );
-        let mut dual = rust.clone();
-        dual.query = Some("test capability");
-        assert_eq!(basic.select(&dual).effective, TagStyle::Basic);
-        assert_eq!(rich.select(&dual).effective, TagStyle::WithExtensionFields);
+        assert_eq!(rich.select(rust).effective, TagStyle::WithExtensionFields);
         let overridden = rich.merge(None, Some("rust"), None).unwrap();
-        assert_eq!(overridden.select(&dual).effective, TagStyle::Basic);
+        assert_eq!(overridden.select(rust).effective, TagStyle::Basic);
     }
 
     #[test]

@@ -43,7 +43,7 @@ language catalog by tests.
 | php | bundled | yes | — |
 | python | bundled | — | yes |
 | ruby | bundled | yes | — |
-| rust | bundled | — | yes |
+| rust | bundled | yes | yes |
 | scala | bundled | yes | — |
 | shell | bundled | yes | — |
 | swift | wasm | — | yes |

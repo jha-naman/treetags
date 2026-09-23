@@ -67,6 +67,8 @@ fn default_and_configured_preferences_are_visible_without_loading_grammars() {
         &rust[3..5],
         &["with_extension_fields", "with_extension_fields"]
     );
+    assert_eq!(rust[2], "basic,with_extension_fields");
+    assert_eq!(rust[5], "preferred style available");
     let zig = p.selection(&["--list-tag-styles", "zig"], "zig");
     assert_eq!(
         &zig[1..5],
@@ -189,7 +191,7 @@ fn explicit_config_path_and_global_override_retain_language_preferences() {
 }
 
 #[test]
-fn basic_output_ignores_rich_options_and_fallback_preserves_current_output() {
+fn basic_output_ignores_rich_options_and_single_style_fallback_preserves_current_output() {
     let p = Project::new("");
     p.write("source.rb", "def greet\nend\n");
     p.write("source.rs", "pub fn hello() {}\n");
@@ -211,13 +213,49 @@ fn basic_output_ignores_rich_options_and_fallback_preserves_current_output() {
             "source.rb"
         ])
     );
-    assert_eq!(
-        p.success(&["-f", "-", "source.rs"]),
-        p.success(&["-f", "-", "--tag-style=with_extension_fields", "source.rs"])
-    );
+    let rust_basic = p.success(&["-f", "-", "source.rs"]);
+    assert!(rust_basic.contains("hello\tsource.rs\t"));
+    assert!(rust_basic
+        .lines()
+        .filter(|line| !line.starts_with('!'))
+        .all(|line| line.trim_end_matches('\t').split('\t').count() == 3));
+    let rust_rich = p.success(&["-f", "-", "--tag-style=with_extension_fields", "source.rs"]);
+    assert!(rust_rich.contains("hello\tsource.rs\t"));
+    assert!(rust_rich.contains("\tf"));
     assert_eq!(
         p.success(&["-f", "-", "--workers=1", "source.rb", "source.rs"]),
         p.success(&["-f", "-", "--workers=4", "source.rb", "source.rs"])
+    );
+}
+
+#[test]
+fn rust_preference_selects_both_backends_and_basic_ignores_rich_controls() {
+    let p = Project::new("[tags]\ndefault='with_extension_fields'\nbasic=['rust']\n");
+    p.write("source.rs", "pub fn hello() {}\n");
+    let basic = p.success(&["-f", "-", "source.rs"]);
+    assert!(basic.contains("hello\tsource.rs\t"));
+    assert!(basic
+        .lines()
+        .filter(|line| !line.starts_with('!'))
+        .all(|line| line.trim_end_matches('\t').split('\t').count() == 3));
+    assert_eq!(
+        basic,
+        p.success(&[
+            "-f",
+            "-",
+            "--fields=+n,+S",
+            "--extras=+q",
+            "--kinds-rust=-f",
+            "source.rs"
+        ])
+    );
+    let rich = p.success(&["-f", "-", "--basic-tags=", "source.rs"]);
+    assert!(rich.contains("hello\tsource.rs\t"));
+    assert!(rich.contains("\tf"));
+    assert_ne!(basic, rich);
+    assert_eq!(
+        basic,
+        p.success(&["-f", "-", "--tag-style=basic", "source.rs"])
     );
 }
 
