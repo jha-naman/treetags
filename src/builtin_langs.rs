@@ -141,7 +141,7 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
         disambiguation: &[],
         grammar: GrammarSource::Wasm(&crate::wasm_grammars::KOTLIN),
         generate_fn: Some(kotlin::generate),
-        query: None,
+        query: Some(crate::queries::KOTLIN_TAGS_QUERY),
         legacy_query_overrides: false,
     },
     LanguageDescriptor {
