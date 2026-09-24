@@ -1,5 +1,5 @@
 use crate::parser::{
-    c_sharp, cpp, dart, elixir, go, java, js, julia, kotlin, objective_c, python, rust, swift,
+    c_sharp, cpp, dart, elixir, go, java, js, julia, kotlin, lua, objective_c, python, rust, swift,
     terraform, typescript, zig, TagKindConfig,
 };
 use crate::tag::Tag;
@@ -360,11 +360,11 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
         extensions: &["lua"],
         patterns: &[],
         interpreters: &["lua"],
-        kind_defaults: &[],
-        kind_optionals: &[],
+        kind_defaults: lua::KIND_DEFAULTS,
+        kind_optionals: lua::KIND_OPTIONALS,
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_lua::LANGUAGE.into()),
-        generate_fn: None,
+        generate_fn: Some(lua::generate),
         query: Some(tree_sitter_lua::TAGS_QUERY),
         legacy_query_overrides: true,
     },

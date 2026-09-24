@@ -1,0 +1,2 @@
+--sort yes -f - --tag-style=with_extension_fields --kinds-lua=+m,+l,+v,+F,+L --fields=+k,+n,+l,+e,+S,+r,+f
+source.lua

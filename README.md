@@ -37,7 +37,7 @@ language catalog by tests.
 | javascript | bundled | yes | yes |
 | julia | bundled | yes | yes |
 | kotlin | wasm | yes | yes |
-| lua | bundled | yes | — |
+| lua | bundled | yes | yes |
 | objc | wasm | yes | yes |
 | ocaml | wasm | yes | — |
 | php | bundled | yes | — |

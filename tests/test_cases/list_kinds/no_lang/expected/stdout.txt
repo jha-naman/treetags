@@ -134,6 +134,14 @@ kotlin
     o  object
     p  package
     v  variable
+lua
+    f  function
+    Y  unknown [off]
+    m  method [off]
+    l  local [off]
+    v  global [off]
+    F  field [off]
+    L  label [off]
 objc
     d  macro
     e  enumerator
