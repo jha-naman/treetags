@@ -30,7 +30,7 @@ language catalog by tests.
 | c | bundled | yes | yes |
 | c# | bundled | yes | yes |
 | c++ | bundled | yes | yes |
-| dart | wasm | — | yes |
+| dart | wasm | yes | yes |
 | elixir | bundled | yes | — |
 | go | bundled | yes | yes |
 | java | bundled | yes | yes |

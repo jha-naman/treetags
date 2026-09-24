@@ -21,6 +21,7 @@ Allow users to manage the downloading of WASM grammars not bundled with treetags
 - Add basic tags support for Terraform
 - Add basic tags support for Swift
 - Add basic tags support for Objective C
+- Add basic tags support for Dart
 
 ### Changed
 - Tag Address is truncated to 96 chars for native parsers

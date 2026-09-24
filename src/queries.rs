@@ -14,6 +14,8 @@ pub const ZIG_TAGS_QUERY: &str = include_str!("../queries/zig.scm");
 
 pub const SWIFT_TAGS_QUERY: &str = include_str!("../queries/swift.scm");
 
+pub const DART_TAGS_QUERY: &str = include_str!("../queries/dart.scm");
+
 pub const TERRAFORM_TAGS_QUERY: &str = include_str!("../queries/terraform.scm");
 
 pub const OBJECTIVE_C_TAGS_QUERY: &str = include_str!("../queries/objective_c.scm");

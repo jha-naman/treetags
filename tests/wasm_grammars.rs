@@ -27,7 +27,11 @@ impl Project {
         fs::write(self.dir.path().join(name), source).unwrap();
     }
     fn install(&self, lang: &str) {
-        let abi = if lang == "swift" { 15 } else { 14 };
+        let abi = if matches!(lang, "swift" | "dart") {
+            15
+        } else {
+            14
+        };
         let dir = self.config_dir().join(format!("wasm_grammars/{abi}"));
         fs::create_dir_all(&dir).unwrap();
         let file = format!("tree-sitter-{lang}.wasm");
