@@ -1,2 +1,2 @@
---sort yes -f '-' --extras='+r' --fields='+l,+r'
+--sort yes -f '-' --tag-style=with_extension_fields --extras='+r' --fields='+l,+r'
 source.tf source.tfvars

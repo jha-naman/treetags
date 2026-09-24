@@ -155,7 +155,7 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
         disambiguation: &[],
         grammar: GrammarSource::Wasm(&crate::wasm_grammars::TERRAFORM),
         generate_fn: Some(terraform::generate),
-        query: None,
+        query: Some(crate::queries::TERRAFORM_TAGS_QUERY),
         legacy_query_overrides: false,
     },
     LanguageDescriptor {

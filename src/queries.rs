@@ -11,3 +11,5 @@ pub const TYPESCRIPT_TAGS_QUERY: &str = include_str!("../queries/typescript.scm"
 pub const C_SHARP_TAGS_QUERY: &str = include_str!("../queries/csharp.scm");
 
 pub const ZIG_TAGS_QUERY: &str = include_str!("../queries/zig.scm");
+
+pub const TERRAFORM_TAGS_QUERY: &str = include_str!("../queries/terraform.scm");

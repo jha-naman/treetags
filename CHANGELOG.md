@@ -18,6 +18,7 @@ Allow users to manage the downloading of WASM grammars not bundled with treetags
 - Add native Dart tag generator that uses downloadable WASM tree-sitter grammar
 - Add native Terraform tag generator that uses downloadable WASM tree-sitter grammar
 - Add basic tags support for Zig
+- Add basic tags support for Terraform
 
 ### Changed
 - Tag Address is truncated to 96 chars for native parsers
