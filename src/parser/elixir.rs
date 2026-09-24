@@ -1,6 +1,6 @@
 //! Elixir definitions from the native tree-sitter grammar.
 use super::common::{
-    cursor::{line_of, node_text},
+    cursor::{field_child, line_of, node_text},
     scope::{ScopeKey, ScopeStack},
     scope_walker::{walk_tree, WalkContext},
     tree_walker::{generate_tags_with_config, Context},
@@ -55,17 +55,6 @@ fn first_arg<'tree>(cursor: &mut TreeCursor<'tree>) -> Option<Node<'tree>> {
                     break;
                 }
             });
-            break;
-        }
-    });
-    result
-}
-
-fn field_child<'tree>(cursor: &mut TreeCursor<'tree>, field: &str) -> Option<Node<'tree>> {
-    let mut result = None;
-    for_each_child!(cursor, {
-        if cursor.field_name() == Some(field) {
-            result = Some(cursor.node());
             break;
         }
     });

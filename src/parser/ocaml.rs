@@ -1,6 +1,6 @@
 //! OCaml definitions from the official tree-sitter grammar.
 use super::common::{
-    cursor::{line_of, node_text},
+    cursor::{field_child, line_of, node_text},
     scope::{ScopeKey, ScopeStack},
     scope_walker::{walk_tree, WalkContext},
     tree_walker::{generate_tags_with_config, Context},
@@ -51,17 +51,6 @@ fn first_child<'tree>(cursor: &mut TreeCursor<'tree>, kinds: &[&str]) -> Option<
         let child = cursor.node();
         if kinds.contains(&child.kind()) {
             found = Some(child);
-            break;
-        }
-    });
-    found
-}
-
-fn field_child<'tree>(cursor: &mut TreeCursor<'tree>, field: &str) -> Option<Node<'tree>> {
-    let mut found = None;
-    for_each_child!(cursor, {
-        if cursor.field_name() == Some(field) {
-            found = Some(cursor.node());
             break;
         }
     });

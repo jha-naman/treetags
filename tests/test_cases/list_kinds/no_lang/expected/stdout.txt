@@ -198,6 +198,15 @@ python
     Y  name referring to a class/variable/function/module defined in other module
     z  function parameters [off]
     l  local variables [off]
+ruby
+    A  accessor
+    C  constant
+    L  library
+    S  singletonMethod
+    a  alias
+    c  class
+    f  method
+    m  module
 rust
     n  module
     s  struct

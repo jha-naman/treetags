@@ -1,6 +1,6 @@
 use crate::parser::{
     c_sharp, cpp, dart, elixir, go, java, js, julia, kotlin, lua, objective_c, ocaml, php, python,
-    rust, swift, terraform, typescript, zig, TagKindConfig,
+    ruby, rust, swift, terraform, typescript, zig, TagKindConfig,
 };
 use crate::tag::Tag;
 use crate::wasm_grammars::GrammarSource;
@@ -287,7 +287,7 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
         legacy_query_overrides: false,
     },
     LanguageDescriptor {
-        lang: "ruby",
+        lang: ruby::LANG_NAME,
         aliases: &[],
         extensions: &["rb"],
         patterns: &[
@@ -304,11 +304,11 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
             "*.rake",
         ],
         interpreters: &["ruby"],
-        kind_defaults: &[],
-        kind_optionals: &[],
+        kind_defaults: ruby::KIND_DEFAULTS,
+        kind_optionals: ruby::KIND_OPTIONALS,
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_ruby::LANGUAGE.into()),
-        generate_fn: None,
+        generate_fn: Some(ruby::generate),
         query: Some(tree_sitter_ruby::TAGS_QUERY),
         legacy_query_overrides: true,
     },

@@ -41,6 +41,7 @@ pub(crate) mod objective_c;
 pub(crate) mod ocaml;
 pub(crate) mod php;
 pub(crate) mod python;
+pub(crate) mod ruby;
 pub(crate) mod rust;
 pub(crate) mod swift;
 pub(crate) mod terraform;

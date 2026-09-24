@@ -28,6 +28,7 @@ Allow users to manage the downloading of WASM grammars not bundled with treetags
 - Add extension fields support for Lua
 - Add extension fields support for OCaml
 - Add extension fields support for PHP
+- Add extension fields support for Ruby
 
 ### Changed
 - Tag Address is truncated to 96 chars for native parsers

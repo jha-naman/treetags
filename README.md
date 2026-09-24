@@ -42,7 +42,7 @@ language catalog by tests.
 | ocaml | wasm | yes | yes |
 | php | bundled | yes | yes |
 | python | bundled | yes | yes |
-| ruby | bundled | yes | — |
+| ruby | bundled | yes | yes |
 | rust | bundled | yes | yes |
 | scala | bundled | yes | — |
 | shell | bundled | yes | — |
