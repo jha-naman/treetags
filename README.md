@@ -40,7 +40,7 @@ language catalog by tests.
 | lua | bundled | yes | yes |
 | objc | wasm | yes | yes |
 | ocaml | wasm | yes | yes |
-| php | bundled | yes | — |
+| php | bundled | yes | yes |
 | python | bundled | yes | yes |
 | ruby | bundled | yes | — |
 | rust | bundled | yes | yes |

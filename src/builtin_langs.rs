@@ -1,6 +1,6 @@
 use crate::parser::{
-    c_sharp, cpp, dart, elixir, go, java, js, julia, kotlin, lua, objective_c, ocaml, python, rust,
-    swift, terraform, typescript, zig, TagKindConfig,
+    c_sharp, cpp, dart, elixir, go, java, js, julia, kotlin, lua, objective_c, ocaml, php, python,
+    rust, swift, terraform, typescript, zig, TagKindConfig,
 };
 use crate::tag::Tag;
 use crate::wasm_grammars::GrammarSource;
@@ -332,12 +332,12 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
         extensions: &["php"],
         patterns: &[],
         interpreters: &["php"],
-        kind_defaults: &[],
-        kind_optionals: &[],
+        kind_defaults: php::KIND_DEFAULTS,
+        kind_optionals: php::KIND_OPTIONALS,
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_php::LANGUAGE_PHP.into()),
-        generate_fn: None,
-        query: Some(tree_sitter_php::TAGS_QUERY),
+        generate_fn: Some(php::generate),
+        query: Some(crate::queries::PHP_TAGS_QUERY),
         legacy_query_overrides: true,
     },
     LanguageDescriptor {

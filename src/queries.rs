@@ -21,3 +21,5 @@ pub const KOTLIN_TAGS_QUERY: &str = include_str!("../queries/kotlin.scm");
 pub const TERRAFORM_TAGS_QUERY: &str = include_str!("../queries/terraform.scm");
 
 pub const OBJECTIVE_C_TAGS_QUERY: &str = include_str!("../queries/objective_c.scm");
+
+pub const PHP_TAGS_QUERY: &str = include_str!("../queries/php.scm");

@@ -1,0 +1,8 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+A	source.php	/^namespace A {$/;"	kind:n	line:2
+B	source.php	/^namespace B {$/;"	kind:n	line:8
+Item	source.php	/^    class Item {$/;"	kind:c	line:9	namespace:B
+counter	source.php	/^        static \$counter = 1;$/;"	kind:l	line:4	function:A\one
+flag	source.php	/^        public static \$flag;$/;"	kind:v	line:10	class:B\Item
+local	source.php	/^        \$local = 2;$/;"	kind:l	line:5	function:A\one
+one	source.php	/^    function one() {$/;"	kind:f	line:3	namespace:A	signature:()

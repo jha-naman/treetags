@@ -178,6 +178,16 @@ ocaml
     r  RecordField
     t  type
     v  var
+php
+    a  alias
+    c  class
+    d  define
+    f  function
+    i  interface
+    n  namespace
+    t  trait
+    v  variable
+    l  local [off]
 python
     c  classes
     f  function

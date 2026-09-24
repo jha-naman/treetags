@@ -1,0 +1,6 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+First	source.php	/^namespace First {$/;"	
+Second	source.php	/^namespace Second {$/;"	
+VALUE	source.php	/^    const VALUE = 3;$/;"	
+shared	source.php	/^    \$shared = 1;$/;"	
+work	source.php	/^    function work() {$/;"	
