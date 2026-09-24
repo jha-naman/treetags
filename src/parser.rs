@@ -43,6 +43,7 @@ pub(crate) mod php;
 pub(crate) mod python;
 pub(crate) mod ruby;
 pub(crate) mod rust;
+pub(crate) mod shell;
 pub(crate) mod swift;
 pub(crate) mod terraform;
 pub(crate) mod typescript;

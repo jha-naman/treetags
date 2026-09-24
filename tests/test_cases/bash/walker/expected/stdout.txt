@@ -1,0 +1,11 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+./other.sh	source.sh	/^. .\/other.sh$/;"	kind:s	line:13	language:Sh	roles:loaded
+EOF_H	source.sh	/^EOF_H$/;"	kind:h	line:8	language:Sh	roles:endmarker
+EOF_H	source.sh	/^cat <<EOF_H$/;"	kind:h	line:6	language:Sh	roles:def	end:8
+TAB	source.sh	/^TAB$/;"	kind:h	line:11	language:Sh	roles:endmarker
+TAB	source.sh	/^cat <<-'TAB'$/;"	kind:h	line:9	language:Sh	roles:def	end:11
+bar	source.sh	/^bar () { :; }$/;"	kind:f	line:3	language:Sh	roles:def
+foo	source.sh	/^function foo() { :; }$/;"	kind:f	line:2	language:Sh	roles:def
+gs	source.sh	/^alias gs="git status" xx=echo$/;"	kind:a	line:5	language:Sh	roles:def
+lib/helpers.sh	source.sh	/^source lib\/helpers.sh$/;"	kind:s	line:12	language:Sh	roles:loaded
+ll	source.sh	/^alias ll='ls -l'$/;"	kind:a	line:4	language:Sh	roles:def

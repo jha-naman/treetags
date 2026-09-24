@@ -133,7 +133,7 @@ mod tests {
     #[test]
     fn selection_covers_both_single_styles_and_dual_capabilities() {
         let rust = official_language("rust").unwrap();
-        let ruby = official_language("ruby").unwrap();
+        let scala = official_language("scala").unwrap();
         let basic = TagPreferences::default();
         assert_eq!(
             basic.select(rust),
@@ -142,13 +142,13 @@ mod tests {
                 effective: TagStyle::Basic,
             }
         );
-        assert_eq!(basic.select(ruby).effective, TagStyle::Basic);
+        assert_eq!(basic.select(scala).effective, TagStyle::Basic);
         let rich = basic
             .clone()
             .merge(Some(TagStyle::WithExtensionFields), None, None)
             .unwrap();
         assert_eq!(
-            rich.select(ruby),
+            rich.select(scala),
             TagSelection {
                 preferred: TagStyle::WithExtensionFields,
                 effective: TagStyle::Basic,

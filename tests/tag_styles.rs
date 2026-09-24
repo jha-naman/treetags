@@ -190,6 +190,7 @@ fn basic_output_ignores_rich_options_and_single_style_fallback_preserves_current
     let p = Project::new("");
     p.write("source.rb", "def greet\nend\n");
     p.write("source.rs", "pub fn hello() {}\n");
+    p.write("source.scala", "def greet = 1\n");
     let plain = p.success(&["-f", "-", "source.rb"]);
     assert!(plain.contains("greet\tsource.rb\t"));
     assert!(plain
@@ -201,11 +202,25 @@ fn basic_output_ignores_rich_options_and_single_style_fallback_preserves_current
         p.success(&[
             "-f",
             "-",
-            "--tag-style=with_extension_fields",
+            "--tag-style=basic",
             "--fields=+n,+S",
             "--extras=+q",
             "--kinds-ruby=anything",
             "source.rb"
+        ])
+    );
+    let scala_basic = p.success(&["-f", "-", "source.scala"]);
+    assert!(scala_basic.contains("greet\tsource.scala\t"));
+    assert_eq!(
+        scala_basic,
+        p.success(&[
+            "-f",
+            "-",
+            "--tag-style=with_extension_fields",
+            "--fields=+n,+S",
+            "--extras=+q",
+            "--kinds-scala=anything",
+            "source.scala"
         ])
     );
     let rust_basic = p.success(&["-f", "-", "source.rs"]);

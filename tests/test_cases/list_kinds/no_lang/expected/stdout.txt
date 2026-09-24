@@ -223,6 +223,11 @@ rust
     v  variable
     t  type
     M  macro
+shell
+    a  alias
+    f  function
+    h  heredoc
+    s  script
 swift
     c  class
     s  struct
