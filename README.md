@@ -49,7 +49,7 @@ language catalog by tests.
 | swift | wasm | — | yes |
 | terraform | wasm | — | yes |
 | typescript | bundled | yes | yes |
-| zig | wasm | — | yes |
+| zig | wasm | yes | yes |
 <!-- tag-style-capabilities:end -->
 
 ## Choosing a tag style

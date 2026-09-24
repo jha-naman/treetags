@@ -72,14 +72,9 @@ fn default_and_configured_preferences_are_visible_without_loading_grammars() {
     let zig = p.selection(&["--list-tag-styles", "zig"], "zig");
     assert_eq!(
         &zig[1..5],
-        &[
-            "wasm",
-            "with_extension_fields",
-            "basic",
-            "with_extension_fields"
-        ]
+        &["wasm", "basic,with_extension_fields", "basic", "basic"]
     );
-    assert!(zig[5].contains("not implemented"));
+    assert_eq!(zig[5], "preferred style available");
     let shell = p.selection(&["--list-tag-styles", "SH"], "shell");
     assert_eq!(&shell[3..5], &["basic", "basic"]);
     assert!(!p.0.path().join("cache").exists());

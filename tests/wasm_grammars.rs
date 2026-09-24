@@ -477,7 +477,13 @@ test "" {}
 test "_" {}
 "#,
     );
-    let out = p.run(&["-f", "-", "--kinds-zig=+z,+l", "source.zig"]);
+    let out = p.run(&[
+        "-f",
+        "-",
+        "--tag-style=with_extension_fields",
+        "--kinds-zig=+z,+l",
+        "source.zig",
+    ]);
     assert!(out.status.success(), "{}", stderr(&out));
     let tags = stdout(&out);
     for line in tags.lines().filter(|line| !line.starts_with('!')) {
@@ -493,7 +499,14 @@ test "_" {}
         "{tags}"
     );
 
-    let out = p.run(&["-f", "-", "--kinds-zig=z", "--fields=+s,+t", "source.zig"]);
+    let out = p.run(&[
+        "-f",
+        "-",
+        "--tag-style=with_extension_fields",
+        "--kinds-zig=z",
+        "--fields=+s,+t",
+        "source.zig",
+    ]);
     assert!(out.status.success(), "{}", stderr(&out));
     let tags = stdout(&out);
     let tags: Vec<_> = tags.lines().filter(|line| !line.starts_with('!')).collect();

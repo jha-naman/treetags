@@ -491,10 +491,8 @@ mod wasm_tests {
         let mut config = Config::for_test();
         config.wasm_grammars_dir =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/grammars/wasm");
-        // A framework fixture, not the production query to be added in Zig's migration.
-        let desc = crate::builtin_langs::LanguageDescriptorTestBuilder::from_language("zig")
-            .query("(identifier) @name @definition.function")
-            .build();
+        let desc =
+            crate::builtin_langs::LanguageDescriptorTestBuilder::from_language("zig").build();
         let mut parser = Parser::new(&config);
         for style in [
             TagStyle::Basic,
