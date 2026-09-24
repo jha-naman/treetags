@@ -1,0 +1,6 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+AbstractThing	source.jl	/^abstract type AbstractThing end$/;"	
+calc	source.jl	/^function calc(x::Int, y=1)::Int$/;"	
+say	source.jl	/^macro say(x)$/;"	
+short	source.jl	/^short(x) = x$/;"	
+typed_short	source.jl	/^typed_short(x)::Int = x$/;"	

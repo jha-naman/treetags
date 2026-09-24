@@ -116,6 +116,15 @@ javascript
     G  getters
     S  setters
     M  fields
+julia
+    Y  unknown
+    c  constant
+    f  function
+    g  field
+    m  macro
+    n  module
+    s  struct
+    t  type
 kotlin
     C  constant
     T  typealias

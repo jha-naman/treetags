@@ -1,0 +1,18 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+ANSWER	source.jl	/^const ANSWER = 42$/;"	kind:c	line:2	language:Julia	module:Outer	roles:def
+AbstractThing	source.jl	/^abstract type AbstractThing end$/;"	kind:t	line:4	language:Julia	module:Outer	roles:def
+Base	source.jl	/^import Base: show, +$/;"	kind:n	line:25	language:Julia	roles:namespace
+Bits	source.jl	/^primitive type Bits <: Integer 32 end$/;"	kind:t	line:5	language:Julia	module:Outer	roles:def
+Box	source.jl	/^mutable struct Box{T} <: AbstractThing$/;"	kind:s	line:6	language:Julia	module:Outer	signature:{T}	roles:def
+Dates	source.jl	/^using Dates$/;"	kind:n	line:24	language:Julia	roles:used
+FLAG	source.jl	/^const FLAG = true$/;"	kind:c	line:21	language:Julia	module:Outer.Inner	roles:def
+Inner	source.jl	/^module Inner$/;"	kind:n	line:20	language:Julia	module:Outer	roles:def
+Outer	source.jl	/^module Outer$/;"	kind:n	line:1	language:Julia	roles:def
+calc	source.jl	/^function calc(x::Int, y=1)::Int$/;"	kind:f	line:11	language:Julia	module:Outer	signature:(x::Int, y=1)::Int	roles:def
+count	source.jl	/^    count::Int$/;"	kind:g	line:8	language:Julia	struct:Outer.Box	signature:::Int	roles:def
+label	source.jl	/^    label$/;"	kind:g	line:9	language:Julia	struct:Outer.Box	roles:def
+say	source.jl	/^macro say(x)$/;"	kind:m	line:17	language:Julia	module:Outer	signature:(x)	roles:def
+short	source.jl	/^short(x) = x$/;"	kind:f	line:15	language:Julia	module:Outer	signature:(x)	roles:def
+show	source.jl	/^import Base: show, +$/;"	kind:Y	line:25	language:Julia	module:Base	roles:imported
+typed_short	source.jl	/^typed_short(x)::Int = x$/;"	kind:f	line:16	language:Julia	module:Outer	signature:(x)::Int	roles:def
+value	source.jl	/^    value::T$/;"	kind:g	line:7	language:Julia	struct:Outer.Box	signature:::T	roles:def

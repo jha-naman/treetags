@@ -1,6 +1,6 @@
 use crate::parser::{
-    c_sharp, cpp, dart, elixir, go, java, js, kotlin, objective_c, python, rust, swift, terraform,
-    typescript, zig, TagKindConfig,
+    c_sharp, cpp, dart, elixir, go, java, js, julia, kotlin, objective_c, python, rust, swift,
+    terraform, typescript, zig, TagKindConfig,
 };
 use crate::tag::Tag;
 use crate::wasm_grammars::GrammarSource;
@@ -412,11 +412,11 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
         extensions: &["jl"],
         patterns: &[],
         interpreters: &["julia"],
-        kind_defaults: &[],
-        kind_optionals: &[],
+        kind_defaults: julia::KIND_DEFAULTS,
+        kind_optionals: julia::KIND_OPTIONALS,
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_julia::LANGUAGE.into()),
-        generate_fn: None,
+        generate_fn: Some(julia::generate),
         query: Some(crate::queries::JULIA_TAGS_QUERY),
         legacy_query_overrides: true,
     },

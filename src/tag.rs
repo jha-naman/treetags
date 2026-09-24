@@ -228,6 +228,7 @@ impl Tag {
                         | "end"
                         | "file"
                         | "signature"
+                        | "roles"
                         | "access"
                         | "language"
                 )
@@ -244,7 +245,7 @@ impl Tag {
                 match key.as_ref() {
                     // These fields should never have module prefixes
                     "line" | "end" | "kind" | "file" | "signature" | "access" | "module"
-                    | "language" => {}
+                    | "language" | "roles" => {}
                     // For scope-related fields, prepend module value if it exists
                     _ => {
                         if let Some(module) = module_value {
