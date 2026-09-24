@@ -1,6 +1,6 @@
 use crate::parser::{
-    c_sharp, cpp, dart, elixir, go, java, js, julia, kotlin, lua, objective_c, python, rust, swift,
-    terraform, typescript, zig, TagKindConfig,
+    c_sharp, cpp, dart, elixir, go, java, js, julia, kotlin, lua, objective_c, ocaml, python, rust,
+    swift, terraform, typescript, zig, TagKindConfig,
 };
 use crate::tag::Tag;
 use crate::wasm_grammars::GrammarSource;
@@ -318,11 +318,11 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
         extensions: &["ml"],
         patterns: &[],
         interpreters: &[],
-        kind_defaults: &[],
+        kind_defaults: ocaml::KIND_DEFAULTS,
         kind_optionals: &[],
         disambiguation: &[],
         grammar: GrammarSource::Wasm(&crate::wasm_grammars::OCAML),
-        generate_fn: None,
+        generate_fn: Some(ocaml::generate),
         query: Some(include_str!("../queries/ocaml.scm")),
         legacy_query_overrides: true,
     },

@@ -38,6 +38,7 @@ pub(crate) mod julia;
 pub(crate) mod kotlin;
 pub(crate) mod lua;
 pub(crate) mod objective_c;
+pub(crate) mod ocaml;
 pub(crate) mod python;
 pub(crate) mod rust;
 pub(crate) mod swift;

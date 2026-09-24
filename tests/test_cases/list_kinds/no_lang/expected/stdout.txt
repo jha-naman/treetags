@@ -167,6 +167,17 @@ objc
     z  parameter [off]
     L  label [off]
     D  macroparam [off]
+ocaml
+    C  Constructor
+    M  module
+    c  class
+    e  Exception
+    f  function
+    m  method
+    p  val
+    r  RecordField
+    t  type
+    v  var
 python
     c  classes
     f  function

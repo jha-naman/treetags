@@ -1,0 +1,16 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+Blue	source.ml	/^  type color = Red | Blue$/;"	C	line:2	language:OCaml	type:Outer/color
+Oops	source.ml	/^  exception Oops$/;"	e	line:4	language:OCaml	module:Outer
+Outer	source.ml	/^module Outer = struct$/;"	M	line:1	language:OCaml
+Red	source.ml	/^  type color = Red | Blue$/;"	C	line:2	language:OCaml	type:Outer/color
+S	source.ml	/^module type S = sig val run : int -> int end$/;"	M	line:9	language:OCaml
+Source	source.ml	/^module Outer = struct$/;"	M	line:1	language:OCaml
+add	source.ml	/^  let add x = x + count$/;"	f	line:6	language:OCaml	module:Outer
+age	source.ml	/^  type person = { age : int }$/;"	r	line:3	language:OCaml	type:Outer/person
+color	source.ml	/^  type color = Red | Blue$/;"	t	line:2	language:OCaml	module:Outer
+count	source.ml	/^  let count = 1$/;"	v	line:5	language:OCaml	module:Outer
+counter	source.ml	/^  class counter = object method get = count end$/;"	c	line:7	language:OCaml	module:Outer
+get	source.ml	/^  class counter = object method get = count end$/;"	m	line:7	language:OCaml	class:Outer/counter
+person	source.ml	/^  type person = { age : int }$/;"	t	line:3	language:OCaml	module:Outer
+primitive	source.ml	/^external primitive : int -> int = "primitive"$/;"	f	line:10	language:OCaml
+run	source.ml	/^module type S = sig val run : int -> int end$/;"	p	line:9	language:OCaml	module:S

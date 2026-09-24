@@ -39,7 +39,7 @@ language catalog by tests.
 | kotlin | wasm | yes | yes |
 | lua | bundled | yes | yes |
 | objc | wasm | yes | yes |
-| ocaml | wasm | yes | — |
+| ocaml | wasm | yes | yes |
 | php | bundled | yes | — |
 | python | bundled | yes | yes |
 | ruby | bundled | yes | — |

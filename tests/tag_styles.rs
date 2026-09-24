@@ -266,7 +266,7 @@ fn basic_query_identity_survives_language_forcing_and_extension_remapping() {
 
 #[test]
 fn wasm_queries_keep_the_same_style_selection_and_offline_installation() {
-    let p = Project::new("[tags]\ndefault='with_extension_fields'");
+    let p = Project::new("[tags]\ndefault='basic'");
     let directory = p.0.path().join("config/treetags/wasm_grammars/14");
     fs::create_dir_all(&directory).unwrap();
     fs::copy(
