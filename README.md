@@ -46,7 +46,7 @@ language catalog by tests.
 | rust | bundled | yes | yes |
 | scala | bundled | yes | — |
 | shell | bundled | yes | — |
-| swift | wasm | — | yes |
+| swift | wasm | yes | yes |
 | terraform | wasm | yes | yes |
 | typescript | bundled | yes | yes |
 | zig | wasm | yes | yes |

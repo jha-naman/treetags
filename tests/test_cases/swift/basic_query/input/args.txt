@@ -1,0 +1,2 @@
+--sort yes -f '-' --fields=+e,+S,+a
+source.swift

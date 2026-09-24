@@ -127,7 +127,7 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
         disambiguation: &[],
         grammar: GrammarSource::Wasm(&crate::wasm_grammars::SWIFT),
         generate_fn: Some(swift::generate),
-        query: None,
+        query: Some(crate::queries::SWIFT_TAGS_QUERY),
         legacy_query_overrides: false,
     },
     LanguageDescriptor {
