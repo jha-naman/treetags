@@ -23,6 +23,7 @@ Allow users to manage the downloading of WASM grammars not bundled with treetags
 - Add basic tags support for Objective C
 - Add basic tags support for Dart
 - Add basic tags support for Kotlin
+- Add extension fields support for Elixir
 
 ### Changed
 - Tag Address is truncated to 96 chars for native parsers

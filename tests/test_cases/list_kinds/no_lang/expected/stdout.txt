@@ -68,6 +68,20 @@ dart
     v  variable
     l  local [off]
     z  parameter [off]
+elixir
+    a  macro
+    c  callback
+    d  delegate
+    e  exception
+    f  function
+    g  guard
+    i  implementation
+    m  module
+    o  operator
+    p  protocol
+    r  record
+    t  test
+    y  type
 go
     p  package
     f  function

@@ -29,6 +29,7 @@ pub(crate) mod c_sharp;
 pub(crate) mod common;
 pub(crate) mod cpp;
 pub(crate) mod dart;
+pub(crate) mod elixir;
 pub(crate) mod go;
 mod helper;
 pub(crate) mod java;

@@ -1,5 +1,5 @@
 use crate::parser::{
-    c_sharp, cpp, dart, go, java, js, kotlin, objective_c, python, rust, swift, terraform,
+    c_sharp, cpp, dart, elixir, go, java, js, kotlin, objective_c, python, rust, swift, terraform,
     typescript, zig, TagKindConfig,
 };
 use crate::tag::Tag;
@@ -343,16 +343,16 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
     LanguageDescriptor {
         lang: "elixir",
         aliases: &[],
-        extensions: &["ex"],
+        extensions: &["ex", "exs"],
         patterns: &[],
         interpreters: &[],
-        kind_defaults: &[],
+        kind_defaults: elixir::KIND_DEFAULTS,
         kind_optionals: &[],
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_elixir::LANGUAGE.into()),
-        generate_fn: None,
+        generate_fn: Some(elixir::generate),
         query: Some(tree_sitter_elixir::TAGS_QUERY),
-        legacy_query_overrides: true,
+        legacy_query_overrides: false,
     },
     LanguageDescriptor {
         lang: "lua",
