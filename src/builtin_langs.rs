@@ -241,7 +241,7 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
         disambiguation: &[("h", objective_c::DISAMBIG_SIGNALS)],
         grammar: GrammarSource::Wasm(&crate::wasm_grammars::OBJECTIVE_C),
         generate_fn: Some(objective_c::generate),
-        query: None,
+        query: Some(crate::queries::OBJECTIVE_C_TAGS_QUERY),
         legacy_query_overrides: false,
     },
     LanguageDescriptor {
