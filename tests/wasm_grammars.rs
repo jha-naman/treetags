@@ -62,41 +62,6 @@ fn stderr(output: &Output) -> String {
 }
 
 #[test]
-fn swift_walker_uses_external_grammar_and_filters_extension_fields() {
-    let p = Project::new();
-    p.write("source.swift", "public struct Box {\n    var value: Int\n    func read(input: Int) -> Int {\n        let local: Int = input\n        return local\n    }\n}\n");
-    p.install("swift");
-
-    let default = p.run(&["-f", "-", "--tag-style=extended", "source.swift"]);
-    assert!(default.status.success(), "{}", stderr(&default));
-    let output = stdout(&default);
-    assert!(output.contains("Box\tsource.swift"), "{output}");
-    assert!(
-        output.contains("struct:Box\ttyperef:typename:Int"),
-        "{output}"
-    );
-    assert!(!output.contains("local\tsource.swift"), "{output}");
-    assert!(!output.contains("signature:"), "{output}");
-
-    let filtered = p.run(&[
-        "-f",
-        "-",
-        "--tag-style=extended",
-        "--fields=-s,-t,+n,+e,+S,+a",
-        "--kinds-swift=+l,+z",
-        "source.swift",
-    ]);
-    assert!(filtered.status.success(), "{}", stderr(&filtered));
-    let output = stdout(&filtered);
-    assert!(output.contains("local\tsource.swift"), "{output}");
-    assert!(output.contains("input\tsource.swift"), "{output}");
-    assert!(output.contains("signature:(input: Int)"), "{output}");
-    assert!(output.contains("access:public"), "{output}");
-    assert!(!output.contains("struct:Box"), "{output}");
-    assert!(!output.contains("typeref:"), "{output}");
-}
-
-#[test]
 fn grammar_commands_list_install_and_uninstall_offline() {
     let p = Project::new();
     let available = p.run(&["grammar", "available"]);

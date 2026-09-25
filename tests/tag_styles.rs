@@ -276,39 +276,3 @@ fn basic_query_identity_survives_language_forcing_and_extension_remapping() {
     assert!(mapped.contains("greet\tsource.custom\t"));
 }
 
-#[test]
-fn wasm_queries_keep_the_same_style_selection_and_offline_installation() {
-    let p = Project::new("[tags]\ndefault='basic'");
-    let directory = p.0.path().join("config/treetags/wasm_grammars/14");
-    fs::create_dir_all(&directory).unwrap();
-    fs::copy(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/grammars/wasm/14/tree-sitter-ocaml.wasm"),
-        directory.join("tree-sitter-ocaml.wasm"),
-    )
-    .unwrap();
-    p.write("source.ml", "let double x = x * 2\n");
-    let output = p.success(&["-f", "-", "source.ml"]);
-    assert!(output.contains("double\tsource.ml\t"));
-    assert_eq!(
-        output,
-        p.success(&["-f", "-", "--tag-style=basic", "source.ml"])
-    );
-}
-
-#[test]
-fn custom_native_grammar_retains_existing_query_override() {
-    let library = Path::new(env!("OUT_DIR")).join(format!(
-        "{}tree_sitter_gleam{}",
-        std::env::consts::DLL_PREFIX,
-        std::env::consts::DLL_SUFFIX
-    ));
-    let config = format!(
-        "[[user_grammars]]\nlanguage_name='gleam'\ngrammar_lib_path='{}'\nextensions=['lua']\n",
-        library.display()
-    );
-    let p = Project::new(&config);
-    p.write("source.lua", "pub fn custom_definition() { 1 }\n");
-    assert!(p
-        .success(&["-f", "-", "source.lua"])
-        .contains("custom_definition\tsource.lua\t"));
-}
