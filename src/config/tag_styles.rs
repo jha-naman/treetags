@@ -151,7 +151,7 @@ mod tests {
             rich.select(scala),
             TagSelection {
                 preferred: TagStyle::WithExtensionFields,
-                effective: TagStyle::Basic,
+                effective: TagStyle::WithExtensionFields,
             }
         );
         assert_eq!(rich.select(rust).effective, TagStyle::WithExtensionFields);

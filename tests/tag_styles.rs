@@ -216,13 +216,21 @@ fn basic_output_ignores_rich_options_and_single_style_fallback_preserves_current
         p.success(&[
             "-f",
             "-",
-            "--tag-style=with_extension_fields",
+            "--tag-style=basic",
             "--fields=+n,+S",
             "--extras=+q",
             "--kinds-scala=anything",
             "source.scala"
         ])
     );
+    let scala_rich = p.success(&[
+        "-f",
+        "-",
+        "--tag-style=with_extension_fields",
+        "source.scala",
+    ]);
+    assert!(scala_rich.contains("greet\tsource.scala\t"));
+    assert!(scala_rich.contains("\tf"));
     let rust_basic = p.success(&["-f", "-", "source.rs"]);
     assert!(rust_basic.contains("hello\tsource.rs\t"));
     assert!(rust_basic

@@ -1,6 +1,6 @@
 use crate::parser::{
     c_sharp, cpp, dart, elixir, go, java, js, julia, kotlin, lua, objective_c, ocaml, php, python,
-    ruby, rust, shell, swift, terraform, typescript, zig, TagKindConfig,
+    ruby, rust, scala, shell, swift, terraform, typescript, zig, TagKindConfig,
 };
 use crate::tag::Tag;
 use crate::wasm_grammars::GrammarSource;
@@ -393,16 +393,16 @@ pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
         legacy_query_overrides: true,
     },
     LanguageDescriptor {
-        lang: "scala",
+        lang: scala::LANG_NAME,
         aliases: &[],
-        extensions: &["scala"],
+        extensions: scala::LANG_EXTENSIONS,
         patterns: &[],
         interpreters: &["scala"],
-        kind_defaults: &[],
-        kind_optionals: &[],
+        kind_defaults: scala::KIND_DEFAULTS,
+        kind_optionals: scala::KIND_OPTIONALS,
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_scala::LANGUAGE.into()),
-        generate_fn: None,
+        generate_fn: Some(scala::generate),
         query: Some(crate::queries::SCALA_TAGS_QUERY),
         legacy_query_overrides: true,
     },

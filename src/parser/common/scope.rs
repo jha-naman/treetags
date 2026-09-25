@@ -51,6 +51,17 @@ impl<K: ScopeKey> ScopeStack<K> {
         self.has_package = true;
     }
 
+    /// Append another unbraced package clause to the file's package path.
+    pub fn append_package(&mut self, name: &str) {
+        if !self.path.is_empty() {
+            self.path.push('.');
+        }
+        self.path.push_str(name);
+        if self.frames.is_empty() {
+            self.has_package = true;
+        }
+    }
+
     /// Enter a scope named `name` of kind `key`.
     pub fn push(&mut self, key: K, name: &str) {
         let path_len_before = self.path.len();

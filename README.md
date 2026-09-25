@@ -44,7 +44,7 @@ language catalog by tests.
 | python | bundled | yes | yes |
 | ruby | bundled | yes | yes |
 | rust | bundled | yes | yes |
-| scala | bundled | yes | — |
+| scala | bundled | yes | yes |
 | shell | bundled | yes | yes |
 | swift | wasm | yes | yes |
 | terraform | wasm | yes | yes |

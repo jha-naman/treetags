@@ -223,6 +223,21 @@ rust
     v  variable
     t  type
     M  macro
+scala
+    C  constant
+    c  class
+    e  enumerator
+    f  function
+    g  enum
+    i  trait
+    m  method
+    o  object
+    p  package
+    P  property
+    t  type
+    v  variable
+    l  local [off]
+    z  parameter [off]
 shell
     a  alias
     f  function
