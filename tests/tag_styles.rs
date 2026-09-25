@@ -1,7 +1,6 @@
 //! User-facing selection and compatibility tests, isolated from host configuration.
 use std::{
     fs,
-    path::Path,
     process::{Command, Output},
 };
 use tempfile::{tempdir, TempDir};
@@ -275,4 +274,3 @@ fn basic_query_identity_survives_language_forcing_and_extension_remapping() {
     assert_eq!(forced, mapped);
     assert!(mapped.contains("greet\tsource.custom\t"));
 }
-
