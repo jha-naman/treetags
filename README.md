@@ -24,34 +24,6 @@ extension fields. Languages with bundled grammars work out of the box; WASM gram
 explicit download. Current capabilities are listed below and checked against the
 language catalog by tests.
 
-<!-- tag-style-capabilities:start -->
-| Language | Grammar | Basic | With extension fields |
-| --- | --- | --- | --- |
-| c | bundled | yes | yes |
-| c# | bundled | yes | yes |
-| c++ | bundled | yes | yes |
-| dart | wasm | yes | yes |
-| elixir | bundled | yes | yes |
-| go | bundled | yes | yes |
-| java | bundled | yes | yes |
-| javascript | bundled | yes | yes |
-| julia | bundled | yes | yes |
-| kotlin | wasm | yes | yes |
-| lua | bundled | yes | yes |
-| objc | wasm | yes | yes |
-| ocaml | wasm | yes | yes |
-| php | bundled | yes | yes |
-| python | bundled | yes | yes |
-| ruby | bundled | yes | yes |
-| rust | bundled | yes | yes |
-| scala | bundled | yes | yes |
-| shell | bundled | yes | yes |
-| swift | wasm | yes | yes |
-| terraform | wasm | yes | yes |
-| typescript | bundled | yes | yes |
-| zig | wasm | yes | yes |
-<!-- tag-style-capabilities:end -->
-
 ## Choosing a tag style
 
 Configure preferences in `${XDG_CONFIG_HOME:-$HOME/.config}/treetags/config.toml`,
