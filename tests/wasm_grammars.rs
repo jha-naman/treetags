@@ -67,12 +67,7 @@ fn swift_walker_uses_external_grammar_and_filters_extension_fields() {
     p.write("source.swift", "public struct Box {\n    var value: Int\n    func read(input: Int) -> Int {\n        let local: Int = input\n        return local\n    }\n}\n");
     p.install("swift");
 
-    let default = p.run(&[
-        "-f",
-        "-",
-        "--tag-style=with_extension_fields",
-        "source.swift",
-    ]);
+    let default = p.run(&["-f", "-", "--tag-style=extended", "source.swift"]);
     assert!(default.status.success(), "{}", stderr(&default));
     let output = stdout(&default);
     assert!(output.contains("Box\tsource.swift"), "{output}");
@@ -86,7 +81,7 @@ fn swift_walker_uses_external_grammar_and_filters_extension_fields() {
     let filtered = p.run(&[
         "-f",
         "-",
-        "--tag-style=with_extension_fields",
+        "--tag-style=extended",
         "--fields=-s,-t,+n,+e,+S,+a",
         "--kinds-swift=+l,+z",
         "source.swift",
@@ -490,7 +485,7 @@ test "_" {}
     let out = p.run(&[
         "-f",
         "-",
-        "--tag-style=with_extension_fields",
+        "--tag-style=extended",
         "--kinds-zig=+z,+l",
         "source.zig",
     ]);
@@ -512,7 +507,7 @@ test "_" {}
     let out = p.run(&[
         "-f",
         "-",
-        "--tag-style=with_extension_fields",
+        "--tag-style=extended",
         "--kinds-zig=z",
         "--fields=+s,+t",
         "source.zig",

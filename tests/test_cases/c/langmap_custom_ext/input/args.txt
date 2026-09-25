@@ -1,2 +1,2 @@
---sort yes -f '-' --map-c=.qc --tag-style=with_extension_fields
+--sort yes -f '-' --map-c=.qc --tag-style=extended
 widget.qc

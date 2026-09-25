@@ -33,7 +33,7 @@ or select a file with `--user-languages-config PATH`:
 [tags]
 default = "basic"
 basic = ["java", "zig"]
-with_extension_fields = ["rust", "python"]
+extended = ["rust", "python"]
 ```
 
 The equivalent command-line settings are:
@@ -44,7 +44,7 @@ treetags --tag-style=basic \
   --tags-with-extension-fields=rust,python
 ```
 
-The default preference is `basic`; the other value is `with_extension_fields`.
+The default preference is `basic`; the other value is `extended`.
 Language lists override that global preference. Names and aliases are
 case-insensitive, and duplicates are ignored. A language cannot appear in both
 effective lists. These settings apply to official languages; installed tag
@@ -73,7 +73,7 @@ the selected style. `--list-kinds` continues to describe extension-field
 capabilities, even when basic tags are preferred.
 
 As additional basic implementations arrive, the default output for those
-languages will become basic. Use `--tag-style=with_extension_fields` to retain
+languages will become basic. Use `--tag-style=extended` to retain
 extension-field output globally, or specify individual languages in the list.
 
 ## External WASM grammars

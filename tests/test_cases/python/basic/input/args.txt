@@ -1,2 +1,2 @@
---sort yes -f '-' --fields=Sar --kinds-python=+l --tag-style=with_extension_fields
+--sort yes -f '-' --fields=Sar --kinds-python=+l --tag-style=extended
 source.py

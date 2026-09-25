@@ -1,2 +1,2 @@
---sort yes -f '-' --tag-style=with_extension_fields --kinds-zig='flz' --fields=-a,-S,-t,-s,-e
+--sort yes -f '-' --tag-style=extended --kinds-zig='flz' --fields=-a,-S,-t,-s,-e
 source.zig

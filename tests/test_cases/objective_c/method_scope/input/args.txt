@@ -1,2 +1,2 @@
---sort yes -f '-' --tag-style=with_extension_fields --kinds-objc=l,L
+--sort yes -f '-' --tag-style=extended --kinds-objc=l,L
 source.m

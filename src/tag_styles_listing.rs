@@ -5,10 +5,7 @@ use std::fmt::Write;
 use crate::builtin_langs::{LanguageDescriptor, OFFICIAL_LANGUAGES};
 use crate::config::{tag_styles::official_language, tag_styles::TagPreferences, Config};
 
-fn render_table(
-    descriptors: &[&LanguageDescriptor],
-    preferences: &TagPreferences,
-) -> String {
+fn render_table(descriptors: &[&LanguageDescriptor], preferences: &TagPreferences) -> String {
     let mut descriptors = descriptors.to_vec();
     descriptors.sort_by_key(|desc| desc.lang);
 
@@ -23,12 +20,12 @@ fn render_table(
             "bundled"
         };
         let basic = desc.query.is_some();
-        let with_extension_fields = desc.generate_fn.is_some();
+        let extended = desc.generate_fn.is_some();
         let selection = preferences.select(desc);
-        let available = match (basic, with_extension_fields) {
-            (true, true) => "basic,with_extension_fields",
+        let available = match (basic, extended) {
+            (true, true) => "basic,extended",
             (true, false) => "basic",
-            (false, true) => "with_extension_fields",
+            (false, true) => "extended",
             (false, false) => "",
         };
         let reason = if selection.preferred == selection.effective {
@@ -61,10 +58,6 @@ pub fn handle(language: &str, config: &Config) -> Result<(), String> {
         vec![official_language(language)
             .ok_or_else(|| format!("unknown official language '{language}'"))?]
     };
-    print!(
-        "{}",
-        render_table(&descriptors, &config.tag_preferences)
-    );
+    print!("{}", render_table(&descriptors, &config.tag_preferences));
     Ok(())
 }
-

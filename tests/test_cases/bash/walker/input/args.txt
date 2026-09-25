@@ -1,2 +1,2 @@
---sort yes -f '-' --tag-style=with_extension_fields --extras='+r' --fields='+k,+n,+l,+r,+e'
+--sort yes -f '-' --tag-style=extended --extras='+r' --fields='+k,+n,+l,+r,+e'
 source.sh

@@ -1,1 +1,1 @@
--f - --tag-style=with_extension_fields --extras=+q --fields=+k,+n,+S,+a,+e,+l,+t source.zig
+-f - --tag-style=extended --extras=+q --fields=+k,+n,+S,+a,+e,+l,+t source.zig

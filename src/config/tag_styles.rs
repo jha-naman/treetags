@@ -10,15 +10,14 @@ use crate::builtin_langs::{LanguageDescriptor, OFFICIAL_LANGUAGES};
 pub enum TagStyle {
     #[default]
     Basic,
-    #[value(name = "with_extension_fields")]
-    WithExtensionFields,
+    Extended,
 }
 
 impl TagStyle {
     pub fn label(self) -> &'static str {
         match self {
             Self::Basic => "basic",
-            Self::WithExtensionFields => "with_extension_fields",
+            Self::Extended => "extended",
         }
     }
 }
@@ -28,7 +27,7 @@ impl TagStyle {
 pub struct TagPreferences {
     pub default: TagStyle,
     pub basic: Vec<String>,
-    pub with_extension_fields: Vec<String>,
+    pub extended: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -44,7 +43,7 @@ impl TagPreferences {
         mut self,
         default: Option<TagStyle>,
         basic: Option<&str>,
-        with_extension_fields: Option<&str>,
+        extended: Option<&str>,
     ) -> Result<Self, String> {
         if let Some(default) = default {
             self.default = default;
@@ -52,15 +51,15 @@ impl TagPreferences {
         if let Some(list) = basic {
             self.basic = split_list(list);
         }
-        if let Some(list) = with_extension_fields {
-            self.with_extension_fields = split_list(list);
+        if let Some(list) = extended {
+            self.extended = split_list(list);
         }
         normalize(&mut self.basic)?;
-        normalize(&mut self.with_extension_fields)?;
+        normalize(&mut self.extended)?;
         for language in &self.basic {
-            if self.with_extension_fields.contains(language) {
+            if self.extended.contains(language) {
                 return Err(format!(
-                    "language '{language}' appears in both basic and with_extension_fields tag lists"
+                    "language '{language}' appears in both basic and extended tag lists"
                 ));
             }
         }
@@ -70,18 +69,14 @@ impl TagPreferences {
     pub fn select(&self, language: &LanguageDescriptor) -> TagSelection {
         let preferred = if self.basic.iter().any(|name| name == language.lang) {
             TagStyle::Basic
-        } else if self
-            .with_extension_fields
-            .iter()
-            .any(|name| name == language.lang)
-        {
-            TagStyle::WithExtensionFields
+        } else if self.extended.iter().any(|name| name == language.lang) {
+            TagStyle::Extended
         } else {
             self.default
         };
         let effective = match preferred {
-            TagStyle::Basic if language.query.is_none() => TagStyle::WithExtensionFields,
-            TagStyle::WithExtensionFields if language.generate_fn.is_none() => TagStyle::Basic,
+            TagStyle::Basic if language.query.is_none() => TagStyle::Extended,
+            TagStyle::Extended if language.generate_fn.is_none() => TagStyle::Basic,
             style => style,
         };
         TagSelection {
@@ -145,16 +140,16 @@ mod tests {
         assert_eq!(basic.select(scala).effective, TagStyle::Basic);
         let rich = basic
             .clone()
-            .merge(Some(TagStyle::WithExtensionFields), None, None)
+            .merge(Some(TagStyle::Extended), None, None)
             .unwrap();
         assert_eq!(
             rich.select(scala),
             TagSelection {
-                preferred: TagStyle::WithExtensionFields,
-                effective: TagStyle::WithExtensionFields,
+                preferred: TagStyle::Extended,
+                effective: TagStyle::Extended,
             }
         );
-        assert_eq!(rich.select(rust).effective, TagStyle::WithExtensionFields);
+        assert_eq!(rich.select(rust).effective, TagStyle::Extended);
         let overridden = rich.merge(None, Some("rust"), None).unwrap();
         assert_eq!(overridden.select(rust).effective, TagStyle::Basic);
     }
@@ -163,7 +158,7 @@ mod tests {
     fn list_replacement_clearing_aliases_and_conflicts() {
         let toml = TagPreferences {
             basic: vec!["ruby".into()],
-            with_extension_fields: vec!["rust".into()],
+            extended: vec!["rust".into()],
             ..Default::default()
         };
         let merged = toml
@@ -171,7 +166,7 @@ mod tests {
             .merge(None, Some(" GoLang , GO , csharp "), Some(""))
             .unwrap();
         assert_eq!(merged.basic, vec!["c#", "go"]);
-        assert!(merged.with_extension_fields.is_empty());
+        assert!(merged.extended.is_empty());
         assert!(toml.merge(None, Some("RUST"), None).is_err());
         assert!(TagPreferences::default()
             .merge(None, Some("missing"), None)

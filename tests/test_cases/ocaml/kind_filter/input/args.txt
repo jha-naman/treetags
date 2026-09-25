@@ -1,2 +1,2 @@
---sort yes -f - --tag-style=with_extension_fields --kinds-ocaml=-C
+--sort yes -f - --tag-style=extended --kinds-ocaml=-C
 source.ml

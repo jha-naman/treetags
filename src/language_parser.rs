@@ -94,7 +94,7 @@ pub(crate) struct OfficialLanguageParser {
 impl OfficialLanguageParser {
     pub(crate) fn from_desc(desc: &LanguageDescriptor, config: &Config) -> Self {
         let selection = config.tag_preferences.select(desc);
-        let kinds_str = if selection.effective == TagStyle::WithExtensionFields {
+        let kinds_str = if selection.effective == TagStyle::Extended {
             config.get_kinds(desc.lang)
         } else {
             ""
@@ -135,7 +135,7 @@ impl LanguageParser for OfficialLanguageParser {
         _absolute_path: &Path,
     ) -> Vec<Tag> {
         match self.selection.effective {
-            TagStyle::WithExtensionFields => {
+            TagStyle::Extended => {
                 parser.generate_with_walker(&self.desc, code, path, &self.kind_config, config)
             }
             TagStyle::Basic => {

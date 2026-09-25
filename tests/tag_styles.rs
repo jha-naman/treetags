@@ -61,19 +61,13 @@ impl Project {
 
 #[test]
 fn default_and_configured_preferences_are_visible_without_loading_grammars() {
-    let p = Project::new("[tags]\nwith_extension_fields = [' RUST ', 'rust']\nbasic = ['BASH']\n");
+    let p = Project::new("[tags]\nextended = [' RUST ', 'rust']\nbasic = ['BASH']\n");
     let rust = p.selection(&["--list-tag-styles", "rust"], "rust");
-    assert_eq!(
-        &rust[3..5],
-        &["with_extension_fields", "with_extension_fields"]
-    );
-    assert_eq!(rust[2], "basic,with_extension_fields");
+    assert_eq!(&rust[3..5], &["extended", "extended"]);
+    assert_eq!(rust[2], "basic,extended");
     assert_eq!(rust[5], "preferred style available");
     let zig = p.selection(&["--list-tag-styles", "zig"], "zig");
-    assert_eq!(
-        &zig[1..5],
-        &["wasm", "basic,with_extension_fields", "basic", "basic"]
-    );
+    assert_eq!(&zig[1..5], &["wasm", "basic,extended", "basic", "basic"]);
     assert_eq!(zig[5], "preferred style available");
     let shell = p.selection(&["--list-tag-styles", "SH"], "shell");
     assert_eq!(&shell[3..5], &["basic", "basic"]);
@@ -83,10 +77,10 @@ fn default_and_configured_preferences_are_visible_without_loading_grammars() {
 
 #[test]
 fn cli_replaces_lists_clears_inheritance_and_overrides_options_file() {
-    let p = Project::new("[tags]\ndefault = 'with_extension_fields'\nwith_extension_fields = ['rust']\nbasic = ['ruby']\n");
+    let p = Project::new("[tags]\ndefault = 'extended'\nextended = ['rust']\nbasic = ['ruby']\n");
     p.write(
         "options",
-        "--tag-style=with_extension_fields\n--basic-tags=java\n--tags-with-extension-fields=go\n",
+        "--tag-style=extended\n--basic-tags=java\n--tags-with-extension-fields=go\n",
     );
     let args = [
         "--options",
@@ -105,35 +99,38 @@ fn cli_replaces_lists_clears_inheritance_and_overrides_options_file() {
     assert_eq!(java[3], "basic");
     let python = p.selection(
         &[
-            "--tag-style=with_extension_fields",
+            "--tag-style=extended",
             "--basic-tags=python",
             "--basic-tags=ruby",
             "--list-tag-styles",
         ],
         "python",
     );
-    assert_eq!(
-        python[3], "with_extension_fields",
-        "last list replaces earlier values"
-    );
+    assert_eq!(python[3], "extended", "last list replaces earlier values");
 }
 
 #[test]
 fn effective_list_conflicts_and_bad_configuration_fail_before_output_changes() {
     for (config, args, expected) in [
-        (
-            "[tags]\nbasic=['rust']\nwith_extension_fields=['RUST']",
-            vec![],
-            "both",
-        ),
+        ("[tags]\nbasic=['rust']\nextended=['RUST']", vec![], "both"),
         (
             "[tags]\nbasic=['not-a-language']",
             vec![],
             "unknown official language",
         ),
         ("[tags]\ndefault='query'", vec![], "Failed to parse"),
+        (
+            "[tags]\ndefault='with_extension_fields'",
+            vec![],
+            "Failed to parse",
+        ),
         ("[tags]\nbaisc=['rust']", vec![], "Failed to parse"),
         ("", vec!["--tag-style=walker"], "invalid value"),
+        (
+            "",
+            vec!["--tag-style=with_extension_fields"],
+            "invalid value",
+        ),
         (
             "",
             vec!["--basic-tags=rust,,go"],
@@ -157,17 +154,14 @@ fn effective_list_conflicts_and_bad_configuration_fail_before_output_changes() {
             "existing tags\n"
         );
     }
-    let p = Project::new("[tags]\nbasic=['rust']\nwith_extension_fields=['RUST']");
+    let p = Project::new("[tags]\nbasic=['rust']\nextended=['RUST']");
     p.success(&["--basic-tags=", "--list-tag-styles"]);
 }
 
 #[test]
 fn explicit_config_path_and_global_override_retain_language_preferences() {
-    let p = Project::new("[tags]\nwith_extension_fields=['rust']");
-    p.write(
-        "other.toml",
-        "[tags]\ndefault='with_extension_fields'\nbasic=['ruby']",
-    );
+    let p = Project::new("[tags]\nextended=['rust']");
+    p.write("other.toml", "[tags]\ndefault='extended'\nbasic=['ruby']");
     let rust = p.selection(
         &[
             "--user-languages-config",
@@ -223,12 +217,7 @@ fn basic_output_ignores_rich_options_and_single_style_fallback_preserves_current
             "source.scala"
         ])
     );
-    let scala_rich = p.success(&[
-        "-f",
-        "-",
-        "--tag-style=with_extension_fields",
-        "source.scala",
-    ]);
+    let scala_rich = p.success(&["-f", "-", "--tag-style=extended", "source.scala"]);
     assert!(scala_rich.contains("greet\tsource.scala\t"));
     assert!(scala_rich.contains("\tf"));
     let rust_basic = p.success(&["-f", "-", "source.rs"]);
@@ -237,7 +226,7 @@ fn basic_output_ignores_rich_options_and_single_style_fallback_preserves_current
         .lines()
         .filter(|line| !line.starts_with('!'))
         .all(|line| line.trim_end_matches('\t').split('\t').count() == 3));
-    let rust_rich = p.success(&["-f", "-", "--tag-style=with_extension_fields", "source.rs"]);
+    let rust_rich = p.success(&["-f", "-", "--tag-style=extended", "source.rs"]);
     assert!(rust_rich.contains("hello\tsource.rs\t"));
     assert!(rust_rich.contains("\tf"));
     assert_eq!(
@@ -248,7 +237,7 @@ fn basic_output_ignores_rich_options_and_single_style_fallback_preserves_current
 
 #[test]
 fn rust_preference_selects_both_backends_and_basic_ignores_rich_controls() {
-    let p = Project::new("[tags]\ndefault='with_extension_fields'\nbasic=['rust']\n");
+    let p = Project::new("[tags]\ndefault='extended'\nbasic=['rust']\n");
     p.write("source.rs", "pub fn hello() {}\n");
     let basic = p.success(&["-f", "-", "source.rs"]);
     assert!(basic.contains("hello\tsource.rs\t"));

@@ -1,2 +1,2 @@
---sort yes -f '-' --tag-style=with_extension_fields --kinds-dart=+l,+z --fields=+k,+n,+e,+a,+S,-s,-t --extras=+q
+--sort yes -f '-' --tag-style=extended --kinds-dart=+l,+z --fields=+k,+n,+e,+a,+S,-s,-t --extras=+q
 source.dart

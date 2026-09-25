@@ -1,2 +1,2 @@
---sort yes -f - --tag-style=with_extension_fields --fields=+k,-s,+n,+l
+--sort yes -f - --tag-style=extended --fields=+k,-s,+n,+l
 source.ml

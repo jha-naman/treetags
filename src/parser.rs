@@ -400,7 +400,7 @@ mod wasm_tests {
         assert_eq!(basic[0].name, "example");
         assert!(basic[0].kind.is_none() && basic[0].extension_fields.is_none());
 
-        config.tag_preferences.default = TagStyle::WithExtensionFields;
+        config.tag_preferences.default = TagStyle::Extended;
         let rich = OfficialLanguageParser::from_desc(&desc, &config).generate_tags(
             &mut parser,
             source,
@@ -441,7 +441,7 @@ mod wasm_tests {
             );
         }
         assert!(parser.grammar_store.queries["rust"].get().unwrap().is_err());
-        config.tag_preferences.default = TagStyle::WithExtensionFields;
+        config.tag_preferences.default = TagStyle::Extended;
         assert!(!OfficialLanguageParser::from_desc(&broken, &config)
             .generate_tags(&mut parser, source, "source.rs", &config, path)
             .is_empty());
@@ -502,11 +502,7 @@ mod wasm_tests {
         let desc =
             crate::builtin_langs::LanguageDescriptorTestBuilder::from_language("zig").build();
         let mut parser = Parser::new(&config);
-        for style in [
-            TagStyle::Basic,
-            TagStyle::WithExtensionFields,
-            TagStyle::Basic,
-        ] {
+        for style in [TagStyle::Basic, TagStyle::Extended, TagStyle::Basic] {
             config.tag_preferences.default = style;
             let tags = OfficialLanguageParser::from_desc(&desc, &config).generate_tags(
                 &mut parser,
@@ -518,7 +514,7 @@ mod wasm_tests {
             assert!(tags.iter().any(|tag| tag.name == "example"));
             assert_eq!(
                 tags.iter().any(|tag| tag.kind.is_some()),
-                style == TagStyle::WithExtensionFields
+                style == TagStyle::Extended
             );
         }
         assert!(parser.walker_wasm_store.get().unwrap().is_ok());

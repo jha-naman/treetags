@@ -1,2 +1,2 @@
---sort yes -f '-' --tag-style=with_extension_fields
+--sort yes -f '-' --tag-style=extended
 plain.h
