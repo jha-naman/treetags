@@ -57,3 +57,11 @@ test max {
 test {
     _ = std;
 }
+
+const Container = struct {
+    value: u32,
+    fn consume(_: u32, named: u32) void {
+        const _ = named;
+        const local = named;
+    }
+};

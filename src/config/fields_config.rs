@@ -60,6 +60,7 @@ impl FieldsConfig {
                             'Z' => "Z",
                             'l' => "l",
                             'm' => "m",
+                            'i' => "i",
                             'o' => "o",
                             'p' => "p",
                             'r' => "r",
@@ -91,6 +92,12 @@ impl FieldsConfig {
                     }
                     "a" | "access" => {
                         config.enabled_fields.insert("access".to_string());
+                    }
+                    "i" | "inherits" => {
+                        config.enabled_fields.insert("inherits".to_string());
+                    }
+                    "m" | "implementation" => {
+                        config.enabled_fields.insert("implementation".to_string());
                     }
                     "f" | "file" => {
                         config.enabled_fields.insert("file".to_string());
@@ -127,6 +134,12 @@ impl FieldsConfig {
                     "a" | "access" => {
                         config.enabled_fields.remove("access");
                     }
+                    "i" | "inherits" => {
+                        config.enabled_fields.remove("inherits");
+                    }
+                    "m" | "implementation" => {
+                        config.enabled_fields.remove("implementation");
+                    }
                     "f" | "file" => {
                         config.enabled_fields.remove("file");
                     }
@@ -161,6 +174,12 @@ impl FieldsConfig {
                     }
                     "a" | "access" => {
                         config.enabled_fields.insert("access".to_string());
+                    }
+                    "i" | "inherits" => {
+                        config.enabled_fields.insert("inherits".to_string());
+                    }
+                    "m" | "implementation" => {
+                        config.enabled_fields.insert("implementation".to_string());
                     }
                     "f" | "file" => {
                         config.enabled_fields.insert("file".to_string());

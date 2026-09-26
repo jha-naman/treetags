@@ -1,2 +1,2 @@
---sort yes -f '-' --kinds-java='acil' --fields=+k,+n,-s
+--sort yes -f '-' --tag-style=extended --kinds-java='acil' --fields=+k,+n,-s
 source.java

@@ -122,7 +122,10 @@ pub fn command_with_all_lang_kinds(plugin_langs: &HashSet<String>) -> clap::Comm
     let mut cmd = super::Config::command();
 
     // Inject help entries for builtin languages
-    for desc in crate::builtin_langs::BUILTIN_LANG_DESCRIPTORS {
+    for desc in crate::builtin_langs::OFFICIAL_LANGUAGES {
+        if desc.generate_fn.is_none() {
+            continue;
+        }
         let name = format!("kinds-{}", desc.lang);
         let help = format!("{} kinds to generate tags for", desc.lang);
         cmd = cmd.arg(
@@ -138,9 +141,9 @@ pub fn command_with_all_lang_kinds(plugin_langs: &HashSet<String>) -> clap::Comm
     let mut sorted_langs: Vec<&String> = plugin_langs.iter().collect();
     sorted_langs.sort();
     for lang in sorted_langs {
-        if crate::builtin_langs::BUILTIN_LANG_DESCRIPTORS
+        if crate::builtin_langs::OFFICIAL_LANGUAGES
             .iter()
-            .any(|desc| desc.lang == lang)
+            .any(|desc| desc.lang == lang && desc.generate_fn.is_some())
         {
             continue;
         }
@@ -165,8 +168,9 @@ pub fn augment_list_kinds_for_completion(
     mut cmd: clap::Command,
     plugin_langs: &std::collections::HashSet<String>,
 ) -> clap::Command {
-    let mut lang_names: Vec<String> = crate::builtin_langs::BUILTIN_LANG_DESCRIPTORS
+    let mut lang_names: Vec<String> = crate::builtin_langs::OFFICIAL_LANGUAGES
         .iter()
+        .filter(|desc| desc.generate_fn.is_some())
         .map(|desc| desc.lang.to_string())
         .collect();
     for lang in plugin_langs {
@@ -177,5 +181,23 @@ pub fn augment_list_kinds_for_completion(
     cmd = cmd.mut_arg("list_kinds", |a| {
         a.value_parser(clap::builder::PossibleValuesParser::new(lang_names))
     });
+    let mut official_names: Vec<String> = crate::builtin_langs::OFFICIAL_LANGUAGES
+        .iter()
+        .flat_map(|desc| std::iter::once(desc.lang).chain(desc.aliases.iter().copied()))
+        .map(str::to_owned)
+        .collect();
+    official_names.sort();
+    official_names.dedup();
+    for argument in [
+        "list_tag_styles",
+        "basic_tags",
+        "tags_with_extension_fields",
+    ] {
+        cmd = cmd.mut_arg(argument, |a| {
+            a.value_parser(clap::builder::PossibleValuesParser::new(
+                official_names.clone(),
+            ))
+        });
+    }
     cmd
 }

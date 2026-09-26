@@ -1,2 +1,2 @@
---fields=nksSafet --extras=+F -f '-'
+--tag-style=extended --fields=nksSafet --extras=+F -f '-'
 source.rs

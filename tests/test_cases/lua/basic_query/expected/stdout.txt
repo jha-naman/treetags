@@ -1,0 +1,13 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+a	source.lua	/^local a, b = function() end, function() end$/;"
+assigned	source.lua	/^local assigned = function(z) return z end$/;"
+field	source.lua	/^API.field = function(v) return v end$/;"
+first	source.lua	/^  first = function(x) return x end,$/;"
+global_fn	source.lua	/^function global_fn(x)$/;"
+local_fn	source.lua	/^local function local_fn(a, b)$/;"
+make	source.lua	/^function API.make(x)$/;"
+nested	source.lua	/^  local function nested(z) return z end$/;"
+run	source.lua	/^function API:run(y, ...)$/;"
+second	source.lua	/^  second = function(y)$/;"
+thing	source.lua	/^thing = function(q) return q end$/;"
+work	source.lua	/^function API.sub:work(v)$/;"

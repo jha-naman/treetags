@@ -68,6 +68,20 @@ dart
     v  variable
     l  local [off]
     z  parameter [off]
+elixir
+    a  macro
+    c  callback
+    d  delegate
+    e  exception
+    f  function
+    g  guard
+    i  implementation
+    m  module
+    o  operator
+    p  protocol
+    r  record
+    t  test
+    y  type
 go
     p  package
     f  function
@@ -102,6 +116,15 @@ javascript
     G  getters
     S  setters
     M  fields
+julia
+    Y  unknown
+    c  constant
+    f  function
+    g  field
+    m  macro
+    n  module
+    s  struct
+    t  type
 kotlin
     C  constant
     T  typealias
@@ -111,6 +134,14 @@ kotlin
     o  object
     p  package
     v  variable
+lua
+    f  function
+    Y  unknown [off]
+    m  method [off]
+    l  local [off]
+    v  global [off]
+    F  field [off]
+    L  label [off]
 objc
     d  macro
     e  enumerator
@@ -136,6 +167,27 @@ objc
     z  parameter [off]
     L  label [off]
     D  macroparam [off]
+ocaml
+    C  Constructor
+    M  module
+    c  class
+    e  Exception
+    f  function
+    m  method
+    p  val
+    r  RecordField
+    t  type
+    v  var
+php
+    a  alias
+    c  class
+    d  define
+    f  function
+    i  interface
+    n  namespace
+    t  trait
+    v  variable
+    l  local [off]
 python
     c  classes
     f  function
@@ -146,6 +198,15 @@ python
     Y  name referring to a class/variable/function/module defined in other module
     z  function parameters [off]
     l  local variables [off]
+ruby
+    A  accessor
+    C  constant
+    L  library
+    S  singletonMethod
+    a  alias
+    c  class
+    f  method
+    m  module
 rust
     n  module
     s  struct
@@ -162,6 +223,26 @@ rust
     v  variable
     t  type
     M  macro
+scala
+    C  constant
+    c  class
+    e  enumerator
+    f  function
+    g  enum
+    i  trait
+    m  method
+    o  object
+    p  package
+    P  property
+    t  type
+    v  variable
+    l  local [off]
+    z  parameter [off]
+shell
+    a  alias
+    f  function
+    h  heredoc
+    s  script
 swift
     c  class
     s  struct

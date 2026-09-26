@@ -1,12 +1,12 @@
 use crate::parser::{
-    c_sharp, cpp, dart, go, java, js, kotlin, objective_c, python, rust, swift, terraform,
-    typescript, zig, TagKindConfig,
+    c_sharp, cpp, dart, elixir, go, java, js, julia, kotlin, lua, objective_c, ocaml, php, python,
+    ruby, rust, scala, shell, swift, terraform, typescript, zig, TagKindConfig,
 };
 use crate::tag::Tag;
 use crate::wasm_grammars::GrammarSource;
 
-/// Function pointer type for builtin language tag generators.
-pub(crate) type BuiltinGenerateFn = fn(
+/// Function pointer type for extension-field tree walkers.
+pub(crate) type WalkerGenerateFn = fn(
     &mut tree_sitter::Parser,
     tree_sitter::Language,
     &[u8],
@@ -15,8 +15,9 @@ pub(crate) type BuiltinGenerateFn = fn(
     &crate::config::Config,
 ) -> Option<Vec<Tag>>;
 
-/// Full descriptor for a builtin language: name, extensions, kind mappings, generate fn.
-pub(crate) struct BuiltinLangDesc {
+/// One official language registration, independent of its available tag styles.
+#[derive(Clone)]
+pub(crate) struct LanguageDescriptor {
     pub lang: &'static str,
     /// Alternate names accepted by `--language-force` (and future langmap options),
     /// in addition to `lang`. Case-insensitive at lookup time.
@@ -36,13 +37,44 @@ pub(crate) struct BuiltinLangDesc {
     /// eg `.h` is owned outright by C and available to C++ on content evidence.
     pub disambiguation: &'static [(&'static str, &'static [&'static str])],
     pub grammar: GrammarSource,
-    pub generate_fn: BuiltinGenerateFn,
+    pub generate_fn: Option<WalkerGenerateFn>,
+    pub query: Option<&'static str>,
+    /// Preserve historical user-query overrides only for original query languages.
+    pub legacy_query_overrides: bool,
 }
 
-/// All builtin languages. Priority in tag generation follows array order.
-/// Adding a new builtin language requires exactly one new entry here.
-pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
-    BuiltinLangDesc {
+#[cfg(test)]
+pub(crate) struct LanguageDescriptorTestBuilder(LanguageDescriptor);
+
+#[cfg(test)]
+impl LanguageDescriptorTestBuilder {
+    pub(crate) fn from_language(lang: &str) -> Self {
+        let desc = OFFICIAL_LANGUAGES
+            .iter()
+            .find(|desc| desc.lang == lang)
+            .unwrap_or_else(|| panic!("unknown test language: {lang}"));
+        Self(desc.clone())
+    }
+
+    pub(crate) fn query(mut self, query: &'static str) -> Self {
+        self.0.query = Some(query);
+        self
+    }
+
+    pub(crate) fn grammar(mut self, grammar: GrammarSource) -> Self {
+        self.0.grammar = grammar;
+        self
+    }
+
+    pub(crate) fn build(self) -> LanguageDescriptor {
+        self.0
+    }
+}
+
+/// All official languages. Source precedence follows array order.
+/// Each language is registered once, whether it has one or both implementations.
+pub(crate) static OFFICIAL_LANGUAGES: &[LanguageDescriptor] = &[
+    LanguageDescriptor {
         lang: dart::LANG_NAME,
         aliases: &[],
         extensions: dart::LANG_EXTENSIONS,
@@ -52,9 +84,11 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_optionals: dart::KIND_OPTIONALS,
         disambiguation: &[],
         grammar: GrammarSource::Wasm(&crate::wasm_grammars::DART),
-        generate_fn: dart::generate,
+        generate_fn: Some(dart::generate),
+        query: Some(crate::queries::DART_TAGS_QUERY),
+        legacy_query_overrides: false,
     },
-    BuiltinLangDesc {
+    LanguageDescriptor {
         lang: java::LANG_NAME,
         aliases: &[],
         extensions: java::LANG_EXTENSIONS,
@@ -64,9 +98,11 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_optionals: java::KIND_OPTIONALS,
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_java::LANGUAGE.into()),
-        generate_fn: java::generate,
+        generate_fn: Some(java::generate),
+        query: Some(tree_sitter_java::TAGS_QUERY),
+        legacy_query_overrides: false,
     },
-    BuiltinLangDesc {
+    LanguageDescriptor {
         lang: zig::LANG_NAME,
         aliases: &[],
         extensions: zig::LANG_EXTENSIONS,
@@ -76,9 +112,11 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_optionals: zig::KIND_OPTIONALS,
         disambiguation: &[],
         grammar: GrammarSource::Wasm(&crate::wasm_grammars::ZIG),
-        generate_fn: zig::generate,
+        generate_fn: Some(zig::generate),
+        query: Some(crate::queries::ZIG_TAGS_QUERY),
+        legacy_query_overrides: false,
     },
-    BuiltinLangDesc {
+    LanguageDescriptor {
         lang: swift::LANG_NAME,
         aliases: &[],
         extensions: swift::LANG_EXTENSIONS,
@@ -88,9 +126,11 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_optionals: swift::KIND_OPTIONALS,
         disambiguation: &[],
         grammar: GrammarSource::Wasm(&crate::wasm_grammars::SWIFT),
-        generate_fn: swift::generate,
+        generate_fn: Some(swift::generate),
+        query: Some(crate::queries::SWIFT_TAGS_QUERY),
+        legacy_query_overrides: false,
     },
-    BuiltinLangDesc {
+    LanguageDescriptor {
         lang: kotlin::LANG_NAME,
         aliases: &[],
         extensions: kotlin::LANG_EXTENSIONS,
@@ -100,9 +140,11 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_optionals: kotlin::KIND_OPTIONALS,
         disambiguation: &[],
         grammar: GrammarSource::Wasm(&crate::wasm_grammars::KOTLIN),
-        generate_fn: kotlin::generate,
+        generate_fn: Some(kotlin::generate),
+        query: Some(crate::queries::KOTLIN_TAGS_QUERY),
+        legacy_query_overrides: false,
     },
-    BuiltinLangDesc {
+    LanguageDescriptor {
         lang: terraform::LANG_NAME,
         aliases: &[],
         extensions: terraform::LANG_EXTENSIONS,
@@ -112,9 +154,11 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_optionals: terraform::KIND_OPTIONALS,
         disambiguation: &[],
         grammar: GrammarSource::Wasm(&crate::wasm_grammars::TERRAFORM),
-        generate_fn: terraform::generate,
+        generate_fn: Some(terraform::generate),
+        query: Some(crate::queries::TERRAFORM_TAGS_QUERY),
+        legacy_query_overrides: false,
     },
-    BuiltinLangDesc {
+    LanguageDescriptor {
         lang: c_sharp::LANG_NAME,
         aliases: &["csharp"],
         extensions: c_sharp::LANG_EXTENSIONS,
@@ -124,9 +168,11 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_optionals: c_sharp::KIND_OPTIONALS,
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_c_sharp::LANGUAGE.into()),
-        generate_fn: c_sharp::generate,
+        generate_fn: Some(c_sharp::generate),
+        query: Some(crate::queries::C_SHARP_TAGS_QUERY),
+        legacy_query_overrides: false,
     },
-    BuiltinLangDesc {
+    LanguageDescriptor {
         lang: rust::LANG_NAME,
         aliases: &[],
         extensions: rust::LANG_EXTENSIONS,
@@ -136,9 +182,11 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_optionals: rust::KIND_OPTIONALS,
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_rust::LANGUAGE.into()),
-        generate_fn: rust::generate,
+        generate_fn: Some(rust::generate),
+        query: Some(tree_sitter_rust::TAGS_QUERY),
+        legacy_query_overrides: false,
     },
-    BuiltinLangDesc {
+    LanguageDescriptor {
         lang: go::LANG_NAME,
         aliases: &["golang"],
         extensions: go::LANG_EXTENSIONS,
@@ -148,9 +196,11 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_optionals: go::KIND_OPTIONALS,
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_go::LANGUAGE.into()),
-        generate_fn: go::generate,
+        generate_fn: Some(go::generate),
+        query: Some(tree_sitter_go::TAGS_QUERY),
+        legacy_query_overrides: false,
     },
-    BuiltinLangDesc {
+    LanguageDescriptor {
         lang: cpp::LANG_NAME,
         aliases: &["cpp", "cxx", "cplusplus"],
         extensions: cpp::LANG_EXTENSIONS,
@@ -161,10 +211,12 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         // `.h` is owned outright by C; C++ claims it only on C++ markers.
         disambiguation: &[("h", cpp::CPP_DISAMBIG_SIGNALS)],
         grammar: GrammarSource::Bundled(|| tree_sitter_cpp::LANGUAGE.into()),
-        generate_fn: cpp::generate,
+        generate_fn: Some(cpp::generate),
+        query: Some(tree_sitter_cpp::TAGS_QUERY),
+        legacy_query_overrides: false,
     },
     // C reuses the C++ parser but is a distinct language with its own kind table.
-    BuiltinLangDesc {
+    LanguageDescriptor {
         lang: cpp::C_LANG_NAME,
         aliases: &[],
         extensions: cpp::C_LANG_EXTENSIONS,
@@ -174,9 +226,11 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_optionals: cpp::C_KIND_OPTIONALS,
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_cpp::LANGUAGE.into()),
-        generate_fn: cpp::generate,
+        generate_fn: Some(cpp::generate),
+        query: Some(tree_sitter_cpp::TAGS_QUERY),
+        legacy_query_overrides: false,
     },
-    BuiltinLangDesc {
+    LanguageDescriptor {
         lang: objective_c::LANG_NAME,
         aliases: objective_c::LANG_ALIASES,
         extensions: objective_c::LANG_EXTENSIONS,
@@ -186,9 +240,11 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_optionals: objective_c::KIND_OPTIONALS,
         disambiguation: &[("h", objective_c::DISAMBIG_SIGNALS)],
         grammar: GrammarSource::Wasm(&crate::wasm_grammars::OBJECTIVE_C),
-        generate_fn: objective_c::generate,
+        generate_fn: Some(objective_c::generate),
+        query: Some(crate::queries::OBJECTIVE_C_TAGS_QUERY),
+        legacy_query_overrides: false,
     },
-    BuiltinLangDesc {
+    LanguageDescriptor {
         lang: js::LANG_NAME,
         aliases: &["js"],
         extensions: js::LANG_EXTENSIONS,
@@ -198,9 +254,11 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_optionals: js::KIND_OPTIONALS,
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_javascript::LANGUAGE.into()),
-        generate_fn: js::generate,
+        generate_fn: Some(js::generate),
+        query: Some(tree_sitter_javascript::TAGS_QUERY),
+        legacy_query_overrides: false,
     },
-    BuiltinLangDesc {
+    LanguageDescriptor {
         lang: python::LANG_NAME,
         aliases: &[],
         extensions: python::LANG_EXTENSIONS,
@@ -210,9 +268,11 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_optionals: python::KIND_OPTIONALS,
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_python::LANGUAGE.into()),
-        generate_fn: python::generate,
+        generate_fn: Some(python::generate),
+        query: Some(tree_sitter_python::TAGS_QUERY),
+        legacy_query_overrides: false,
     },
-    BuiltinLangDesc {
+    LanguageDescriptor {
         lang: typescript::LANG_NAME,
         aliases: &["ts"],
         extensions: typescript::LANG_EXTENSIONS,
@@ -222,6 +282,142 @@ pub(crate) static BUILTIN_LANG_DESCRIPTORS: &[BuiltinLangDesc] = &[
         kind_optionals: typescript::KIND_OPTIONALS,
         disambiguation: &[],
         grammar: GrammarSource::Bundled(|| tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()),
-        generate_fn: typescript::generate,
+        generate_fn: Some(typescript::generate),
+        query: Some(crate::queries::TYPESCRIPT_TAGS_QUERY),
+        legacy_query_overrides: false,
+    },
+    LanguageDescriptor {
+        lang: ruby::LANG_NAME,
+        aliases: &[],
+        extensions: &["rb"],
+        patterns: &[
+            "Rakefile",
+            "Gemfile",
+            "Guardfile",
+            "Vagrantfile",
+            "Podfile",
+            "Berksfile",
+            "Brewfile",
+            "Capfile",
+            "*.gemspec",
+            "*.podspec",
+            "*.rake",
+        ],
+        interpreters: &["ruby"],
+        kind_defaults: ruby::KIND_DEFAULTS,
+        kind_optionals: ruby::KIND_OPTIONALS,
+        disambiguation: &[],
+        grammar: GrammarSource::Bundled(|| tree_sitter_ruby::LANGUAGE.into()),
+        generate_fn: Some(ruby::generate),
+        query: Some(tree_sitter_ruby::TAGS_QUERY),
+        legacy_query_overrides: true,
+    },
+    LanguageDescriptor {
+        lang: "ocaml",
+        aliases: &[],
+        extensions: &["ml"],
+        patterns: &[],
+        interpreters: &[],
+        kind_defaults: ocaml::KIND_DEFAULTS,
+        kind_optionals: &[],
+        disambiguation: &[],
+        grammar: GrammarSource::Wasm(&crate::wasm_grammars::OCAML),
+        generate_fn: Some(ocaml::generate),
+        query: Some(include_str!("../queries/ocaml.scm")),
+        legacy_query_overrides: true,
+    },
+    LanguageDescriptor {
+        lang: "php",
+        aliases: &[],
+        extensions: &["php"],
+        patterns: &[],
+        interpreters: &["php"],
+        kind_defaults: php::KIND_DEFAULTS,
+        kind_optionals: php::KIND_OPTIONALS,
+        disambiguation: &[],
+        grammar: GrammarSource::Bundled(|| tree_sitter_php::LANGUAGE_PHP.into()),
+        generate_fn: Some(php::generate),
+        query: Some(crate::queries::PHP_TAGS_QUERY),
+        legacy_query_overrides: true,
+    },
+    LanguageDescriptor {
+        lang: "elixir",
+        aliases: &[],
+        extensions: &["ex", "exs"],
+        patterns: &[],
+        interpreters: &[],
+        kind_defaults: elixir::KIND_DEFAULTS,
+        kind_optionals: &[],
+        disambiguation: &[],
+        grammar: GrammarSource::Bundled(|| tree_sitter_elixir::LANGUAGE.into()),
+        generate_fn: Some(elixir::generate),
+        query: Some(tree_sitter_elixir::TAGS_QUERY),
+        legacy_query_overrides: false,
+    },
+    LanguageDescriptor {
+        lang: "lua",
+        aliases: &[],
+        extensions: &["lua"],
+        patterns: &[],
+        interpreters: &["lua"],
+        kind_defaults: lua::KIND_DEFAULTS,
+        kind_optionals: lua::KIND_OPTIONALS,
+        disambiguation: &[],
+        grammar: GrammarSource::Bundled(|| tree_sitter_lua::LANGUAGE.into()),
+        generate_fn: Some(lua::generate),
+        query: Some(tree_sitter_lua::TAGS_QUERY),
+        legacy_query_overrides: true,
+    },
+    LanguageDescriptor {
+        lang: "shell",
+        aliases: &["sh", "bash"],
+        extensions: &["sh", "bash"],
+        patterns: &[
+            ".bashrc",
+            ".bash_profile",
+            ".bash_logout",
+            ".zshrc",
+            ".zprofile",
+            ".zshenv",
+            ".profile",
+            "PKGBUILD",
+            "*.zsh",
+        ],
+        interpreters: &["sh", "bash", "dash", "zsh", "ksh"],
+        kind_defaults: shell::KIND_DEFAULTS,
+        kind_optionals: &[],
+        disambiguation: &[],
+        grammar: GrammarSource::Bundled(|| tree_sitter_bash::LANGUAGE.into()),
+        generate_fn: Some(shell::generate),
+        query: Some(crate::queries::BASH_TAGS_QUERY),
+        legacy_query_overrides: true,
+    },
+    LanguageDescriptor {
+        lang: scala::LANG_NAME,
+        aliases: &[],
+        extensions: scala::LANG_EXTENSIONS,
+        patterns: &[],
+        interpreters: &["scala"],
+        kind_defaults: scala::KIND_DEFAULTS,
+        kind_optionals: scala::KIND_OPTIONALS,
+        disambiguation: &[],
+        grammar: GrammarSource::Bundled(|| tree_sitter_scala::LANGUAGE.into()),
+        generate_fn: Some(scala::generate),
+        query: Some(crate::queries::SCALA_TAGS_QUERY),
+        legacy_query_overrides: true,
+    },
+    LanguageDescriptor {
+        lang: "julia",
+        aliases: &[],
+        extensions: &["jl"],
+        patterns: &[],
+        interpreters: &["julia"],
+        kind_defaults: julia::KIND_DEFAULTS,
+        kind_optionals: julia::KIND_OPTIONALS,
+        disambiguation: &[],
+        grammar: GrammarSource::Bundled(|| tree_sitter_julia::LANGUAGE.into()),
+        generate_fn: Some(julia::generate),
+        query: Some(crate::queries::JULIA_TAGS_QUERY),
+        legacy_query_overrides: true,
     },
 ];

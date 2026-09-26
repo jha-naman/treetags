@@ -1,12 +1,12 @@
 !_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
-T	source.zig	/^pub inline fn max(comptime T: type, a: T, b: T) T {$/;"	z
-a	source.zig	/^pub inline fn max(comptime T: type, a: T, b: T) T {$/;"	z
-b	source.zig	/^pub inline fn max(comptime T: type, a: T, b: T) T {$/;"	z
-chosen	source.zig	/^    const chosen = if (a > b) a else b;$/;"	l
-dx	source.zig	/^        const dx = self.x - other.x;$/;"	l
-malloc	source.zig	/^extern fn malloc(size: usize) ?*anyopaque;$/;"	f	implementation:extern
-max	source.zig	/^pub inline fn max(comptime T: type, a: T, b: T) T {$/;"	f	implementation:inline
-other	source.zig	/^    pub fn distance(self: Point, other: Point) f64 {$/;"	z
-point	source.zig	/^    const point = Point{ .x = 1 };$/;"	l
-self	source.zig	/^    pub fn distance(self: Point, other: Point) f64 {$/;"	z
-size	source.zig	/^extern fn malloc(size: usize) ?*anyopaque;$/;"	z
+T	source.zig	/^pub inline fn max(comptime T: type, a: T, b: T) T {$/;"	z	function:max	typeref:typename:type
+a	source.zig	/^pub inline fn max(comptime T: type, a: T, b: T) T {$/;"	z	function:max	typeref:typename:T
+b	source.zig	/^pub inline fn max(comptime T: type, a: T, b: T) T {$/;"	z	function:max	typeref:typename:T
+chosen	source.zig	/^    const chosen = if (a > b) a else b;$/;"	l	function:max
+dx	source.zig	/^        const dx = self.x - other.x;$/;"	l	function:Point.distance
+local	source.zig	/^        const local = named;$/;"	l	function:Container.consume
+named	source.zig	/^    fn consume(_: u32, named: u32) void {$/;"	z	function:Container.consume	typeref:typename:u32
+other	source.zig	/^    pub fn distance(self: Point, other: Point) f64 {$/;"	z	function:Point.distance	typeref:typename:Point
+point	source.zig	/^    const point = Point{ .x = 1 };$/;"	l	test:point distance
+self	source.zig	/^    pub fn distance(self: Point, other: Point) f64 {$/;"	z	function:Point.distance	typeref:typename:Point
+size	source.zig	/^extern fn malloc(size: usize) ?*anyopaque;$/;"	z	typeref:typename:usize

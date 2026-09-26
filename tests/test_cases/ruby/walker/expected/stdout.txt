@@ -1,0 +1,20 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+ANSWER	source.rb	/^  ANSWER = 42$/;"	kind:C	line:26	language:Ruby	module:Space	roles:def
+CONST	source.rb	/^  CONST = 1$/;"	kind:C	line:9	language:Ruby	class:Outer	roles:def
+Global	source.rb	/^Global = 3$/;"	kind:C	line:28	language:Ruby	roles:def
+Inner	source.rb	/^  class Inner; end$/;"	kind:c	line:23	language:Ruby	class:Outer	roles:def	end:23
+Outer	source.rb	/^class Outer < Base$/;"	kind:c	line:5	language:Ruby	roles:def	end:24	mixin:include:Comparable,prepend:Mixin,extend:ExtendMe
+Space	source.rb	/^module Space$/;"	kind:m	line:25	language:Ruby	roles:def	end:27
+age	source.rb	/^  attr_reader :name, :age$/;"	kind:A	line:10	language:Ruby	class:Outer	roles:def
+foo	source.rb	/^  attr_accessor :foo$/;"	kind:A	line:12	language:Ruby	class:Outer	roles:def
+foo=	source.rb	/^  attr_accessor :foo$/;"	kind:A	line:12	language:Ruby	class:Outer	roles:def
+helper	source.rb	/^require_relative 'helper'$/;"	kind:L	line:2	language:Ruby	roles:requiredRel
+inside	source.rb	/^    def inside$/;"	kind:S	line:20	language:Ruby	class:Outer	signature:()	roles:def	end:21
+json	source.rb	/^require 'json'$/;"	kind:L	line:1	language:Ruby	roles:required
+legacy	source.rb	/^  alias_method :legacy, :modern$/;"	kind:a	line:14	language:Ruby	class:Outer	roles:def
+name	source.rb	/^  attr_reader :name, :age$/;"	kind:A	line:10	language:Ruby	class:Outer	roles:def
+old_name	source.rb	/^  alias old_name name$/;"	kind:a	line:13	language:Ruby	class:Outer	roles:def
+other.rb	source.rb	/^load 'other.rb'$/;"	kind:L	line:3	language:Ruby	roles:loaded
+regular	source.rb	/^  def regular(a, b = 1, **kw)$/;"	kind:f	line:15	language:Ruby	class:Outer	signature:(a, b = 1, **kw)	roles:def	end:16
+singleton	source.rb	/^  def self.singleton(x)$/;"	kind:S	line:17	language:Ruby	class:Outer	signature:(x)	roles:def	end:18
+status=	source.rb	/^  attr_writer :status$/;"	kind:A	line:11	language:Ruby	class:Outer	roles:def

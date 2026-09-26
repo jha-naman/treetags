@@ -1,6 +1,6 @@
 //! Dart tags from the downloaded tree-sitter WASM grammar.
 use super::common::{
-    cursor::{line_of, node_text},
+    cursor::{field_child, line_of, node_text},
     scope::{ScopeKey, ScopeStack},
     scope_walker::{walk_tree, WalkContext},
     tree_walker::{generate_tags_with_config, Context},
@@ -191,17 +191,6 @@ fn named_child_of_kind<'a>(cursor: &mut TreeCursor<'a>, kind: &str) -> Option<No
     let mut result = None;
     for_each_child!(cursor, {
         if cursor.node().kind() == kind {
-            result = Some(cursor.node());
-            break;
-        }
-    });
-    result
-}
-
-fn field_child<'a>(cursor: &mut TreeCursor<'a>, field: &str) -> Option<Node<'a>> {
-    let mut result = None;
-    for_each_child!(cursor, {
-        if cursor.field_name() == Some(field) {
             result = Some(cursor.node());
             break;
         }

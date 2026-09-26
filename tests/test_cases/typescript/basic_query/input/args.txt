@@ -1,0 +1,2 @@
+--tag-style=basic -f '-' --sort yes
+source.ts

@@ -15,6 +15,7 @@ mod fields_config;
 pub mod lang_map;
 pub mod paths;
 mod plugin_config;
+pub mod tag_styles;
 mod user_grammars;
 
 /// Default worker-thread count. Overridable via `--workers`, or bumped up to the
@@ -115,6 +116,29 @@ pub enum PluginCommands {
 #[derive(Parser, Clone, Debug)]
 #[command(about = "Generate vi compatible tags for multiple languages", long_about = None)]
 pub struct Config {
+    /// Preferred output style (default: extended); falls back when a language only supports the other style.
+    #[arg(long, value_enum, overrides_with = "tag_style")]
+    pub tag_style: Option<tag_styles::TagStyle>,
+
+    /// Comma-separated languages preferring basic tags. Replaces the configured list; empty clears it.
+    #[arg(long, value_name = "LANGS", overrides_with = "basic_tags")]
+    pub basic_tags: Option<String>,
+
+    /// Comma-separated languages preferring extension fields. Replaces the configured list; empty clears it.
+    #[arg(
+        long,
+        value_name = "LANGS",
+        overrides_with = "tags_with_extension_fields"
+    )]
+    pub tags_with_extension_fields: Option<String>,
+
+    /// List available, preferred, and effective tag styles without loading grammars.
+    #[arg(long, value_name = "LANG", num_args = 0..=1, default_missing_value = "")]
+    pub list_tag_styles: Option<String>,
+
+    #[arg(skip)]
+    pub tag_preferences: tag_styles::TagPreferences,
+
     #[command(subcommand)]
     pub command: Option<Commands>,
 
@@ -377,24 +401,39 @@ impl Config {
 
         config.extras_config = ExtrasConfig::from_string(&config.extras);
         config.fields_config = FieldsConfig::from_string(&config.fields);
-        let language_config = if matches!(
-            config.command,
-            Some(Commands::Grammar {
-                action: GrammarCommands::Install {
-                    configured: true,
-                    ..
+        // Management commands remain usable with broken configuration, except
+        // configured installation, which necessarily depends on that file.
+        let requires_config = config.command.is_none()
+            || config.list_tag_styles.is_some()
+            || matches!(
+                config.command,
+                Some(Commands::Grammar {
+                    action: GrammarCommands::Install {
+                        configured: true,
+                        ..
+                    }
+                })
+            );
+        let language_config = user_grammars::load_checked(config.user_languages_config.as_ref())
+            .unwrap_or_else(|err| {
+                if !requires_config {
+                    eprintln!("Warning: {err:#}");
+                    return user_grammars::TOMLConfig::default();
                 }
-            })
-        ) {
-            user_grammars::load_checked(config.user_languages_config.as_ref()).unwrap_or_else(
-                |err| {
-                    eprintln!("error: {err:#}");
-                    std::process::exit(1);
-                },
+                eprintln!("error: {err:#}");
+                std::process::exit(1);
+            });
+        config.tag_preferences = language_config
+            .tags
+            .merge(
+                config.tag_style,
+                config.basic_tags.as_deref(),
+                config.tags_with_extension_fields.as_deref(),
             )
-        } else {
-            user_grammars::load(config.user_languages_config.as_ref())
-        };
+            .unwrap_or_else(|err| {
+                eprintln!("error: {err}");
+                std::process::exit(1);
+            });
         config.user_grammars = language_config.user_grammars;
         config.wasm_grammar_languages = language_config.wasm_grammars.languages;
         config.plugins_dir = config

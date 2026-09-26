@@ -34,6 +34,18 @@ pub fn line_of(node: Node) -> u32 {
     node.start_position().row as u32 + 1
 }
 
+/// First direct child with the given grammar field. Restores the shared cursor.
+pub fn field_child<'tree>(cursor: &mut TreeCursor<'tree>, field: &str) -> Option<Node<'tree>> {
+    let mut result = None;
+    for_each_child!(cursor, {
+        if cursor.field_name() == Some(field) {
+            result = Some(cursor.node());
+            break;
+        }
+    });
+    result
+}
+
 /// Text + 1-based line of the first direct child whose kind is in `kinds`.
 /// The cursor is restored to the node it started on.
 pub fn child_ident(

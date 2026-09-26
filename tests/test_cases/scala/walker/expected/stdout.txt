@@ -1,0 +1,58 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+Bar	../../basic/input/source.scala	/^object Bar {$/;"	o	line:28	end:30	package:demo.nested
+Blue	../../basic/input/source.scala	/^  case Red, Blue$/;"	e	line:64	end:64	enum:demo.nested.Color
+Color	../../basic/input/source.scala	/^enum Color {$/;"	g	line:63	end:66	package:demo.nested
+Employee	../../basic/input/source.scala	/^class Employee(val name: String) extends Named {$/;"	c	line:43	end:50	inherits:Named	package:demo.nested	signature:(val name: String)
+Foo	../../basic/input/source.scala	/^class Foo(a: String) {$/;"	c	line:23	end:26	package:demo.nested	signature:(a: String)
+Id	../../basic/input/source.scala	/^  type Id = String$/;"	t	line:53	end:53	object:demo.nested.Registry	typeref:typename:String
+Named	../../basic/input/source.scala	/^trait Named {$/;"	i	line:38	end:41	package:demo.nested
+Person	../../basic/input/source.scala	/^case class Person(first_name: String, last_name: String)$/;"	c	line:32	end:32	package:demo.nested	signature:(first_name: String, last_name: String)
+Red	../../basic/input/source.scala	/^  case Red, Blue$/;"	e	line:64	end:64	enum:demo.nested.Color
+Registry	../../basic/input/source.scala	/^object Registry {$/;"	o	line:52	end:57	package:demo.nested
+Rgb	../../basic/input/source.scala	/^  case Rgb(r: Int, g: Int, b: Int)$/;"	e	line:65	end:65	enum:demo.nested.Color	signature:(r: Int, g: Int, b: Int)
+Token	../../basic/input/source.scala	/^  opaque type Token = String$/;"	t	line:54	end:54	object:demo.nested.Registry	typeref:typename:String
+Trait	../../basic/input/source.scala	/^trait Trait {$/;"	i	line:34	end:36	package:demo.nested
+a	../../basic/input/source.scala	/^class Foo(a: String) {$/;"	P	line:23	end:23	class:demo.nested.Foo	typeref:typename:String
+a	../../basic/input/source.scala	/^val (a, b) = (1, 2)$/;"	C	line:21	end:21	package:demo.nested
+a	../../basic/input/source.scala	/^val a: Double = 1.0$/;"	C	line:5	end:5	package:demo.nested	typeref:typename:Double
+active	../../basic/input/source.scala	/^  var active = true$/;"	v	line:45	end:45	class:demo.nested.Employee
+add	../../basic/input/source.scala	/^def add(x: Int, y: Int): Int = {$/;"	f	line:7	end:10	package:demo.nested	signature:(x: Int, y: Int)	typeref:typename:Int
+add2	../../basic/input/source.scala	/^def add2(x: Int, y: Int = 2) = x + y$/;"	f	line:12	end:12	package:demo.nested	signature:(x: Int, y: Int = 2)
+add3	../../basic/input/source.scala	/^def add3(x: Int): Int = {$/;"	f	line:14	end:19	package:demo.nested	signature:(x: Int)	typeref:typename:Int
+age	../../basic/input/source.scala	/^  val age: Int = 1$/;"	C	line:44	end:44	class:demo.nested.Employee	typeref:typename:Int
+anonFunc	../../basic/input/source.scala	/^  val anonFunc: Int => Int = { z =>$/;"	l	line:15	end:17	function:demo.nested.add3	typeref:typename:Int => Int
+b	../../basic/input/source.scala	/^  case Rgb(r: Int, g: Int, b: Int)$/;"	P	line:65	end:65	class:demo.nested.Color.Rgb	typeref:typename:Int
+b	../../basic/input/source.scala	/^  var b: String = a$/;"	v	line:24	end:24	class:demo.nested.Foo	typeref:typename:String
+b	../../basic/input/source.scala	/^val (a, b) = (1, 2)$/;"	C	line:21	end:21	package:demo.nested
+baz	../../basic/input/source.scala	/^  def baz = 1$/;"	m	line:29	end:29	object:demo.nested.Bar
+c	../../basic/input/source.scala	/^  private def c = "see"$/;"	m	line:25	end:25	access:private	class:demo.nested.Foo
+defaultName	../../basic/input/source.scala	/^given defaultName: String = "guest"$/;"	C	line:69	end:69	package:demo.nested	typeref:typename:String
+demo	../../basic/input/source.scala	/^package demo$/;"	p	line:1	end:1
+first	../../basic/input/source.scala	/^  val (first, second) = (1, 2)$/;"	C	line:55	end:55	object:demo.nested.Registry
+first_name	../../basic/input/source.scala	/^case class Person(first_name: String, last_name: String)$/;"	P	line:32	end:32	class:demo.nested.Person	typeref:typename:String
+g	../../basic/input/source.scala	/^  case Rgb(r: Int, g: Int, b: Int)$/;"	P	line:65	end:65	class:demo.nested.Color.Rgb	typeref:typename:Int
+greet	../../basic/input/source.scala	/^  private def greet(other: String): String = {$/;"	m	line:46	end:49	access:private	class:demo.nested.Employee	signature:(other: String)	typeref:typename:String
+helpers	../../basic/input/source.scala	/^package object helpers {$/;"	o	line:59	end:61	package:demo.nested
+isCool	../../basic/input/source.scala	/^  def isCool: Boolean$/;"	m	line:35	end:35	trait:demo.nested.Trait	typeref:typename:Boolean
+last_name	../../basic/input/source.scala	/^case class Person(first_name: String, last_name: String)$/;"	P	line:32	end:32	class:demo.nested.Person	typeref:typename:String
+left	../../basic/input/source.scala	/^  val left, right: Int$/;"	C	line:39	end:39	trait:demo.nested.Named	typeref:typename:Int
+local	../../basic/input/source.scala	/^    val local = other$/;"	l	line:47	end:47	method:demo.nested.Employee.greet
+make	../../basic/input/source.scala	/^  def make(name: String) = new Employee(name)$/;"	m	line:56	end:56	object:demo.nested.Registry	signature:(name: String)
+name	../../basic/input/source.scala	/^  def make(name: String) = new Employee(name)$/;"	z	line:56	end:56	method:demo.nested.Registry.make	typeref:typename:String
+name	../../basic/input/source.scala	/^  def name: String$/;"	m	line:40	end:40	trait:demo.nested.Named	typeref:typename:String
+name	../../basic/input/source.scala	/^class Employee(val name: String) extends Named {$/;"	P	line:43	end:43	class:demo.nested.Employee	typeref:typename:String
+nested	../../basic/input/source.scala	/^package nested$/;"	p	line:2	end:2	package:demo
+other	../../basic/input/source.scala	/^  private def greet(other: String): String = {$/;"	z	line:46	end:46	method:demo.nested.Employee.greet	typeref:typename:String
+r	../../basic/input/source.scala	/^  case Rgb(r: Int, g: Int, b: Int)$/;"	P	line:65	end:65	class:demo.nested.Color.Rgb	typeref:typename:Int
+right	../../basic/input/source.scala	/^  val left, right: Int$/;"	C	line:39	end:39	trait:demo.nested.Named	typeref:typename:Int
+second	../../basic/input/source.scala	/^  val (first, second) = (1, 2)$/;"	C	line:55	end:55	object:demo.nested.Registry
+top	../../basic/input/source.scala	/^def top(value: Int): Int = value$/;"	f	line:68	end:68	package:demo.nested	signature:(value: Int)	typeref:typename:Int
+value	../../basic/input/source.scala	/^def top(value: Int): Int = value$/;"	z	line:68	end:68	function:demo.nested.top	typeref:typename:Int
+version	../../basic/input/source.scala	/^  val version = 1$/;"	C	line:60	end:60	object:demo.nested.helpers
+x	../../basic/input/source.scala	/^def add(x: Int, y: Int): Int = {$/;"	z	line:7	end:7	function:demo.nested.add	typeref:typename:Int
+x	../../basic/input/source.scala	/^def add2(x: Int, y: Int = 2) = x + y$/;"	z	line:12	end:12	function:demo.nested.add2	typeref:typename:Int
+x	../../basic/input/source.scala	/^def add3(x: Int): Int = {$/;"	z	line:14	end:14	function:demo.nested.add3	typeref:typename:Int
+x	../../basic/input/source.scala	/^val x = 10$/;"	C	line:4	end:4	package:demo.nested
+y	../../basic/input/source.scala	/^def add(x: Int, y: Int): Int = {$/;"	z	line:7	end:7	function:demo.nested.add	typeref:typename:Int
+y	../../basic/input/source.scala	/^def add2(x: Int, y: Int = 2) = x + y$/;"	z	line:12	end:12	function:demo.nested.add2	typeref:typename:Int
+y2	../../basic/input/source.scala	/^  val y2 = x + y$/;"	l	line:8	end:8	function:demo.nested.add

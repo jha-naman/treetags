@@ -1,0 +1,28 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+again	source.lua	/^  ::again::$/;"	kind:L	line:32	language:Lua	function:config.refresh	roles:def
+block_local	source.lua	/^  local block_local = 1$/;"	kind:l	line:4	language:Lua	file:	roles:def
+block_local	source.lua	/^block_local = 3$/;"	kind:v	line:7	language:Lua	roles:def
+cache	source.lua	/^local cache = 1$/;"	kind:l	line:1	language:Lua	file:	roles:def
+config	source.lua	/^config = {$/;"	kind:v	line:14	language:Lua	roles:def
+counter	source.lua	/^counter = 0$/;"	kind:v	line:12	language:Lua	roles:def
+done	source.lua	/^  ::done::$/;"	kind:L	line:39	language:Lua	function:helper	roles:def
+enabled	source.lua	/^  enabled = true,$/;"	kind:F	line:16	language:Lua	table:config	roles:def
+global_in_function	source.lua	/^  global_in_function = 7$/;"	kind:v	line:31	language:Lua	function:config.refresh	roles:def
+handle	source.lua	/^local handle = function(x) return x end$/;"	kind:f	line:42	language:Lua	end:42	signature:(x)	file:	roles:def
+handler	source.lua	/^  handler = function(x) return x end,$/;"	kind:f	line:18	language:Lua	end:18	table:config	signature:(x)	roles:def
+helper	source.lua	/^local function helper(arg)$/;"	kind:f	line:36	language:Lua	end:41	signature:(arg)	file:	roles:def
+i	source.lua	/^for i = 1, 2 do$/;"	kind:l	line:8	language:Lua	file:	roles:def
+i	source.lua	/^i = 3$/;"	kind:v	line:11	language:Lua	roles:def
+inside	source.lua	/^  local inside = delta$/;"	kind:l	line:28	language:Lua	function:config.refresh	file:	roles:def
+key	source.lua	/^for key, value in pairs(config) do$/;"	kind:l	line:23	language:Lua	file:	roles:def
+limit	source.lua	/^  self.limit = inside$/;"	kind:F	line:30	language:Lua	table:self	roles:def
+limit	source.lua	/^config.limit = 10$/;"	kind:F	line:20	language:Lua	table:config	roles:def
+mode	source.lua	/^config["mode"] = "fast"$/;"	kind:F	line:21	language:Lua	table:config	roles:def
+nested	source.lua	/^  nested = { value = 3 },$/;"	kind:F	line:17	language:Lua	table:config	roles:def
+pending	source.lua	/^local pending$/;"	kind:l	line:2	language:Lua	file:	roles:def
+refresh	source.lua	/^function config:refresh(delta)$/;"	kind:m	line:26	language:Lua	end:34	table:config	signature:(delta)	roles:def
+scope_value	source.lua	/^  local scope_value = arg$/;"	kind:l	line:37	language:Lua	function:helper	file:	roles:def
+title	source.lua	/^  title = "demo",$/;"	kind:F	line:15	language:Lua	table:config	roles:def
+utility	source.lua	/^function config.utility(value) return value end$/;"	kind:f	line:35	language:Lua	end:35	table:config	signature:(value)	roles:def
+value	source.lua	/^  nested = { value = 3 },$/;"	kind:F	line:17	language:Lua	table:config.nested	roles:def
+value	source.lua	/^for key, value in pairs(config) do$/;"	kind:l	line:23	language:Lua	file:	roles:def

@@ -1,2 +1,2 @@
---sort yes -f '-' --kinds-objc=+D,+p,+x,+z,+l,+L --fields=+k,+n,-s
+--sort yes -f '-' --tag-style=extended --kinds-objc=+D,+p,+x,+z,+l,+L --fields=+k,+n,-s
 source.m

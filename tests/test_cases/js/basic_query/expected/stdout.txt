@@ -1,0 +1,12 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+Fields	source.js	/^class Fields {field1$/;"	
+Rectangle	source.js	/^class Rectangle {$/;"	
+area	source.js	/^  area() {$/;"	
+fn	source.js	/^  fn: () => {},$/;"	
+fn	source.js	/^String.prototype.fn = function() {};$/;"	
+fn	source.js	/^const fn = (foo, bar) => {};$/;"	
+func	source.js	/^var func = function() {};$/;"	
+height	source.js	/^  get height() {$/;"	
+height	source.js	/^  set height(x) {$/;"	
+inner	source.js	/^	function inner() {};$/;"	
+method	source.js	/^  method() {$/;"	

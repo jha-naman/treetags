@@ -1,2 +1,2 @@
---sort yes -f '-' --kinds-c++='cdefghLpDAUZz'
+--sort yes -f '-' --kinds-c++='cdefghLpDAUZz' --tag-style=extended
 source.cpp

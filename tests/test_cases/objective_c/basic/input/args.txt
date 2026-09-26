@@ -1,2 +1,2 @@
---sort yes -f '-'
+--sort yes -f '-' --tag-style=extended
 source.m Klass.h

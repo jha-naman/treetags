@@ -1,0 +1,21 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+<~>	source.ex	/^  defmacro left <~> right, do: {left, right}$/;"	kind:o	line:29	language:Elixir	module:Operators
+Demo	source.ex	/^  defexception [:message]$/;"	kind:e	line:3	language:Elixir	module:Demo
+Demo	source.ex	/^defmodule Demo do$/;"	kind:m	line:1	language:Elixir	end:18
+Operators	source.ex	/^defmodule Operators do$/;"	kind:m	line:28	language:Elixir	end:30
+Printable	source.ex	/^defimpl Printable, for: Demo do$/;"	kind:i	line:24	language:Elixir	protocol:Printable
+Printable	source.ex	/^defprotocol Printable do$/;"	kind:p	line:20	language:Elixir	end:22
+build	source.ex	/^  @macrocallback build(term()) :: Macro.t()$/;"	kind:c	line:8	language:Elixir	module:Demo
+delegated	source.ex	/^  defdelegate delegated(x), to: Other$/;"	kind:d	line:13	language:Elixir	module:Demo
+hello	source.ex	/^  def hello(a, b \\\\ nil), do: a$/;"	kind:f	line:9	language:Elixir	module:Demo
+hidden	source.ex	/^  @typep hidden :: atom()$/;"	kind:y	line:5	language:Elixir	module:Demo
+hidden	source.ex	/^  defp hidden(x), do: x$/;"	kind:f	line:10	language:Elixir	module:Demo
+item	source.ex	/^  @type item :: term()$/;"	kind:y	line:4	language:Elixir	module:Demo
+make	source.ex	/^  defmacro make(x), do: x$/;"	kind:a	line:11	language:Elixir	module:Demo
+render	source.ex	/^  def render(data)$/;"	kind:f	line:21	language:Elixir	protocol:Printable
+render	source.ex	/^  def render(data), do: data$/;"	kind:f	line:25	language:Elixir	protocol:Printable
+run	source.ex	/^  @callback run(term()) :: term()$/;"	kind:c	line:7	language:Elixir	module:Demo
+secret	source.ex	/^  @opaque secret :: binary()$/;"	kind:y	line:6	language:Elixir	module:Demo
+user	source.ex	/^  Record.defrecord :user, name: nil$/;"	kind:r	line:14	language:Elixir	module:Demo
+valid	source.ex	/^  defguard valid(x) when is_atom(x)$/;"	kind:g	line:12	language:Elixir	module:Demo
+works	source.ex	/^  test "works" do$/;"	kind:t	line:15	language:Elixir	module:Demo

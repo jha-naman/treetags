@@ -54,6 +54,9 @@ test max {
     _ = max(u8, 1, 2);
 }
 
+test "_" {}
+test "" {}
+
 test {
     _ = std;
 }

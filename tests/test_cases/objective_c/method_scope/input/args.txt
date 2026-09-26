@@ -1,2 +1,2 @@
---sort yes -f '-' --kinds-objc=l,L
+--sort yes -f '-' --tag-style=extended --kinds-objc=l,L
 source.m

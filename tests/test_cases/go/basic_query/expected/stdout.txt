@@ -1,0 +1,9 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+Alias	source.go	/^type Alias map[string]int$/;"	
+AnotherOne	source.go	/^type AnotherOne Alias$/;"	
+Bar	source.go	/^func (f *Point) Bar(baz string) map[string]string {$/;"	
+Point	source.go	/^type Point struct {$/;"	
+String	source.go	/^func (p Point) String() string {$/;"	
+Stringer	source.go	/^type Stringer interface {$/;"	
+foo	source.go	/^func foo(bar, baz string, arr []string) (error, map[string]string) {}$/;"	
+main	source.go	/^func main() {}$/;"	

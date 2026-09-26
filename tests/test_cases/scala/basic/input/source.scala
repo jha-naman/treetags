@@ -1,3 +1,6 @@
+package demo
+package nested
+
 val x = 10
 val a: Double = 1.0
 
@@ -32,3 +35,35 @@ trait Trait {
   def isCool: Boolean
 }
 
+trait Named {
+  val left, right: Int
+  def name: String
+}
+
+class Employee(val name: String) extends Named {
+  val age: Int = 1
+  var active = true
+  private def greet(other: String): String = {
+    val local = other
+    local
+  }
+}
+
+object Registry {
+  type Id = String
+  opaque type Token = String
+  val (first, second) = (1, 2)
+  def make(name: String) = new Employee(name)
+}
+
+package object helpers {
+  val version = 1
+}
+
+enum Color {
+  case Red, Blue
+  case Rgb(r: Int, g: Int, b: Int)
+}
+
+def top(value: Int): Int = value
+given defaultName: String = "guest"

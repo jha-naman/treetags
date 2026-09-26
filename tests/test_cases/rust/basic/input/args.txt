@@ -1,2 +1,2 @@
---sort yes -f '-'
+--tag-style=extended --sort yes -f '-'
 source.rs

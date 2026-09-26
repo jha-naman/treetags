@@ -1,0 +1,1 @@
+--sort yes -f - --tag-style=extended --fields=+k,+n,+e,+s,+l,+S,+a,+i,+m --kinds-php=+l

@@ -6,7 +6,6 @@ use tree_sitter::{
     wasmtime::{Cache, CacheConfig, Config, Engine},
     Language, WasmStore,
 };
-use tree_sitter_tags::TagsConfiguration;
 
 pub(crate) fn engine() -> &'static Engine {
     static ENGINE: OnceLock<Engine> = OnceLock::new();
@@ -41,7 +40,6 @@ pub struct WasmGrammar {
     pub url: &'static str,
     pub sha256: &'static str,
     pub abi: usize,
-    pub query: Option<&'static str>,
 }
 
 pub(crate) static ZIG: WasmGrammar = WasmGrammar {
@@ -51,7 +49,6 @@ pub(crate) static ZIG: WasmGrammar = WasmGrammar {
     url: "https://github.com/tree-sitter-grammars/tree-sitter-zig/releases/download/v1.1.2/tree-sitter-zig.wasm",
     sha256: "54b3b83dd9c62da5815f06132bc3fc914d9dcc780370b32416446a0b7969e8c6",
     abi: 14,
-    query: None,
 };
 pub(crate) static DART: WasmGrammar = WasmGrammar {
     name: "dart",
@@ -60,7 +57,6 @@ pub(crate) static DART: WasmGrammar = WasmGrammar {
     url: "https://github.com/jha-naman/tree-sitter-dart/releases/download/v0.2.1/tree-sitter-dart.wasm",
     sha256: "e700b38561a3f1e641340fac8232dfca493dbc024d142d338a5075feca3e9efc",
     abi: 15,
-    query: None,
 };
 pub(crate) static SWIFT: WasmGrammar = WasmGrammar {
     name: "swift",
@@ -69,7 +65,6 @@ pub(crate) static SWIFT: WasmGrammar = WasmGrammar {
     url: "https://github.com/alex-pinkus/tree-sitter-swift/releases/download/0.7.3/tree-sitter-swift.wasm",
     sha256: "0258a7ef17303a8079ffe0748b3583d59656b5c3e8653fca7b6451b3e6689eb2",
     abi: 15,
-    query: None,
 };
 pub(crate) static KOTLIN: WasmGrammar = WasmGrammar {
     name: "kotlin",
@@ -79,7 +74,6 @@ pub(crate) static KOTLIN: WasmGrammar = WasmGrammar {
         "https://github.com/fwcd/tree-sitter-kotlin/releases/download/0.3.8/tree-sitter-kotlin.wasm",
     sha256: "c624e7443b371c28adc5d81674e73067564c12555ebe3ed96a6c8db814b7602d",
     abi: 14,
-    query: None,
 };
 pub(crate) static OBJECTIVE_C: WasmGrammar = WasmGrammar {
     name: "objc",
@@ -88,7 +82,6 @@ pub(crate) static OBJECTIVE_C: WasmGrammar = WasmGrammar {
     url: "https://github.com/tree-sitter-grammars/tree-sitter-objc/releases/download/v3.0.2/tree-sitter-objc.wasm",
     sha256: "155bf61fc94941fa9d07c86cd46895f14dfb2549fb7f646faeb83765af05c970",
     abi: 14,
-    query: None,
 };
 pub(crate) static TERRAFORM: WasmGrammar = WasmGrammar {
     name: "terraform",
@@ -97,7 +90,6 @@ pub(crate) static TERRAFORM: WasmGrammar = WasmGrammar {
     url: "https://github.com/tree-sitter-grammars/tree-sitter-hcl/releases/download/v1.2.0/tree-sitter-hcl.wasm",
     sha256: "2f9acf63e7c263215f283e2cf0f4ebbb9bfa77f58e18fa42b91094be201372a7",
     abi: 15,
-    query: None,
 };
 pub(crate) static OCAML: WasmGrammar = WasmGrammar {
     name: "ocaml",
@@ -106,7 +98,6 @@ pub(crate) static OCAML: WasmGrammar = WasmGrammar {
     url: "https://github.com/tree-sitter/tree-sitter-ocaml/releases/download/v0.24.0/tree-sitter-ocaml.wasm",
     sha256: "a7fb5e4bff6854b9f68123cd79bb170788314e8d4e5adc8f4af835039e4ef571",
     abi: 14,
-    query: Some(include_str!("../queries/ocaml.scm")),
 };
 pub(crate) const GRAMMARS: &[&WasmGrammar] = &[
     &ZIG,
@@ -127,7 +118,6 @@ impl WasmGrammar {
 
 pub(crate) struct LoadedGrammar {
     pub language: Language,
-    pub tags: Option<TagsConfiguration>,
 }
 
 pub(crate) struct WasmGrammars {
@@ -172,12 +162,7 @@ impl WasmGrammars {
         {
             return Err(format!("incompatible ABI {abi}, expected {}", grammar.abi));
         }
-        let tags = grammar
-            .query
-            .map(|q| TagsConfiguration::new(language.clone(), q, ""))
-            .transpose()
-            .map_err(|e| format!("invalid tag query: {e}"))?;
-        Ok(LoadedGrammar { language, tags })
+        Ok(LoadedGrammar { language })
     }
 
     /// Validate configured names without loading grammars before they are used.
@@ -258,7 +243,7 @@ mod tests {
     }
 
     #[test]
-    fn failures_are_cached_and_wrong_abi_or_query_is_rejected() {
+    fn failures_are_cached_and_wrong_abi_or_export_is_rejected() {
         let root = tempfile::tempdir().unwrap();
         let grammars = WasmGrammars::new(root.path().to_owned());
         assert!(grammars.get(&ZIG).is_none());
@@ -270,14 +255,6 @@ mod tests {
             .err()
             .unwrap()
             .contains("incompatible ABI 14"));
-        let bad_query = WasmGrammar {
-            query: Some("("),
-            ..ZIG
-        };
-        assert!(WasmGrammars::load(&bad_query, &fixture())
-            .err()
-            .unwrap()
-            .contains("invalid tag query"));
         let wrong_export = WasmGrammar {
             name: "nonexistent",
             ..ZIG

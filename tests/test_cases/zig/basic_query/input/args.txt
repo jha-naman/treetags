@@ -1,0 +1,2 @@
+--sort yes -f '-' --tag-style=basic --kinds-zig=-f --fields=+n,+S --extras=+q
+source.zig

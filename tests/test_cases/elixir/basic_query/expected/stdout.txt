@@ -1,0 +1,11 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+Demo	source.ex	/^defmodule Demo do$/;"	
+Operators	source.ex	/^defmodule Operators do$/;"	
+Printable	source.ex	/^defprotocol Printable do$/;"	
+delegated	source.ex	/^  defdelegate delegated(x), to: Other$/;"	
+hello	source.ex	/^  def hello(a, b \\\\ nil), do: a$/;"	
+hidden	source.ex	/^  defp hidden(x), do: x$/;"	
+make	source.ex	/^  defmacro make(x), do: x$/;"	
+render	source.ex	/^  def render(data)$/;"	
+render	source.ex	/^  def render(data), do: data$/;"	
+valid	source.ex	/^  defguard valid(x) when is_atom(x)$/;"	

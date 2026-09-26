@@ -1,0 +1,2 @@
+--tag-style extended --sort yes -f '-' --fields=+n,+S,+i,+a,+e --kinds-scala=+l,+z
+../../basic/input/source.scala

@@ -1,0 +1,24 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+App\Deep	source.php	/^namespace App\\Deep;$/;"	kind:n	line:2	language:PHP	end:2
+C	source.php	/^abstract class C extends ParentClass implements I, OtherI {$/;"	kind:c	line:19	language:PHP	end:29	namespace:App\Deep	inherits:ParentClass,I,OtherI	implementation:abstract
+CC	source.php	/^    public const CC = 3;$/;"	kind:d	line:22	language:PHP	class:App\Deep\C
+DYN	source.php	/^define('DYN', 2);$/;"	kind:d	line:7	language:PHP	namespace:App\Deep
+Handy	source.php	/^use Vendor\\Tool as Handy;$/;"	kind:a	line:3	language:PHP	namespace:App\Deep	typeref:unknown:Vendor\Tool
+I	source.php	/^interface I extends \\Base\\I {$/;"	kind:i	line:10	language:PHP	end:13	namespace:App\Deep	inherits:\Base\I
+IC	source.php	/^    const IC = 1;$/;"	kind:d	line:12	language:PHP	interface:App\Deep\I
+One	source.php	/^use Vendor\\More\\{One, Two as Second};$/;"	kind:a	line:5	language:PHP	namespace:App\Deep	typeref:unknown:Vendor\More\One
+Other	source.php	/^use Vendor\\Other;$/;"	kind:a	line:4	language:PHP	namespace:App\Deep	typeref:unknown:Vendor\Other
+Second	source.php	/^use Vendor\\More\\{One, Two as Second};$/;"	kind:a	line:5	language:PHP	namespace:App\Deep	typeref:unknown:Vendor\More\Two
+T	source.php	/^trait T {$/;"	kind:t	line:15	language:PHP	end:17	namespace:App\Deep
+TOP	source.php	/^const TOP = 1;$/;"	kind:d	line:6	language:PHP	namespace:App\Deep
+__construct	source.php	/^    public function __construct(public int \$promoted) {}$/;"	kind:f	line:24	language:PHP	end:24	class:App\Deep\C	access:public	signature:(public int $promoted)
+global	source.php	/^\$global = 1;$/;"	kind:v	line:8	language:PHP	namespace:App\Deep
+helper	source.php	/^    public function helper(\$a) {}$/;"	kind:f	line:16	language:PHP	end:16	trait:App\Deep\T	access:public	signature:($a)
+local	source.php	/^        \$local = 1;$/;"	kind:l	line:26	language:PHP	function:App\Deep\C::run
+local	source.php	/^    \$local = 1;$/;"	kind:l	line:32	language:PHP	function:App\Deep\work
+other	source.php	/^    private static string \$prop = 'v', \$other = 'x';$/;"	kind:v	line:23	language:PHP	class:App\Deep\C	access:private
+pending	source.php	/^    abstract protected function pending(): void;$/;"	kind:f	line:21	language:PHP	end:21	class:App\Deep\C	typeref:unknown:void	access:protected	implementation:abstract	signature:()
+prop	source.php	/^    private static string \$prop = 'v', \$other = 'x';$/;"	kind:v	line:23	language:PHP	class:App\Deep\C	access:private
+run	source.php	/^    protected static function run(int \$x, ?string \$y = null): ?string {$/;"	kind:f	line:25	language:PHP	end:28	class:App\Deep\C	typeref:unknown:?string	access:protected	signature:(int $x, ?string $y = null)
+run	source.php	/^    public function run(int \$x): ?string;$/;"	kind:f	line:11	language:PHP	end:11	interface:App\Deep\I	typeref:unknown:?string	access:public	signature:(int $x)
+work	source.php	/^function work(int \$a): void {$/;"	kind:f	line:31	language:PHP	end:33	namespace:App\Deep	typeref:unknown:void	signature:(int $a)

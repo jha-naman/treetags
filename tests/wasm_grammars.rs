@@ -27,7 +27,11 @@ impl Project {
         fs::write(self.dir.path().join(name), source).unwrap();
     }
     fn install(&self, lang: &str) {
-        let abi = if lang == "swift" { 15 } else { 14 };
+        let abi = if matches!(lang, "swift" | "dart") {
+            15
+        } else {
+            14
+        };
         let dir = self.config_dir().join(format!("wasm_grammars/{abi}"));
         fs::create_dir_all(&dir).unwrap();
         let file = format!("tree-sitter-{lang}.wasm");
@@ -55,40 +59,6 @@ fn stdout(output: &Output) -> String {
 }
 fn stderr(output: &Output) -> String {
     String::from_utf8(output.stderr.clone()).unwrap()
-}
-
-#[test]
-fn swift_walker_uses_external_grammar_and_filters_extension_fields() {
-    let p = Project::new();
-    p.write("source.swift", "public struct Box {\n    var value: Int\n    func read(input: Int) -> Int {\n        let local: Int = input\n        return local\n    }\n}\n");
-    p.install("swift");
-
-    let default = p.run(&["-f", "-", "source.swift"]);
-    assert!(default.status.success(), "{}", stderr(&default));
-    let output = stdout(&default);
-    assert!(output.contains("Box\tsource.swift"), "{output}");
-    assert!(
-        output.contains("struct:Box\ttyperef:typename:Int"),
-        "{output}"
-    );
-    assert!(!output.contains("local\tsource.swift"), "{output}");
-    assert!(!output.contains("signature:"), "{output}");
-
-    let filtered = p.run(&[
-        "-f",
-        "-",
-        "--fields=-s,-t,+n,+e,+S,+a",
-        "--kinds-swift=+l,+z",
-        "source.swift",
-    ]);
-    assert!(filtered.status.success(), "{}", stderr(&filtered));
-    let output = stdout(&filtered);
-    assert!(output.contains("local\tsource.swift"), "{output}");
-    assert!(output.contains("input\tsource.swift"), "{output}");
-    assert!(output.contains("signature:(input: Int)"), "{output}");
-    assert!(output.contains("access:public"), "{output}");
-    assert!(!output.contains("struct:Box"), "{output}");
-    assert!(!output.contains("typeref:"), "{output}");
 }
 
 #[test]
@@ -457,48 +427,4 @@ fn metadata_does_not_require_installed_grammars() {
         assert_eq!(stderr(&out), "");
         assert!(!stdout(&out).is_empty());
     }
-}
-
-#[test]
-fn zig_emitter_filters_names_and_preserves_disabled_parent_scopes() {
-    let p = Project::new();
-    p.install("zig");
-    p.write(
-        "source.zig",
-        r#"const Container = struct {
-    value: u32,
-    fn consume(_: u32, named: u32) void {
-        const _ = named;
-        const local = named;
-    }
-};
-const Choice = enum(u8) { first, _ };
-test "" {}
-test "_" {}
-"#,
-    );
-    let out = p.run(&["-f", "-", "--kinds-zig=+z,+l", "source.zig"]);
-    assert!(out.status.success(), "{}", stderr(&out));
-    let tags = stdout(&out);
-    for line in tags.lines().filter(|line| !line.starts_with('!')) {
-        let name = line.split('\t').next().unwrap();
-        assert!(!name.is_empty() && name != "_", "{line}");
-    }
-    assert!(
-        tags.lines().any(|line| line.starts_with("named\t")),
-        "{tags}"
-    );
-    assert!(
-        tags.lines().any(|line| line.starts_with("first\t")),
-        "{tags}"
-    );
-
-    let out = p.run(&["-f", "-", "--kinds-zig=z", "--fields=+s,+t", "source.zig"]);
-    assert!(out.status.success(), "{}", stderr(&out));
-    let tags = stdout(&out);
-    let tags: Vec<_> = tags.lines().filter(|line| !line.starts_with('!')).collect();
-    assert_eq!(tags.len(), 1, "{tags:?}");
-    assert!(tags[0].starts_with("named\t"), "{tags:?}");
-    assert!(tags[0].contains("function:Container.consume"), "{tags:?}");
-    assert!(tags[0].contains("typeref:typename:u32"), "{tags:?}");
 }

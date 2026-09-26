@@ -1,0 +1,18 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+a	source.lua	/^local a, b = function() end, function() end$/;"	kind:f	line:28	language:Lua	end:28	signature:()	file:	roles:def
+assigned	source.lua	/^local assigned = function(z) return z end$/;"	kind:f	line:18	language:Lua	end:18	signature:(z)	file:	roles:def
+b	source.lua	/^local a, b = function() end, function() end$/;"	kind:f	line:28	language:Lua	end:28	signature:()	file:	roles:def
+field	source.lua	/^API.field = function(v) return v end$/;"	kind:f	line:20	language:Lua	end:20	table:API	signature:(v)	roles:def
+first	source.lua	/^  first = function(x) return x end,$/;"	kind:f	line:22	language:Lua	end:22	table:table_functions	signature:(x)	roles:def
+global_fn	source.lua	/^function global_fn(x)$/;"	kind:f	line:5	language:Lua	end:7	signature:(x)	roles:def
+global_fn	source.lua	/^global_fn(1)$/;"	kind:Y	line:29	language:Lua	roles:referenced
+local_fn	source.lua	/^local function local_fn(a, b)$/;"	kind:f	line:2	language:Lua	end:4	signature:(a, b)	file:	roles:def
+make	source.lua	/^function API.make(x)$/;"	kind:f	line:8	language:Lua	end:10	table:API	signature:(x)	roles:def
+nested	source.lua	/^  local function nested(z) return z end$/;"	kind:f	line:12	language:Lua	end:12	function:API.run	signature:(z)	file:	roles:def
+nested	source.lua	/^  return nested(y)$/;"	kind:Y	line:13	language:Lua	function:API.run	roles:referenced
+run	source.lua	/^API:run(2)$/;"	kind:Y	line:30	language:Lua	table:API	roles:referenced
+run	source.lua	/^function API:run(y, ...)$/;"	kind:f	line:11	language:Lua	end:14	table:API	signature:(y, ...)	roles:def
+second	source.lua	/^  second = function(y)$/;"	kind:f	line:23	language:Lua	end:25	table:table_functions	signature:(y)	roles:def
+thing	source.lua	/^thing = function(q) return q end$/;"	kind:f	line:19	language:Lua	end:19	signature:(q)	roles:def
+third	source.lua	/^  ["third"] = function(z) return z end,$/;"	kind:f	line:26	language:Lua	end:26	table:table_functions	signature:(z)	roles:def
+work	source.lua	/^function API.sub:work(v)$/;"	kind:f	line:15	language:Lua	end:17	table:API.sub	signature:(v)	roles:def

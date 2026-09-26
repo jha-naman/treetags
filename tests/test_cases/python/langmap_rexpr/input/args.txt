@@ -1,2 +1,2 @@
---sort yes -f '-' --map-python=%scripts/.*\.txt%
+--sort yes -f '-' --map-python=%scripts/.*\.txt% --tag-style=extended
 scripts/tool.txt

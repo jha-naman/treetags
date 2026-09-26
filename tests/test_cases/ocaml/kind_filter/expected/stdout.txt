@@ -1,0 +1,14 @@
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted/
+Oops	source.ml	/^  exception Oops$/;"	e	module:Outer
+Outer	source.ml	/^module Outer = struct$/;"	M
+S	source.ml	/^module type S = sig val run : int -> int end$/;"	M
+Source	source.ml	/^module Outer = struct$/;"	M
+add	source.ml	/^  let add x = x + count$/;"	f	module:Outer
+age	source.ml	/^  type person = { age : int }$/;"	r	type:Outer/person
+color	source.ml	/^  type color = Red | Blue$/;"	t	module:Outer
+count	source.ml	/^  let count = 1$/;"	v	module:Outer
+counter	source.ml	/^  class counter = object method get = count end$/;"	c	module:Outer
+get	source.ml	/^  class counter = object method get = count end$/;"	m	class:Outer/counter
+person	source.ml	/^  type person = { age : int }$/;"	t	module:Outer
+primitive	source.ml	/^external primitive : int -> int = "primitive"$/;"	f
+run	source.ml	/^module type S = sig val run : int -> int end$/;"	p	module:S

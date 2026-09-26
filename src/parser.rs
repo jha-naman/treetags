@@ -3,13 +3,14 @@
 //! Per-thread execution engine for tag generation. Holds the mutable state
 //! needed by all three language backends:
 //! - `ts_parser` — used by builtin tree-walker parsers
-//! - `tags_context` / `grammar_store` — used by query-based fallback parsers
+//! - `tags_context` / `grammar_store` — used by basic tag queries
 //! - `shared_registry` / `local_instances` — used by WASM plugin parsers
 //!
 //! Language routing lives in `LanguageParser` / `LanguageParserRegistry`
 //! (`language_parser.rs`); this module is a pure execution engine.
 
 use crate::built_in_grammars::{self, QueryConfig};
+use crate::builtin_langs::{LanguageDescriptor, OFFICIAL_LANGUAGES};
 use crate::config::Config;
 use crate::plugin::instance::WasmInstance;
 use crate::plugin::registry::PluginRegistry;
@@ -20,7 +21,7 @@ use libloading::Library;
 use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::fs;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use tree_sitter::Parser as TSParser;
 use tree_sitter_tags::TagsContext;
 
@@ -28,14 +29,22 @@ pub(crate) mod c_sharp;
 pub(crate) mod common;
 pub(crate) mod cpp;
 pub(crate) mod dart;
+pub(crate) mod elixir;
 pub(crate) mod go;
 mod helper;
 pub(crate) mod java;
 pub(crate) mod js;
+pub(crate) mod julia;
 pub(crate) mod kotlin;
+pub(crate) mod lua;
 pub(crate) mod objective_c;
+pub(crate) mod ocaml;
+pub(crate) mod php;
 pub(crate) mod python;
+pub(crate) mod ruby;
 pub(crate) mod rust;
+pub(crate) mod scala;
+pub(crate) mod shell;
 pub(crate) mod swift;
 pub(crate) mod terraform;
 pub(crate) mod typescript;
@@ -44,20 +53,52 @@ pub(crate) mod zig;
 pub(crate) use helper::kinds_from_mappings;
 pub use helper::{KindInfo, TagKindConfig};
 
-/// Shared, immutable grammar data for query-based tag generation.
-/// Built once at startup and shared across all worker threads via `Arc`.
+/// Shared grammar and query caches for both official tag styles.
+/// Initialized lazily and shared across all worker threads via `Arc`.
 /// `_libs` keeps dynamically-loaded grammar libraries alive.
 pub(crate) struct GrammarStore {
     pub(crate) grammar_configs: Vec<QueryConfig>,
     pub(crate) extension_config_map: HashMap<String, usize>,
     _libs: Vec<Library>,
     pub(crate) wasm: WasmGrammars,
+    languages: HashMap<&'static str, OnceLock<Option<tree_sitter::Language>>>,
+    queries: HashMap<&'static str, OnceLock<Result<tree_sitter_tags::TagsConfiguration, String>>>,
 }
 
 impl GrammarStore {
-    /// Builds the store from already-loaded built-in grammars, so callers that
-    /// also need the grammars' metadata (e.g. `LanguageParserRegistry`) don't
-    /// pay to compile every `TagsConfiguration` twice.
+    pub(crate) fn has_user_query(&self, extension: &str) -> bool {
+        self.extension_config_map
+            .get(extension)
+            .is_some_and(|&index| matches!(self.grammar_configs[index], QueryConfig::User(_)))
+    }
+
+    fn language(&self, desc: &LanguageDescriptor) -> Option<tree_sitter::Language> {
+        self.languages[desc.lang]
+            .get_or_init(|| desc.grammar.language(&self.wasm))
+            .clone()
+    }
+
+    fn query(&self, desc: &LanguageDescriptor) -> Option<&tree_sitter_tags::TagsConfiguration> {
+        self.queries[desc.lang]
+            .get_or_init(|| {
+                let language = self
+                    .language(desc)
+                    .ok_or_else(|| "grammar unavailable".to_owned())?;
+                let query = desc
+                    .query
+                    .ok_or_else(|| "query not implemented".to_owned())?;
+                tree_sitter_tags::TagsConfiguration::new(language, query, "").map_err(|error| {
+                    let message = format!("invalid tag query for '{}': {error}", desc.lang);
+                    eprintln!("treetags: {message}");
+                    message
+                })
+            })
+            .as_ref()
+            .ok()
+    }
+
+    /// Registers official query metadata without loading grammars or compiling
+    /// queries. Custom native grammars retain their historical loading behavior.
     pub(crate) fn build(
         builtin_grammars: Vec<built_in_grammars::BuiltinGrammar>,
         config: &Config,
@@ -81,7 +122,7 @@ impl GrammarStore {
                     extension_config_map.insert(extension, index);
                 }
             }
-            grammar_configs.push(QueryConfig::Bundled(config_res));
+            grammar_configs.push(QueryConfig::User(config_res));
         }
 
         Self {
@@ -89,6 +130,14 @@ impl GrammarStore {
             extension_config_map,
             _libs: user_grammars._grammars,
             wasm: WasmGrammars::new(config.wasm_grammars_dir.clone()),
+            languages: OFFICIAL_LANGUAGES
+                .iter()
+                .map(|d| (d.lang, OnceLock::new()))
+                .collect(),
+            queries: OFFICIAL_LANGUAGES
+                .iter()
+                .map(|d| (d.lang, OnceLock::new()))
+                .collect(),
         }
     }
 }
@@ -99,7 +148,7 @@ pub struct Parser {
     pub tags_context: TagsContext,
     walker_wasm_store: OnceCell<Result<(), String>>,
     query_wasm_store: OnceCell<Result<(), String>>,
-    /// Exposed `pub(crate)` so `BuiltinLanguageParser` can pass it to language
+    /// Exposed `pub(crate)` so `OfficialLanguageParser` can pass it to language
     /// free-functions without going through an extra method call.
     pub(crate) ts_parser: TSParser,
     pub(crate) shared_registry: Option<Arc<PluginRegistry>>,
@@ -140,15 +189,15 @@ impl Parser {
         }
     }
 
-    pub(crate) fn generate_builtin(
+    pub(crate) fn generate_with_walker(
         &mut self,
-        desc: &crate::builtin_langs::BuiltinLangDesc,
+        desc: &LanguageDescriptor,
         code: &[u8],
         path: &str,
         kinds: &TagKindConfig,
         config: &Config,
     ) -> Vec<tag::Tag> {
-        let Some(language) = desc.grammar.language(&self.grammar_store.wasm) else {
+        let Some(language) = self.grammar_store.language(desc) else {
             return vec![];
         };
         if language.is_wasm()
@@ -165,8 +214,17 @@ impl Parser {
         {
             return vec![];
         }
-        (desc.generate_fn)(&mut self.ts_parser, language, code, path, kinds, config)
-            .unwrap_or_default()
+        (desc
+            .generate_fn
+            .expect("selected walker must be implemented"))(
+            &mut self.ts_parser,
+            language,
+            code,
+            path,
+            kinds,
+            config,
+        )
+        .unwrap_or_default()
     }
 
     /// Attempt to generate tags for `extension` using a WASM plugin.
@@ -196,32 +254,43 @@ impl Parser {
         file_path_relative_to_tag_file: &str,
         extension: &str,
     ) -> Vec<tag::Tag> {
-        let config = self
-            .grammar_store
-            .extension_config_map
-            .get(extension)
-            .and_then(|&i| {
-                self.grammar_store
-                    .grammar_configs
-                    .get(i)
-                    .and_then(|result| match result {
-                        QueryConfig::Bundled(result) => result.as_ref().ok(),
-                        QueryConfig::Wasm(grammar) => self
-                            .grammar_store
-                            .wasm
-                            .get(grammar)
-                            .and_then(|g| g.tags.as_ref()),
-                    })
-            });
+        let store = Arc::clone(&self.grammar_store);
+        let config = store.extension_config_map.get(extension).and_then(|&i| {
+            store
+                .grammar_configs
+                .get(i)
+                .and_then(|result| match result {
+                    QueryConfig::User(result) => result.as_ref().ok(),
+                    QueryConfig::Official(desc) => store.query(desc),
+                })
+        });
 
-        let mut tags: Vec<tag::Tag> = Vec::new();
-
-        let tags_config = if let Some(config) = config {
-            config
-        } else {
-            return tags;
+        let Some(tags_config) = config else {
+            return vec![];
         };
+        self.generate_query(tags_config, code, file_path_relative_to_tag_file)
+    }
 
+    pub(crate) fn generate_official_query(
+        &mut self,
+        desc: &LanguageDescriptor,
+        code: &[u8],
+        path: &str,
+    ) -> Vec<tag::Tag> {
+        let store = Arc::clone(&self.grammar_store);
+        let Some(query) = store.query(desc) else {
+            return vec![];
+        };
+        self.generate_query(query, code, path)
+    }
+
+    fn generate_query(
+        &mut self,
+        tags_config: &tree_sitter_tags::TagsConfiguration,
+        code: &[u8],
+        file_path_relative_to_tag_file: &str,
+    ) -> Vec<tag::Tag> {
+        let mut tags = Vec::new();
         if tags_config.language.is_wasm()
             && self
                 .query_wasm_store
@@ -267,11 +336,8 @@ impl Parser {
         tags
     }
 
-    /// Read file bytes and generate tags, applying the three-priority dispatch
+    /// Compatibility helper using the same registry and style selection as workers.
     #[allow(dead_code)]
-    /// (WASM plugin → builtin tree-walker → tag-query fallback) without
-    /// requiring a `LanguageParserRegistry`.  Intended for tests and
-    /// one-off external callers.
     pub fn parse_file(
         &mut self,
         file_path_relative_to_tag_file: &str,
@@ -282,43 +348,179 @@ impl Parser {
         let code = fs::read(file_path)
             .map_err(|e| format!("Failed to read file '{}': {}", file_path, e))?;
 
-        // Priority 1: WASM plugin
-        if let Some(tags) = self.try_plugin(
-            extension,
-            &code,
-            file_path_relative_to_tag_file,
+        use crate::language_parser::LanguageParserRegistry;
+        let registry = LanguageParserRegistry::new(config);
+        let routing_path =
+            std::path::Path::new(file_path_relative_to_tag_file).with_extension(extension);
+        let id = crate::tag_processor::select_language(
+            &registry,
             config,
             std::path::Path::new(file_path),
-        ) {
-            return Ok(tags);
-        }
-
-        // Priority 2: builtin tree-walker (data-driven, no match needed)
-        for desc in crate::builtin_langs::BUILTIN_LANG_DESCRIPTORS {
-            if desc.extensions.contains(&extension) {
-                let kind_config = TagKindConfig::from_string(
-                    config.get_kinds(desc.lang),
-                    desc.kind_defaults,
-                    desc.kind_optionals,
-                );
-                return Ok(self.generate_builtin(
-                    desc,
+            &routing_path,
+        )
+        .map(|selection| selection.lang);
+        Ok(id
+            .map(|id| {
+                registry.parser(id).generate_tags(
+                    self,
                     &code,
                     file_path_relative_to_tag_file,
-                    &kind_config,
                     config,
-                ));
-            }
-        }
-
-        // Priority 3: tag-query fallback
-        Ok(self.generate_by_tag_query(&code, file_path_relative_to_tag_file, extension))
+                    std::path::Path::new(file_path),
+                )
+            })
+            .unwrap_or_default())
     }
 }
 
 #[cfg(test)]
 mod wasm_tests {
     use super::*;
+
+    #[test]
+    fn dual_implementation_dispatch_and_query_failure_isolation() {
+        use crate::config::tag_styles::TagStyle;
+        use crate::language_parser::{LanguageParser, OfficialLanguageParser};
+
+        let mut config = Config::for_test();
+        config.tag_preferences.default = TagStyle::Basic;
+        let desc = crate::builtin_langs::LanguageDescriptorTestBuilder::from_language("rust")
+            .query("(function_item name: (identifier) @name) @definition.function")
+            .build();
+        let mut parser = Parser::new(&config);
+        let source = b"pub fn example() {}";
+        let path = std::path::Path::new("source.rs");
+        let basic = OfficialLanguageParser::from_desc(&desc, &config).generate_tags(
+            &mut parser,
+            source,
+            "source.rs",
+            &config,
+            path,
+        );
+        assert_eq!(basic.len(), 1);
+        assert_eq!(basic[0].name, "example");
+        assert!(basic[0].kind.is_none() && basic[0].extension_fields.is_none());
+
+        config.tag_preferences.default = TagStyle::Extended;
+        let rich = OfficialLanguageParser::from_desc(&desc, &config).generate_tags(
+            &mut parser,
+            source,
+            "source.rs",
+            &config,
+            path,
+        );
+        assert!(rich
+            .iter()
+            .any(|tag| tag.name == "example" && tag.kind.is_some()));
+
+        let broken = crate::builtin_langs::LanguageDescriptorTestBuilder::from_language("rust")
+            .query("(")
+            .build();
+        let mut parser = Parser::new(&config);
+        assert!(parser.grammar_store.queries["rust"].get().is_none());
+        let rich = OfficialLanguageParser::from_desc(&broken, &config).generate_tags(
+            &mut parser,
+            source,
+            "source.rs",
+            &config,
+            path,
+        );
+        assert!(!rich.is_empty());
+        assert!(parser.grammar_store.queries["rust"].get().is_none());
+        config.tag_preferences.default = TagStyle::Basic;
+        for _ in 0..2 {
+            let basic = OfficialLanguageParser::from_desc(&broken, &config).generate_tags(
+                &mut parser,
+                source,
+                "source.rs",
+                &config,
+                path,
+            );
+            assert!(
+                basic.is_empty(),
+                "query failure must not fall back to walker"
+            );
+        }
+        assert!(parser.grammar_store.queries["rust"].get().unwrap().is_err());
+        config.tag_preferences.default = TagStyle::Extended;
+        assert!(!OfficialLanguageParser::from_desc(&broken, &config)
+            .generate_tags(&mut parser, source, "source.rs", &config, path)
+            .is_empty());
+    }
+
+    #[test]
+    fn official_metadata_does_not_load_unused_grammars_or_queries() {
+        let parser = Parser::new(&Config::for_test());
+        assert!(parser
+            .grammar_store
+            .languages
+            .values()
+            .all(|cell| cell.get().is_none()));
+        assert!(parser
+            .grammar_store
+            .queries
+            .values()
+            .all(|cell| cell.get().is_none()));
+    }
+
+    #[test]
+    fn newly_added_official_query_is_not_replaced_by_custom_extension_mapping() {
+        use crate::language_parser::{LanguageParser, OfficialLanguageParser};
+
+        let config = Config::for_test();
+        let desc = crate::builtin_langs::LanguageDescriptorTestBuilder::from_language("rust")
+            .query("(function_item name: (identifier) @name) @definition.function")
+            .build();
+        let mut parser = Parser::new(&config);
+        let store = Arc::get_mut(&mut parser.grammar_store).unwrap();
+        let index = store.grammar_configs.len();
+        store
+            .grammar_configs
+            .push(QueryConfig::User(tree_sitter_tags::TagsConfiguration::new(
+                tree_sitter_rust::LANGUAGE.into(),
+                "",
+                "",
+            )));
+        store.extension_config_map.insert("rs".into(), index);
+        let tags = OfficialLanguageParser::from_desc(&desc, &config).generate_tags(
+            &mut parser,
+            b"fn official() {}",
+            "source.rs",
+            &config,
+            std::path::Path::new("source.rs"),
+        );
+        assert!(tags.iter().any(|tag| tag.name == "official"));
+    }
+
+    #[test]
+    fn dual_styles_share_a_wasm_grammar_with_separate_parser_stores() {
+        use crate::config::tag_styles::TagStyle;
+        use crate::language_parser::{LanguageParser, OfficialLanguageParser};
+
+        let mut config = Config::for_test();
+        config.wasm_grammars_dir =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/grammars/wasm");
+        let desc =
+            crate::builtin_langs::LanguageDescriptorTestBuilder::from_language("zig").build();
+        let mut parser = Parser::new(&config);
+        for style in [TagStyle::Basic, TagStyle::Extended, TagStyle::Basic] {
+            config.tag_preferences.default = style;
+            let tags = OfficialLanguageParser::from_desc(&desc, &config).generate_tags(
+                &mut parser,
+                b"pub fn example() void {}",
+                "source.zig",
+                &config,
+                std::path::Path::new("source.zig"),
+            );
+            assert!(tags.iter().any(|tag| tag.name == "example"));
+            assert_eq!(
+                tags.iter().any(|tag| tag.kind.is_some()),
+                style == TagStyle::Extended
+            );
+        }
+        assert!(parser.walker_wasm_store.get().unwrap().is_ok());
+        assert!(parser.query_wasm_store.get().unwrap().is_ok());
+    }
 
     #[test]
     fn cached_store_failures_skip_wasm_but_allow_native_languages() {

@@ -219,29 +219,33 @@ impl Tag {
             // Extract module value if present
             let module_value = fields.get("module");
 
-            // Count non-module keys to determine if module is the only field
-            let non_module_keys_count = fields
-                .iter()
-                .filter(|(k, _)| k.as_ref() != "module")
-                .count();
-            let module_only = non_module_keys_count == 0 && module_value.is_some();
-
-            // Process module field if it's the only field
-            if module_only {
-                if let Some(module) = module_value {
-                    output.extend_from_slice(b"\tmodule:");
-                    output.extend_from_slice(module.as_bytes());
-                }
-            }
+            let has_other_scope = fields.iter().any(|(key, _)| {
+                !matches!(
+                    key.as_ref(),
+                    "module"
+                        | "kind"
+                        | "line"
+                        | "end"
+                        | "file"
+                        | "signature"
+                        | "roles"
+                        | "access"
+                        | "language"
+                )
+            });
 
             // Process all non-module fields
-            for (key, value) in fields.iter().filter(|(k, _)| k.as_ref() != "module") {
+            for (key, value) in fields
+                .iter()
+                .filter(|(k, _)| k.as_ref() != "module" || !has_other_scope)
+            {
                 output.push(b'\t');
                 output.extend_from_slice(key.as_bytes());
                 output.push(b':');
                 match key.as_ref() {
                     // These fields should never have module prefixes
-                    "line" | "end" | "kind" | "file" | "signature" | "access" => {}
+                    "line" | "end" | "kind" | "file" | "signature" | "access" | "module"
+                    | "language" | "roles" => {}
                     // For scope-related fields, prepend module value if it exists
                     _ => {
                         if let Some(module) = module_value {

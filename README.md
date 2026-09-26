@@ -11,44 +11,75 @@ ctags see [here](#what-does-treetags-do).
 ### More information
 
 - [Installation](#installation)
-- [Natively Supported Languages](#natively-supported-languages)
+- [Supported languages and tag styles](#supported-languages-and-tag-styles)
+- [Choosing a tag style](#choosing-a-tag-style)
 - [Languages with external WASM grammars](#external-wasm-grammars)
 - [Languages supported by WASM plugins](#wasm-plugins)
 - [Recommended usage](#recommended-usage)
 
-## Natively Supported Languages
+## Supported languages and tag styles
 
-Support for these languages is available out of the box in treetags
+Each language is being migrated to support both basic tags and tags with
+extension fields. Languages with bundled grammars work out of the box; WASM grammars require an
+explicit download. Current capabilities are listed below and checked against the
+language catalog by tests.
 
-### Full support with extension fields
-- [x] C
-- [x] C++
-- [x] Go
-- [x] Java
-- [x] JavaScript
-- [x] Python
-- [x] Rust
-- [x] TypeScript
+## Choosing a tag style
 
-Refer to Universal ctags [documentation](https://docs.ctags.io/en/latest/man/ctags.1.html#extension-fields)
-for more about extension fields.
+Configure preferences in `${XDG_CONFIG_HOME:-$HOME/.config}/treetags/config.toml`,
+or select a file with `--user-languages-config PATH`:
 
-### Basic navigation support without extension fields
-- [x] Bash/Sh
-- [x] C#
-- [x] Elixir
-- [x] ~Haskell~
-- [x] Julia
-- [x] Lua
-- [x] PHP
-- [x] Ruby
-- [x] Scala
+```toml
+[tags]
+default = "extended"
+basic = ["java", "zig"]
+extended = ["rust", "python"]
+```
+
+The equivalent command-line settings are:
+
+```sh
+treetags --tag-style=extended \
+  --basic-tags=java,zig \
+  --tags-with-extension-fields=rust,python
+```
+
+The default preference is `extended`; the other value is `basic`.
+Language lists override that global preference. Names and aliases are
+case-insensitive, and duplicates are ignored. A language cannot appear in both
+effective lists. These settings apply to official languages; installed tag
+plugins retain their precedence and user-provided grammars keep their existing
+behavior.
+
+Command-line settings override `--options` file settings, which override TOML.
+Each supplied list replaces its inherited list; an empty value such as
+`--basic-tags=` clears it. Repeated options use the last value. Invalid tag
+settings or malformed TOML stop tag generation before writing tags. Management
+commands such as `grammar available` remain usable with malformed TOML.
+
+While a language has only one implementation, treetags quietly uses that style
+even if the other is preferred. This preserves existing output during the first
+migration stage. Grammar or parsing failures do not switch styles. Inspect the
+available, preferred, and effective styles without loading grammars:
+
+```sh
+treetags --list-tag-styles
+treetags --list-tag-styles rust
+```
+
+Basic tags contain only the definition name, file, and address. `--fields`,
+`--extras`, and `--kinds-*` apply to tags with extension fields and do not change
+the selected style. `--list-kinds` continues to describe extension-field
+capabilities, even when basic tags are preferred.
+
+Use `--tag-style=basic` to prefer basic output globally, or specify individual
+languages with `--basic-tags`.
 
 ## External WASM grammars
 
 Treetags does not include the tree-sitter grammars for all languages it supports
-due to binary size constraints. **Dart**, **Zig**, **Swift**, **Kotlin**, and
-**Objective C** use downloaded grammars with extension fields; **OCaml** also
+due to binary size constraints. **Dart**, **Zig**, **Swift**, **Kotlin**,
+**Terraform**, and **Objective C** use downloaded grammars with extension fields; **OCaml** also
 uses a downloaded grammar.
 
 Find missing grammars for your project:
