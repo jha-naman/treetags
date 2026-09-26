@@ -1,2 +1,2 @@
---sort yes -f '-' -G
+--tag-style=basic --sort yes -f '-' -G
 snippet.txt

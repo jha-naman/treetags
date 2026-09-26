@@ -8,8 +8,8 @@ use crate::builtin_langs::{LanguageDescriptor, OFFICIAL_LANGUAGES};
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, ValueEnum)]
 #[serde(rename_all = "snake_case")]
 pub enum TagStyle {
-    #[default]
     Basic,
+    #[default]
     Extended,
 }
 
@@ -129,7 +129,11 @@ mod tests {
     fn selection_covers_both_single_styles_and_dual_capabilities() {
         let rust = official_language("rust").unwrap();
         let scala = official_language("scala").unwrap();
-        let basic = TagPreferences::default();
+        let rich = TagPreferences::default();
+        let basic = rich
+            .clone()
+            .merge(Some(TagStyle::Basic), None, None)
+            .unwrap();
         assert_eq!(
             basic.select(rust),
             TagSelection {
@@ -138,10 +142,6 @@ mod tests {
             }
         );
         assert_eq!(basic.select(scala).effective, TagStyle::Basic);
-        let rich = basic
-            .clone()
-            .merge(Some(TagStyle::Extended), None, None)
-            .unwrap();
         assert_eq!(
             rich.select(scala),
             TagSelection {

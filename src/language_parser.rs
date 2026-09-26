@@ -879,7 +879,9 @@ mod tests {
                 &crate::wasm_grammars::OCAML,
             ))
             .build();
-        let parser = OfficialLanguageParser::from_desc(&desc, &Config::for_test());
+        let mut config = Config::for_test();
+        config.tag_preferences.default = TagStyle::Basic;
+        let parser = OfficialLanguageParser::from_desc(&desc, &config);
         let mut reg = registry();
         assert_eq!(parser.wasm_grammar_name(&reg), Some("ocaml"));
 

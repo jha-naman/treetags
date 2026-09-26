@@ -116,7 +116,7 @@ pub enum PluginCommands {
 #[derive(Parser, Clone, Debug)]
 #[command(about = "Generate vi compatible tags for multiple languages", long_about = None)]
 pub struct Config {
-    /// Preferred output style; falls back when a language only supports the other style.
+    /// Preferred output style (default: extended); falls back when a language only supports the other style.
     #[arg(long, value_enum, overrides_with = "tag_style")]
     pub tag_style: Option<tag_styles::TagStyle>,
 

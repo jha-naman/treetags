@@ -383,6 +383,7 @@ mod wasm_tests {
         use crate::language_parser::{LanguageParser, OfficialLanguageParser};
 
         let mut config = Config::for_test();
+        config.tag_preferences.default = TagStyle::Basic;
         let desc = crate::builtin_langs::LanguageDescriptorTestBuilder::from_language("rust")
             .query("(function_item name: (identifier) @name) @definition.function")
             .build();

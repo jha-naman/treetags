@@ -1,2 +1,2 @@
---sort yes -f '-'
+--tag-style=basic --sort yes -f '-'
 source.js

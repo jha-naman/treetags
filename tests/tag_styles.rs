@@ -66,7 +66,10 @@ fn default_and_configured_preferences_are_visible_without_loading_grammars() {
     assert_eq!(rust[2], "basic,extended");
     assert_eq!(rust[5], "preferred style available");
     let zig = p.selection(&["--list-tag-styles", "zig"], "zig");
-    assert_eq!(&zig[1..5], &["wasm", "basic,extended", "basic", "basic"]);
+    assert_eq!(
+        &zig[1..5],
+        &["wasm", "basic,extended", "extended", "extended"]
+    );
     assert_eq!(zig[5], "preferred style available");
     let shell = p.selection(&["--list-tag-styles", "SH"], "shell");
     assert_eq!(&shell[3..5], &["basic", "basic"]);
@@ -184,7 +187,7 @@ fn basic_output_ignores_rich_options_and_single_style_fallback_preserves_current
     p.write("source.rb", "def greet\nend\n");
     p.write("source.rs", "pub fn hello() {}\n");
     p.write("source.scala", "def greet = 1\n");
-    let plain = p.success(&["-f", "-", "source.rb"]);
+    let plain = p.success(&["-f", "-", "--tag-style=basic", "source.rb"]);
     assert!(plain.contains("greet\tsource.rb\t"));
     assert!(plain
         .lines()
@@ -202,7 +205,7 @@ fn basic_output_ignores_rich_options_and_single_style_fallback_preserves_current
             "source.rb"
         ])
     );
-    let scala_basic = p.success(&["-f", "-", "source.scala"]);
+    let scala_basic = p.success(&["-f", "-", "--tag-style=basic", "source.scala"]);
     assert!(scala_basic.contains("greet\tsource.scala\t"));
     assert_eq!(
         scala_basic,
@@ -219,7 +222,7 @@ fn basic_output_ignores_rich_options_and_single_style_fallback_preserves_current
     let scala_rich = p.success(&["-f", "-", "--tag-style=extended", "source.scala"]);
     assert!(scala_rich.contains("greet\tsource.scala\t"));
     assert!(scala_rich.contains("\tf"));
-    let rust_basic = p.success(&["-f", "-", "source.rs"]);
+    let rust_basic = p.success(&["-f", "-", "--tag-style=basic", "source.rs"]);
     assert!(rust_basic.contains("hello\tsource.rs\t"));
     assert!(rust_basic
         .lines()
@@ -228,6 +231,7 @@ fn basic_output_ignores_rich_options_and_single_style_fallback_preserves_current
     let rust_rich = p.success(&["-f", "-", "--tag-style=extended", "source.rs"]);
     assert!(rust_rich.contains("hello\tsource.rs\t"));
     assert!(rust_rich.contains("\tf"));
+    assert_eq!(rust_rich, p.success(&["-f", "-", "source.rs"]));
     assert_eq!(
         p.success(&["-f", "-", "--workers=1", "source.rb", "source.rs"]),
         p.success(&["-f", "-", "--workers=4", "source.rb", "source.rs"])

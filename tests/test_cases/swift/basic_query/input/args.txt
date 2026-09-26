@@ -1,2 +1,2 @@
---sort yes -f '-' --fields=+e,+S,+a
+--tag-style=basic --sort yes -f '-' --fields=+e,+S,+a
 source.swift
