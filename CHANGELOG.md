@@ -8,29 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Add native Rust based Zig parser that uses WASM tree-sitter grammar
 - WASM Grammar management commands
 Allow users to manage the downloading of WASM grammars not bundled with treetags
-- Add native Rust based Objective C parser that uses WASM tree-sitter grammar
-- Add native extension fields support for Java
-- Add native Rust based Swift parser that uses WASM tree-sitter grammar
-- Add native Kotlin tag generator that uses downloadable WASM tree-sitter grammar
-- Add native Dart tag generator that uses downloadable WASM tree-sitter grammar
-- Add native Terraform tag generator that uses downloadable WASM tree-sitter grammar
-- Add basic tags support for Zig
-- Add basic tags support for Terraform
-- Add basic tags support for Swift
-- Add basic tags support for Objective C
-- Add basic tags support for Dart
-- Add basic tags support for Kotlin
-- Add extension fields support for Elixir
-- Add extension fields support for Julia
-- Add extension fields support for Lua
-- Add extension fields support for OCaml
-- Add extension fields support for PHP
-- Add extension fields support for Ruby
-- Add extension fields support for Bash
-- Add extension fields support for Scala
+- Add native Rust based parser that uses WASM tree-sitter grammar for:
+  - Zig
+  - Objective C
+  - Java
+  - Swift
+  - Kotlin
+  - Dart
+  - Terraform
+- Add basic style tags support for:
+  - Zig
+  - Terraform
+  - Swift
+  - Objective C
+  - Dart
+  - Kotlin
+- Add extension fields support for:
+  - Elixir
+  - Julia
+  - Lua
+  - OCaml
+  - PHP
+  - Ruby
+  - Bash
+  - Scala
 
 ### Changed
 - Tag Address is truncated to 96 chars for native parsers
@@ -38,32 +41,33 @@ Allow users to manage the downloading of WASM grammars not bundled with treetags
 ### Removed
 - Removed the ability to use treetags as a library crate
 - Ocaml grammar bundled with treetags.
-- Zig plugin removed from the source repository
-- Objective C plugin removed from the source repository
-- Java plugin removed from the source repository
-- Swift plugin removed from the source repository
-- Kotlin plugin removed from the source repository
-- Dart plugin removed from the source repository
-- Terraform plugin removed from the source repository
+- Remove plugin code from the source repository for:
+  - Zig
+  - Objective
+  - Java
+  - Swift
+  - Kotlin
+  - Dart
+  - Terraform
 
-- [0.18.0]
+## [0.18.0]
 
 ### Added
 - Add extension fields support for C#
 
-- [0.17.0]
+## [0.17.0]
 
 ### Added
 - Add Terraform support via WASM plugin
 - Add Zig support via WASM plugin
 - Recognize `language` field and `reference` extra as valid value
 
-- [0.16.0]
+## [0.16.0]
 
 ### Added
 - Add support for files with encodings other than UTF-8 (@abougouffa)
 
-- [0.15.0]
+## [0.15.0]
 
 ### Added
 - Add Swift support via plugin
@@ -71,7 +75,7 @@ Allow users to manage the downloading of WASM grammars not bundled with treetags
 - Add `--list-languages` cli arg to list supported languages
 Lists all installed languages. Will not list uninstalled plugins
 
-- [0.14.0]
+## [0.14.0]
 
 ### Added
 - Add Kotlin WASM plugin
@@ -89,7 +93,7 @@ Noticably faster than the earlier thread based implementation
 ### Removed
 - Fallback tags query for Kotlin
 
-- [0.13.0]
+## [0.13.0]
 
 ### Changed
 - Removed `IndexMap` dependency
@@ -98,7 +102,7 @@ Noticably faster than the earlier thread based implementation
   with extension fields support
 - Escape `$` and `^` in tag address content
 
-- [0.12.0]
+## [0.12.0]
 
 ### Added
  - Add plugin management commands to treetags cli
@@ -107,7 +111,7 @@ Noticably faster than the earlier thread based implementation
    The index is to be hosted online for consumption by treeetags
    binary for plugin discovery
 
-- [0.11.0]
+## [0.11.0]
 
 ### ADDED
  - Add support for relative regex when using `--map-<lang>` cli arg
@@ -121,7 +125,7 @@ Noticably faster than the earlier thread based implementation
  - Improve parser matching via patterns/aliases/shebang when all file extensions
    for a parser are overridden by a plugin
 
-- [0.10.0]
+## [0.10.0]
 
 ### Added
  - Many-to-many mapping between file extensions and parsers
